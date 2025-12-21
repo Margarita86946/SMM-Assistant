@@ -13,11 +13,34 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - smm-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U smm_user -d smm_assistant_db"]
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: smm-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@smm.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    networks:
+      - smm-network
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
 
 volumes:
   postgres_data:
+  pgadmin_data:
+
+networks:
+  smm-network:
+    driver: bridge
