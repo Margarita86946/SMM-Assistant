@@ -1,0 +1,222 @@
+.generator-container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 36px 32px 60px;
+}
+
+.generator-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.generator-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+
+.generator-back-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.generator-header-text h2 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.4px;
+  margin: 0 0 2px;
+}
+
+.generator-header-text p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ---- Form card ---- */
+.generator-form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.gen-form-group {
+  margin-bottom: 16px;
+}
+
+.gen-form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 7px;
+}
+
+.gen-form-group input,
+.gen-form-group select {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--text-primary);
+  background: #FAFAFA;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  font-family: inherit;
+}
+
+.gen-form-group input:focus,
+.gen-form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.gen-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 540px) {
+  .gen-form-row { grid-template-columns: 1fr; }
+}
+
+.btn-generate {
+  width: 100%;
+  padding: 12px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+  margin-top: 4px;
+  letter-spacing: 0.2px;
+}
+
+.btn-generate:hover:not(:disabled) {
+  background: var(--primary-dark);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-generate:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---- Results card ---- */
+.generator-results-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.generator-results-card h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 20px;
+  letter-spacing: -0.2px;
+}
+
+.gen-result-block {
+  margin-bottom: 18px;
+}
+
+.gen-result-block:last-of-type {
+  margin-bottom: 24px;
+}
+
+.gen-result-block strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.gen-result-block p {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.gen-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-save-draft {
+  flex: 1;
+  padding: 10px;
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1.5px solid #A7F3D0;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.btn-save-draft:hover:not(:disabled) {
+  background: #BBFCE7;
+  transform: translateY(-1px);
+}
+
+.btn-save-draft:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-generate-new {
+  flex: 1;
+  padding: 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-generate-new:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+@media (max-width: 768px) {
+  .generator-container { padding: 24px 16px; }
+}

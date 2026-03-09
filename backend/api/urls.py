@@ -17,4 +17,6 @@ urlpatterns = [
     
     # Dashboard endpoint
     path('dashboard/stats/', views.dashboard_stats, name='dashboard-stats'),
+
+    path('generate-content/', views.generate_content, name='generate-content'),
 ]

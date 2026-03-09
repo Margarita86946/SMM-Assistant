@@ -7,27 +7,33 @@ import CreatePost from './components/CreatePost';
 import EditPost from './components/EditPost';
 import Calendar from './components/Calendar';
 import NotFound from './components/NotFound';
+import ContentGenerator from './components/ContentGenerator';
+import Sidebar from './components/Sidebar';
 import './App.css';
 
-// Protected Route Component
-function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('token');
-  
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return children;
+// Layout wrapper with sidebar for authenticated pages
+function AppLayout({ children }) {
+  return (
+    <div className="app-layout">
+      <Sidebar />
+      <main className="app-main">
+        {children}
+      </main>
+    </div>
+  );
 }
 
-// Public Route - Redirect to dashboard if already logged in
+// Protected Route — guards AND wraps with sidebar layout
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem('token');
+  if (!token) return <Navigate to="/login" replace />;
+  return <AppLayout>{children}</AppLayout>;
+}
+
+// Public Route — redirects to dashboard if already logged in
 function PublicRoute({ children }) {
   const token = localStorage.getItem('token');
-  
-  if (token) {
-    return <Navigate to="/dashboard" replace />;
-  }
-  
+  if (token) return <Navigate to="/dashboard" replace />;
   return children;
 }
 
@@ -36,75 +42,18 @@ function App() {
     <Router>
       <div className="App">
         <Routes>
-          {/* Redirect root to login */}
           <Route path="/" element={<Navigate to="/login" replace />} />
 
-          {/* Public Routes - Login/Register */}
-          <Route 
-            path="/login" 
-            element={
-              <PublicRoute>
-                <Login isLoginMode={true} />
-              </PublicRoute>
-            } 
-          />
+          <Route path="/login" element={<PublicRoute><Login isLoginMode={true} /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><Login isLoginMode={false} /></PublicRoute>} />
 
-          <Route 
-            path="/register" 
-            element={
-              <PublicRoute>
-                <Login isLoginMode={false} />
-              </PublicRoute>
-            } 
-          />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/posts" element={<ProtectedRoute><PostsList /></ProtectedRoute>} />
+          <Route path="/create" element={<ProtectedRoute><CreatePost /></ProtectedRoute>} />
+          <Route path="/edit/:id" element={<ProtectedRoute><EditPost /></ProtectedRoute>} />
+          <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
+          <Route path="/generate" element={<ProtectedRoute><ContentGenerator /></ProtectedRoute>} />
 
-          {/* Protected Routes - Require Authentication */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/posts"
-            element={
-              <ProtectedRoute>
-                <PostsList />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/create"
-            element={
-              <ProtectedRoute>
-                <CreatePost />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/edit/:id"
-            element={
-              <ProtectedRoute>
-                <EditPost />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/calendar"
-            element={
-              <ProtectedRoute>
-                <Calendar />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* 404 Page - For any unknown routes */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

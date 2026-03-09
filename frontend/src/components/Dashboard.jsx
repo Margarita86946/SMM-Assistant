@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardAPI, postsAPI } from '../services/api';
 import '../styles/Dashboard.css';
@@ -16,39 +16,29 @@ function Dashboard() {
   const navigate = useNavigate();
   const username = localStorage.getItem('username');
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
-      const statsResponse = await dashboardAPI.getStats();
-      setStats(statsResponse.data);
+      const [statsResponse, postsResponse] = await Promise.all([
+        dashboardAPI.getStats(),
+        postsAPI.getAll(),
+      ]);
 
-      const postsResponse = await postsAPI.getAll();
+      setStats(statsResponse.data);
       setRecentPosts(postsResponse.data.slice(0, 5));
 
-      setLoading(false);
     } catch (err) {
       console.error('Error loading dashboard:', err);
-      if (err.response?.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('username');
-        navigate('/');
-      } else {
-        setError('Failed to load dashboard data');
-      }
+      setError('Failed to load dashboard data');
+    } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    navigate('/');
-  };
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Not scheduled';
@@ -83,20 +73,16 @@ function Dashboard() {
 
   return (
     <div className="dashboard-container">
-      {}
+
       <div className="dashboard-header">
         <div>
           <h1>Welcome back, {username}! 👋</h1>
           <p className="subtitle">Here's what's happening with your posts</p>
         </div>
-        <button onClick={handleLogout} className="btn-logout">
-          Logout
-        </button>
       </div>
 
       {error && <div className="error-message">{error}</div>}
 
-      {}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-icon">📝</div>
@@ -105,7 +91,6 @@ function Dashboard() {
             <p>Total Posts</p>
           </div>
         </div>
-
         <div className="stat-card">
           <div className="stat-icon">📅</div>
           <div className="stat-info">
@@ -113,7 +98,6 @@ function Dashboard() {
             <p>This Week</p>
           </div>
         </div>
-
         <div className="stat-card">
           <div className="stat-icon">✏️</div>
           <div className="stat-info">
@@ -121,7 +105,6 @@ function Dashboard() {
             <p>Drafts</p>
           </div>
         </div>
-
         <div className="stat-card">
           <div className="stat-icon">⏰</div>
           <div className="stat-info">
@@ -131,7 +114,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {}
       <div className="recent-posts-section">
         <div className="section-header">
           <h2>Recent Posts</h2>
@@ -152,7 +134,11 @@ function Dashboard() {
             {recentPosts.map((post) => (
               <div key={post.id} className="post-card">
                 <div className="post-header">
-                  <h3>{post.caption.substring(0, 50)}...</h3>
+                  <h3>
+                    {post.caption.length > 50
+                      ? post.caption.substring(0, 50) + '...'
+                      : post.caption}
+                  </h3>
                   {getStatusBadge(post.status)}
                 </div>
                 <div className="post-meta">
@@ -164,7 +150,9 @@ function Dashboard() {
                   <span className="post-date">{formatDate(post.scheduled_time)}</span>
                 </div>
                 <div className="post-hashtags">
-                  {post.hashtags.substring(0, 60)}...
+                  {post.hashtags.length > 60
+                    ? post.hashtags.substring(0, 60) + '...'
+                    : post.hashtags}
                 </div>
               </div>
             ))}
@@ -172,7 +160,6 @@ function Dashboard() {
         )}
       </div>
 
-      {}
       <div className="quick-actions">
         <h2>Quick Actions</h2>
         <div className="actions-grid">
@@ -187,6 +174,10 @@ function Dashboard() {
           <button className="action-btn" onClick={() => navigate('/calendar')}>
             <span className="action-icon">📅</span>
             <span>Calendar View</span>
+          </button>
+          <button className="action-btn" onClick={() => navigate('/generate')}>
+            <span className="action-icon">🤖</span>
+            <span>AI Generate</span>
           </button>
         </div>
       </div>

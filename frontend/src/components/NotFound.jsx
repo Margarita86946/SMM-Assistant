@@ -20,31 +20,32 @@ function NotFound() {
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
       color: 'white',
       textAlign: 'center',
       padding: '20px'
     }}>
-      <h1 style={{ fontSize: '72px', margin: '0' }}>404</h1>
-      <h2 style={{ fontSize: '32px', margin: '20px 0' }}>Page Not Found</h2>
-      <p style={{ fontSize: '18px', marginBottom: '30px' }}>
+      <h1 style={{ fontSize: '72px', margin: '0', fontWeight: '800', letterSpacing: '-2px' }}>404</h1>
+      <h2 style={{ fontSize: '28px', margin: '16px 0 8px', fontWeight: '700' }}>Page Not Found</h2>
+      <p style={{ fontSize: '16px', marginBottom: '32px', opacity: 0.85 }}>
         The page you're looking for doesn't exist.
       </p>
       <button
         onClick={handleGoBack}
         style={{
-          padding: '12px 24px',
+          padding: '12px 28px',
           background: 'white',
-          color: '#667eea',
+          color: '#6366F1',
           border: 'none',
-          borderRadius: '6px',
-          fontSize: '16px',
-          fontWeight: '600',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: '700',
           cursor: 'pointer',
-          transition: 'transform 0.2s'
+          transition: 'transform 0.2s, box-shadow 0.2s',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
         }}
-        onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-        onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+        onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+        onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
       >
         {isLoggedIn ? '← Go to Dashboard' : '← Go to Login'}
       </button>

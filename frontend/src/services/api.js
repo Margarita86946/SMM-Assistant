@@ -1,9 +1,7 @@
 import axios from 'axios';
 
-// Base URL for Django API
 const API_URL = 'http://localhost:8000/api';
 
-// Create axios instance with default config
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -11,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add token to requests if it exists
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -25,22 +22,24 @@ api.interceptors.request.use(
   }
 );
 
-// Handle response errors globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Extract error message
+    // Auto-logout on 401
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      window.location.href = '/login';
+      return Promise.reject(error);
+    }
+
     if (error.response?.data?.error) {
-      // Single error message from backend
       error.message = error.response.data.error;
     } else if (error.response?.data) {
-      // Multiple errors (validation errors)
       const errors = error.response.data;
       const errorMessages = Object.entries(errors)
         .map(([key, value]) => {
-          if (Array.isArray(value)) {
-            return value.join(', ');
-          }
+          if (Array.isArray(value)) return value.join(', ');
           return value;
         })
         .join(', ');
@@ -75,6 +74,11 @@ export const dashboardAPI = {
 export const calendarAPI = {
   getMonthPosts: (month, year) => api.get(`/calendar/?month=${month}&year=${year}`),
   getTodayPosts: () => api.get('/calendar/today/'),
+};
+
+// AI Generation API calls
+export const aiAPI = {
+  generateContent: (data) => api.post('/generate-content/', data),
 };
 
 export default api;
