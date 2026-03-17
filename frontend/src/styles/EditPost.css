@@ -47,6 +47,20 @@
   padding: 28px;
 }
 
+.edit-post-image {
+  margin-bottom: 20px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.edit-post-image img {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+}
+
 .edit-form-group {
   margin-bottom: 20px;
 }

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardAPI, postsAPI } from '../services/api';
+import { useTranslation } from '../i18n';
+import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import '../styles/Dashboard.css';
 
 function Dashboard() {
@@ -9,11 +11,15 @@ function Dashboard() {
     posts_this_week: 0,
     draft_posts: 0,
     scheduled_posts: 0,
+    most_used_hashtags: [],
   });
   const [recentPosts, setRecentPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { language } = useSettings();
+  const locale = LOCALE_MAP[language] || 'en-US';
   const username = localStorage.getItem('username');
 
   const loadDashboardData = useCallback(async () => {
@@ -26,11 +32,11 @@ function Dashboard() {
       ]);
 
       setStats(statsResponse.data);
-      setRecentPosts(postsResponse.data.slice(0, 5));
+      const allPosts = postsResponse.data.results ?? postsResponse.data;
+      setRecentPosts(allPosts.slice(0, 5));
 
-    } catch (err) {
-      console.error('Error loading dashboard:', err);
-      setError('Failed to load dashboard data');
+    } catch {
+      setError('dashboard.failedLoad');
     } finally {
       setLoading(false);
     }
@@ -41,9 +47,9 @@ function Dashboard() {
   }, [loadDashboardData]);
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Not scheduled';
+    if (!dateString) return t('dashboard.notScheduled');
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString(locale, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -54,10 +60,10 @@ function Dashboard() {
 
   const getStatusBadge = (status) => {
     const badges = {
-      draft: { text: 'Draft', class: 'badge-draft' },
-      scheduled: { text: 'Scheduled', class: 'badge-scheduled' },
-      ready_to_post: { text: 'Ready', class: 'badge-ready' },
-      posted: { text: 'Posted', class: 'badge-posted' },
+      draft: { text: t('posts.draft'), class: 'badge-draft' },
+      scheduled: { text: t('posts.scheduled'), class: 'badge-scheduled' },
+      ready_to_post: { text: t('posts.ready'), class: 'badge-ready' },
+      posted: { text: t('posts.posted'), class: 'badge-posted' },
     };
     const badge = badges[status] || { text: status, class: 'badge-default' };
     return <span className={`status-badge ${badge.class}`}>{badge.text}</span>;
@@ -66,7 +72,7 @@ function Dashboard() {
   if (loading) {
     return (
       <div className="dashboard-container">
-        <div className="loading">Loading dashboard...</div>
+        <div className="loading">{t('dashboard.loading')}</div>
       </div>
     );
   }
@@ -76,57 +82,75 @@ function Dashboard() {
 
       <div className="dashboard-header">
         <div>
-          <h1>Welcome back, {username}! 👋</h1>
-          <p className="subtitle">Here's what's happening with your posts</p>
+          <h1>{t('dashboard.welcome', { username })}</h1>
+          <p className="subtitle">{t('dashboard.subtitle')}</p>
         </div>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="error-message">{t(error)}</div>}
 
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-icon">📝</div>
           <div className="stat-info">
             <h3>{stats.total_posts}</h3>
-            <p>Total Posts</p>
+            <p>{t('dashboard.totalPosts')}</p>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon">📅</div>
           <div className="stat-info">
             <h3>{stats.posts_this_week}</h3>
-            <p>This Week</p>
+            <p>{t('dashboard.thisWeek')}</p>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon">✏️</div>
           <div className="stat-info">
             <h3>{stats.draft_posts}</h3>
-            <p>Drafts</p>
+            <p>{t('dashboard.drafts')}</p>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon">⏰</div>
           <div className="stat-info">
             <h3>{stats.scheduled_posts}</h3>
-            <p>Scheduled</p>
+            <p>{t('dashboard.scheduled')}</p>
           </div>
         </div>
       </div>
 
+      <div className="recent-posts-section hashtag-stats-section">
+        <div className="section-header">
+          <h2>{t('dashboard.topHashtags')}</h2>
+        </div>
+        {stats.most_used_hashtags.length === 0 ? (
+          <p className="hashtag-empty">{t('dashboard.noHashtags')}</p>
+        ) : (
+          <div className="hashtag-stats-list">
+            {stats.most_used_hashtags.map((item) => (
+              <div key={item.tag} className="hashtag-stat-item">
+                <span className="hashtag-tag">{item.tag}</span>
+                <span className="hashtag-count">×{item.count}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="recent-posts-section">
         <div className="section-header">
-          <h2>Recent Posts</h2>
+          <h2>{t('dashboard.recentPosts')}</h2>
           <button className="btn-view-all" onClick={() => navigate('/posts')}>
-            View All →
+            {t('dashboard.viewAll')}
           </button>
         </div>
 
         {recentPosts.length === 0 ? (
           <div className="empty-state">
-            <p>📭 No posts yet</p>
+            <p>{t('dashboard.noPosts')}</p>
             <button className="btn-create" onClick={() => navigate('/create')}>
-              Create Your First Post
+              {t('dashboard.createFirst')}
             </button>
           </div>
         ) : (
@@ -161,23 +185,23 @@ function Dashboard() {
       </div>
 
       <div className="quick-actions">
-        <h2>Quick Actions</h2>
+        <h2>{t('dashboard.quickActions')}</h2>
         <div className="actions-grid">
           <button className="action-btn" onClick={() => navigate('/create')}>
             <span className="action-icon">✨</span>
-            <span>Create New Post</span>
+            <span>{t('dashboard.createNew')}</span>
           </button>
           <button className="action-btn" onClick={() => navigate('/posts')}>
             <span className="action-icon">📋</span>
-            <span>View All Posts</span>
+            <span>{t('dashboard.viewAllPosts')}</span>
           </button>
           <button className="action-btn" onClick={() => navigate('/calendar')}>
             <span className="action-icon">📅</span>
-            <span>Calendar View</span>
+            <span>{t('dashboard.calendarView')}</span>
           </button>
           <button className="action-btn" onClick={() => navigate('/generate')}>
             <span className="action-icon">🤖</span>
-            <span>AI Generate</span>
+            <span>{t('dashboard.aiGenerate')}</span>
           </button>
         </div>
       </div>

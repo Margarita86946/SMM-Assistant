@@ -2,11 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 
 class User(AbstractUser):
-    """
-    Custom user model - extends Django's default User
-    """
     email = models.EmailField(unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'users'
@@ -32,9 +28,13 @@ class Post(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
     caption = models.TextField()
     hashtags = models.TextField(blank=True)
-    platform = models.CharField(max_length=15, choices=PLATFORM_CHOICES, default='instagram')
-    scheduled_time = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    topic = models.CharField(max_length=255, blank=True, default='')
+    tone = models.CharField(max_length=50, blank=True, default='')
+    image_prompt = models.TextField(blank=True, default='')
+    image_url = models.URLField(max_length=1000, blank=True, default='')
+    platform = models.CharField(max_length=15, choices=PLATFORM_CHOICES, default='instagram', db_index=True)
+    scheduled_time = models.DateTimeField(null=True, blank=True, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -44,15 +44,3 @@ class Post(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.platform} - {self.status}"
-
-
-class ImagePrompt(models.Model):
-    post = models.OneToOneField(Post, on_delete=models.CASCADE, related_name='image_prompt')
-    prompt_text = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'image_prompts'
-
-    def __str__(self):
-        return f"Prompt for Post #{self.post.id}"

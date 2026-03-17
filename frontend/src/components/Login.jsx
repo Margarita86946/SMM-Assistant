@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
+import { useTranslation } from '../i18n';
 import '../styles/Auth.css';
 
 function Login({ isLoginMode }) {
@@ -14,6 +15,7 @@ function Login({ isLoginMode }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     setIsLogin(isLoginMode);
@@ -40,7 +42,7 @@ function Login({ isLoginMode }) {
         navigate('/dashboard');
       } else {
         if (formData.password !== formData.password2) {
-          setError('Passwords do not match!');
+          setError(t('auth.passwordMismatch'));
           setLoading(false);
           return;
         }
@@ -58,8 +60,7 @@ function Login({ isLoginMode }) {
         navigate('/dashboard');
       }
     } catch (err) {
-      console.error('Auth error:', err);
-      setError(err.message || 'An error occurred. Please try again.');
+      setError(err.message || t('auth.genericError'));
     } finally {
       setLoading(false);
     }
@@ -73,7 +74,6 @@ function Login({ isLoginMode }) {
 
   return (
     <div className="auth-container">
-      {/* Left branding panel */}
       <div className="auth-left">
         <div className="auth-brand-logo">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -81,8 +81,8 @@ function Login({ isLoginMode }) {
             <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"/>
           </svg>
         </div>
-        <h1>Your social media,<br />fully automated.</h1>
-        <p>Plan, generate, and schedule content across all your platforms — powered by AI.</p>
+        <h1>{t('auth.tagline')}</h1>
+        <p>{t('auth.taglineDesc')}</p>
 
         <div className="auth-features">
           <div className="auth-feature">
@@ -93,8 +93,8 @@ function Login({ isLoginMode }) {
               </svg>
             </div>
             <div className="auth-feature-text">
-              <strong>AI Content Generation</strong>
-              <span>Generate captions, hashtags &amp; image prompts instantly</span>
+              <strong>{t('auth.feature1Title')}</strong>
+              <span>{t('auth.feature1Desc')}</span>
             </div>
           </div>
           <div className="auth-feature">
@@ -108,8 +108,8 @@ function Login({ isLoginMode }) {
               </svg>
             </div>
             <div className="auth-feature-text">
-              <strong>Smart Scheduling</strong>
-              <span>Plan posts across Instagram, LinkedIn &amp; Twitter</span>
+              <strong>{t('auth.feature2Title')}</strong>
+              <span>{t('auth.feature2Desc')}</span>
             </div>
           </div>
           <div className="auth-feature">
@@ -122,26 +122,25 @@ function Login({ isLoginMode }) {
               </svg>
             </div>
             <div className="auth-feature-text">
-              <strong>Dashboard Analytics</strong>
-              <span>Track posts, drafts, and scheduled content at a glance</span>
+              <strong>{t('auth.feature3Title')}</strong>
+              <span>{t('auth.feature3Desc')}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right form panel */}
       <div className="auth-right">
         <div className="auth-box">
           <div className="auth-box-header">
-            <h2>{isLogin ? 'Welcome back' : 'Create your account'}</h2>
-            <p>{isLogin ? 'Sign in to your dashboard' : 'Start managing your content today'}</p>
+            <h2>{isLogin ? t('auth.loginTitle') : t('auth.registerTitle')}</h2>
+            <p>{isLogin ? t('auth.loginSubtitle') : t('auth.registerSubtitle')}</p>
           </div>
 
           {error && <div className="error-message">{error}</div>}
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>Username</label>
+              <label>{t('auth.username')}</label>
               <input
                 type="text"
                 name="username"
@@ -149,13 +148,13 @@ function Login({ isLoginMode }) {
                 onChange={handleChange}
                 required
                 disabled={loading}
-                placeholder="Enter your username"
+                placeholder={t('auth.usernamePlaceholder')}
               />
             </div>
 
             {!isLogin && (
               <div className="form-group">
-                <label>Email</label>
+                <label>{t('auth.email')}</label>
                 <input
                   type="email"
                   name="email"
@@ -163,13 +162,13 @@ function Login({ isLoginMode }) {
                   onChange={handleChange}
                   required
                   disabled={loading}
-                  placeholder="Enter your email"
+                  placeholder={t('auth.emailPlaceholder')}
                 />
               </div>
             )}
 
             <div className="form-group">
-              <label>Password</label>
+              <label>{t('auth.password')}</label>
               <input
                 type="password"
                 name="password"
@@ -177,13 +176,13 @@ function Login({ isLoginMode }) {
                 onChange={handleChange}
                 required
                 disabled={loading}
-                placeholder="Enter your password"
+                placeholder={t('auth.passwordPlaceholder')}
               />
             </div>
 
             {!isLogin && (
               <div className="form-group">
-                <label>Confirm Password</label>
+                <label>{t('auth.confirmPassword')}</label>
                 <input
                   type="password"
                   name="password2"
@@ -191,20 +190,20 @@ function Login({ isLoginMode }) {
                   onChange={handleChange}
                   required
                   disabled={loading}
-                  placeholder="Confirm your password"
+                  placeholder={t('auth.confirmPasswordPlaceholder')}
                 />
               </div>
             )}
 
             <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Please wait...' : (isLogin ? 'Sign in' : 'Create account')}
+              {loading ? t('auth.pleaseWait') : (isLogin ? t('auth.signIn') : t('auth.createAccount'))}
             </button>
           </form>
 
           <p className="toggle-text">
-            {isLogin ? "Don't have an account? " : 'Already have an account? '}
+            {isLogin ? t('auth.noAccount') : t('auth.hasAccount')}{' '}
             <span onClick={toggleMode} className="toggle-link">
-              {isLogin ? 'Register here' : 'Sign in'}
+              {isLogin ? t('auth.registerHere') : t('auth.signIn')}
             </span>
           </p>
         </div>

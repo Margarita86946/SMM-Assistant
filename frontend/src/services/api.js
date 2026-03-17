@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -25,7 +25,6 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Auto-logout on 401
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('username');
@@ -49,14 +48,12 @@ api.interceptors.response.use(
   }
 );
 
-// Auth API calls
 export const authAPI = {
   register: (userData) => api.post('/register/', userData),
   login: (credentials) => api.post('/login/', credentials),
   logout: () => api.post('/logout/'),
 };
 
-// Posts API calls
 export const postsAPI = {
   getAll: () => api.get('/posts/'),
   getOne: (id) => api.get(`/posts/${id}/`),
@@ -65,20 +62,19 @@ export const postsAPI = {
   delete: (id) => api.delete(`/posts/${id}/`),
 };
 
-// Dashboard API calls
 export const dashboardAPI = {
   getStats: () => api.get('/dashboard/stats/'),
 };
 
-// Calendar API calls
 export const calendarAPI = {
   getMonthPosts: (month, year) => api.get(`/calendar/?month=${month}&year=${year}`),
   getTodayPosts: () => api.get('/calendar/today/'),
 };
 
-// AI Generation API calls
 export const aiAPI = {
   generateContent: (data) => api.post('/generate-content/', data),
+  generateImage: (prompt, platform = 'instagram') => api.post('/generate-image/', { prompt, platform }),
+  polishContent: (data) => api.post('/polish-content/', data),
 };
 
 export default api;

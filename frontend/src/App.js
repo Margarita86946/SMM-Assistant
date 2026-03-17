@@ -11,7 +11,6 @@ import ContentGenerator from './components/ContentGenerator';
 import Sidebar from './components/Sidebar';
 import './App.css';
 
-// Layout wrapper with sidebar for authenticated pages
 function AppLayout({ children }) {
   return (
     <div className="app-layout">
@@ -23,14 +22,12 @@ function AppLayout({ children }) {
   );
 }
 
-// Protected Route — guards AND wraps with sidebar layout
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/login" replace />;
   return <AppLayout>{children}</AppLayout>;
 }
 
-// Public Route — redirects to dashboard if already logged in
 function PublicRoute({ children }) {
   const token = localStorage.getItem('token');
   if (token) return <Navigate to="/dashboard" replace />;

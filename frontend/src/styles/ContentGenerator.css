@@ -46,7 +46,6 @@
   margin: 0;
 }
 
-/* ---- Form card ---- */
 .generator-form-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -125,7 +124,6 @@
   cursor: not-allowed;
 }
 
-/* ---- Results card ---- */
 .generator-results-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -219,4 +217,100 @@
 
 @media (max-width: 768px) {
   .generator-container { padding: 24px 16px; }
+}
+
+.gen-result-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.gen-result-label-row strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gen-result-block strong {
+  margin-bottom: 0;
+}
+
+.btn-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.btn-copy svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.btn-copy:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.btn-copy--done {
+  border-color: var(--success);
+  color: var(--success-text);
+  background: var(--success-bg);
+}
+
+.btn-copy--done:hover {
+  border-color: var(--success);
+  color: var(--success-text);
+  background: var(--success-bg);
+}
+.gen-result-image {
+  display: block;
+  width: 100%;
+  max-width: 512px;
+  border-radius: 10px;
+  margin: 12px auto 0;
+  border: 1px solid var(--border);
+}
+.btn-download-image {
+  display: block;
+  margin: 12px auto 0;
+  padding: 9px 24px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.btn-download-image:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.btn-download-image:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.gen-image-status {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--text-secondary, #6B7280);
+}
+.gen-image-error {
+  color: #EF4444;
 }
