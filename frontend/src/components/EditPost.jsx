@@ -1,8 +1,32 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useBlocker } from 'react-router-dom';
 import { postsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import '../styles/EditPost.css';
+
+function UnsavedModal({ onLeave, onStay, t }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onStay(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onStay]);
+
+  return (
+    <div className="edit-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onStay(); }}>
+      <div className="edit-modal">
+        <div className="edit-modal-header">
+          <span className="edit-modal-icon">⚠️</span>
+          <h3>{t('edit.unsavedTitle')}</h3>
+        </div>
+        <p className="edit-modal-msg">{t('edit.unsavedMsg')}</p>
+        <div className="edit-modal-actions">
+          <button className="edit-modal-leave-btn" onClick={onLeave}>{t('edit.leave')}</button>
+          <button className="edit-modal-stay-btn" onClick={onStay}>{t('edit.stay')}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function EditPost() {
   const navigate = useNavigate();
@@ -19,16 +43,34 @@ function EditPost() {
     status: 'draft',
     scheduled_time: '',
   });
+  const [originalData, setOriginalData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  const isDirty = originalData !== null && JSON.stringify(formData) !== JSON.stringify(originalData);
+
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    isDirty && currentLocation.pathname !== nextLocation.pathname
+  );
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
   const loadPost = useCallback(async () => {
     try {
       const response = await postsAPI.getOne(id);
       const post = response.data;
-      setFormData({
+      const data = {
         caption: post.caption || '',
         hashtags: post.hashtags || '',
         topic: post.topic || '',
@@ -46,10 +88,12 @@ function EditPost() {
             return '';
           }
         })(),
-      });
+      };
+      setFormData(data);
+      setOriginalData(data);
     } catch (err) {
       if (err.response?.status === 404) {
-        navigate('/posts');
+        navigate('/not-found', { state: { from: `/edit/${id}` } });
       } else {
         setError('edit.failedLoad');
       }
@@ -63,7 +107,18 @@ function EditPost() {
   }, [loadPost]);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    const updates = { [name]: value };
+    if (name === 'scheduled_time') {
+      updates.status = value ? 'scheduled' : 'draft';
+    }
+    setFormData({ ...formData, ...updates });
+  };
+
+  const handleDiscard = () => {
+    setFormData(originalData);
+    setError('');
+    setSuccessMsg('');
   };
 
   const handleSave = async () => {
@@ -75,6 +130,7 @@ function EditPost() {
         scheduled_time: formData.scheduled_time || null,
       };
       await postsAPI.update(id, dataToSend);
+      setOriginalData(formData);
       setSuccessMsg(t('edit.savedMsg'));
       setTimeout(() => navigate('/posts'), 1500);
     } catch (err) {
@@ -94,11 +150,20 @@ function EditPost() {
 
   return (
     <div className="edit-post-container">
+      {blocker.state === 'blocked' && (
+        <UnsavedModal
+          t={t}
+          onLeave={() => blocker.proceed()}
+          onStay={() => blocker.reset()}
+        />
+      )}
+
       <div className="edit-post-header">
         <button className="edit-back-btn" onClick={() => navigate('/posts')}>
           {t('edit.back')}
         </button>
         <h2>{t('edit.title')}{id}</h2>
+        {isDirty && <span className="edit-dirty-badge">{t('edit.unsavedTitle')}</span>}
       </div>
 
       <div className="edit-post-card">
@@ -177,7 +242,13 @@ function EditPost() {
 
           <div className="edit-form-group">
             <label>{t('edit.status')}</label>
-            <select name="status" value={formData.status} onChange={handleChange}>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              disabled={!!formData.scheduled_time}
+              title={formData.scheduled_time ? t('edit.statusLockedHint') : undefined}
+            >
               <option value="draft">{t('edit.draft')}</option>
               <option value="scheduled">{t('edit.scheduled')}</option>
               <option value="ready_to_post">{t('edit.readyToPost')}</option>
@@ -197,6 +268,11 @@ function EditPost() {
         </div>
 
         <div className="edit-form-actions">
+          {isDirty && (
+            <button className="btn-discard" onClick={handleDiscard}>
+              {t('edit.discardChanges')}
+            </button>
+          )}
           <button className="btn-save" onClick={handleSave} disabled={saving}>
             {saving ? t('edit.saving') : t('edit.saveChanges')}
           </button>

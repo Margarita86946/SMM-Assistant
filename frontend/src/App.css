@@ -4,111 +4,7 @@
   box-sizing: border-box;
 }
 
-[data-theme="dark"] {
-  --bg: #0D1117;
-  --surface: #161B22;
-  --surface-2: #21262D;
-  --text-primary: #E6EDF3;
-  --text-secondary: #8B949E;
-  --text-tertiary: #6E7681;
-  --border: #30363D;
-  --border-light: #21262D;
-  --primary-light: rgba(99, 102, 241, 0.2);
-  --primary-muted: rgba(99, 102, 241, 0.15);
-
-  --success-bg: rgba(16, 185, 129, 0.15);
-  --success-text: #4ADE80;
-  --warning-bg: rgba(245, 158, 11, 0.15);
-  --warning-text: #FCD34D;
-  --error-bg: rgba(239, 68, 68, 0.15);
-  --error-text: #F87171;
-  --info-bg: rgba(59, 130, 246, 0.15);
-  --info-text: #60A5FA;
-}
-
-[data-theme="dark"] input,
-[data-theme="dark"] select,
-[data-theme="dark"] textarea {
-  background: #21262D !important;
-  color: #E6EDF3 !important;
-  border-color: #30363D !important;
-  color-scheme: dark;
-}
-
-[data-theme="dark"] input:focus,
-[data-theme="dark"] select:focus,
-[data-theme="dark"] textarea:focus {
-  background: #2A3140 !important;
-  border-color: #6366F1 !important;
-}
-
-[data-theme="dark"] input::placeholder,
-[data-theme="dark"] textarea::placeholder {
-  color: #6E7681 !important;
-}
-
-[data-theme="dark"] .btn-delete {
-  background: #21262D !important;
-  color: #8B949E !important;
-  border-color: #30363D !important;
-}
-
-[data-theme="dark"] .cal-cell:hover {
-  background: #1C2230 !important;
-}
-
-[data-theme="dark"] .cal-cell--today {
-  background: rgba(99, 102, 241, 0.1) !important;
-}
-
-[data-theme="dark"] .cal-cell--empty {
-  background: #0D1117 !important;
-}
-
-[data-theme="dark"] .cal-chip--instagram {
-  background: rgba(236, 72, 153, 0.2) !important;
-  color: #F9A8D4 !important;
-}
-
-[data-theme="dark"] .cal-chip--linkedin {
-  background: rgba(59, 130, 246, 0.2) !important;
-  color: #93C5FD !important;
-}
-
-[data-theme="dark"] .cal-chip--twitter {
-  background: rgba(14, 165, 233, 0.2) !important;
-  color: #7DD3FC !important;
-}
-
-[data-theme="dark"] .ai-assist-card {
-  background: linear-gradient(135deg, #1a1f35 0%, #1c1a30 100%) !important;
-  border-color: rgba(99, 102, 241, 0.3) !important;
-}
-
-[data-theme="dark"] .settings-lang-select {
-  background: #21262D !important;
-  color: #E6EDF3 !important;
-  border-color: #30363D !important;
-}
-
-[data-theme="dark"] .post-card:hover {
-  background: #1C2230 !important;
-}
-
-[data-theme="dark"] .stat-card:nth-child(1) .stat-icon { background: rgba(99,102,241,0.15) !important; }
-[data-theme="dark"] .stat-card:nth-child(2) .stat-icon { background: rgba(59,130,246,0.15) !important; }
-[data-theme="dark"] .stat-card:nth-child(3) .stat-icon { background: rgba(245,158,11,0.15) !important; }
-[data-theme="dark"] .stat-card:nth-child(4) .stat-icon { background: rgba(16,185,129,0.15) !important; }
-
-[data-theme="dark"] .post-item:hover {
-  border-color: #6366F1 !important;
-}
-
-[data-theme="dark"] .btn-edit {
-  background: rgba(99,102,241,0.15) !important;
-  border-color: rgba(99,102,241,0.3) !important;
-}
-
+/* ── Light mode (default) ────────────────────────── */
 :root {
   --primary: #6366F1;
   --primary-dark: #4F46E5;
@@ -161,6 +57,208 @@
   --radius-xl: 20px;
 }
 
+/* ── Dark mode — comes AFTER :root so it wins ────── */
+[data-theme="dark"] {
+  --bg: #0B1120;
+  --surface: #111827;
+  --surface-2: #1A2336;
+
+  --text-primary: #E2EAF4;
+  --text-secondary: #6B7E99;
+  --text-tertiary: #3D5068;
+
+  --border: #1E2D45;
+  --border-light: #131E30;
+
+  --primary-light: rgba(99, 102, 241, 0.15);
+  --primary-muted: rgba(99, 102, 241, 0.10);
+
+  --success-bg: rgba(16, 185, 129, 0.13);
+  --success-text: #34D399;
+  --warning-bg: rgba(245, 158, 11, 0.13);
+  --warning-text: #FCD34D;
+  --error-bg: rgba(239, 68, 68, 0.13);
+  --error-text: #F87171;
+  --info-bg: rgba(59, 130, 246, 0.13);
+  --info-text: #60A5FA;
+
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.5);
+  --shadow: 0 2px 12px rgba(0,0,0,0.55);
+  --shadow-md: 0 4px 20px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03);
+}
+
+/* ── Dark mode component overrides ──────────────── */
+
+/* Inputs */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: #0D1828 !important;
+  color: #E2EAF4 !important;
+  border-color: #1E2D45 !important;
+  color-scheme: dark;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  background: #101F34 !important;
+  border-color: #6366F1 !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.18) !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #3D5068 !important;
+}
+
+/* Scrollbar */
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #1E3050;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #284264;
+}
+
+/* Sidebar */
+[data-theme="dark"] .sidebar {
+  background: linear-gradient(180deg, #090F1C 0%, #070D19 100%);
+  border-right-color: #131E30;
+}
+
+[data-theme="dark"] .settings-panel {
+  background: #111827 !important;
+  border-color: rgba(255,255,255,0.07) !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
+}
+
+[data-theme="dark"] .settings-lang-select {
+  background: #1A2336 !important;
+  color: #E2EAF4 !important;
+  border-color: #1E2D45 !important;
+}
+
+/* Stat cards — gradient background + colored top border */
+[data-theme="dark"] .stat-card {
+  background: linear-gradient(160deg, #131F30 0%, #111827 100%) !important;
+  border-color: #1E2D45 !important;
+}
+
+[data-theme="dark"] .stat-card:hover {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05) !important;
+}
+
+[data-theme="dark"] .stat-card:nth-child(1) { border-top: 2px solid rgba(99,102,241,0.6) !important; }
+[data-theme="dark"] .stat-card:nth-child(2) { border-top: 2px solid rgba(59,130,246,0.6) !important; }
+[data-theme="dark"] .stat-card:nth-child(3) { border-top: 2px solid rgba(245,158,11,0.6) !important; }
+[data-theme="dark"] .stat-card:nth-child(4) { border-top: 2px solid rgba(16,185,129,0.6) !important; }
+
+[data-theme="dark"] .stat-card:nth-child(1) .stat-icon {
+  background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.18)) !important;
+  box-shadow: 0 0 18px rgba(99,102,241,0.2);
+}
+[data-theme="dark"] .stat-card:nth-child(2) .stat-icon {
+  background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(96,165,250,0.18)) !important;
+  box-shadow: 0 0 18px rgba(59,130,246,0.2);
+}
+[data-theme="dark"] .stat-card:nth-child(3) .stat-icon {
+  background: linear-gradient(135deg, rgba(245,158,11,0.3), rgba(251,191,36,0.18)) !important;
+  box-shadow: 0 0 18px rgba(245,158,11,0.18);
+}
+[data-theme="dark"] .stat-card:nth-child(4) .stat-icon {
+  background: linear-gradient(135deg, rgba(16,185,129,0.3), rgba(52,211,153,0.18)) !important;
+  box-shadow: 0 0 18px rgba(16,185,129,0.18);
+}
+
+/* Dashboard post list */
+[data-theme="dark"] .post-card:hover {
+  background: #1A2336 !important;
+}
+
+/* Posts grid */
+[data-theme="dark"] .post-item:hover {
+  border-color: rgba(99,102,241,0.5) !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 24px rgba(99,102,241,0.07) !important;
+}
+
+/* Edit/Delete buttons */
+[data-theme="dark"] .btn-edit {
+  background: rgba(99,102,241,0.12) !important;
+  border-color: rgba(99,102,241,0.28) !important;
+  color: #A5B4FC !important;
+}
+[data-theme="dark"] .btn-edit:hover {
+  background: rgba(99,102,241,0.22) !important;
+  border-color: rgba(99,102,241,0.5) !important;
+}
+
+[data-theme="dark"] .btn-delete {
+  background: #111827 !important;
+  color: #6B7E99 !important;
+  border-color: #1E2D45 !important;
+}
+[data-theme="dark"] .btn-delete:hover {
+  background: rgba(239,68,68,0.1) !important;
+  border-color: rgba(239,68,68,0.4) !important;
+  color: #F87171 !important;
+}
+
+/* Save draft */
+[data-theme="dark"] .btn-save-draft {
+  border-color: rgba(16,185,129,0.3) !important;
+}
+[data-theme="dark"] .btn-save-draft:hover:not(:disabled) {
+  background: rgba(16,185,129,0.18) !important;
+  border-color: rgba(16,185,129,0.5) !important;
+}
+
+/* Copy done */
+[data-theme="dark"] .btn-copy--done {
+  border-color: rgba(16,185,129,0.4) !important;
+}
+
+/* AI assist card */
+[data-theme="dark"] .ai-assist-card {
+  background: linear-gradient(135deg, #0F1835 0%, #0D1430 100%) !important;
+  border-color: rgba(99, 102, 241, 0.28) !important;
+}
+
+/* Image loading overlay */
+[data-theme="dark"] .image-preview-loading {
+  background: rgba(11, 17, 32, 0.92) !important;
+}
+[data-theme="dark"] .image-preview-loading p {
+  color: #6B7E99 !important;
+}
+
+/* Calendar */
+[data-theme="dark"] .cal-cell:hover {
+  background: #1A2336 !important;
+}
+[data-theme="dark"] .cal-cell--today {
+  background: rgba(99, 102, 241, 0.1) !important;
+}
+[data-theme="dark"] .cal-cell--empty {
+  background: #0B1120 !important;
+}
+[data-theme="dark"] .cal-chip--instagram {
+  background: rgba(236, 72, 153, 0.2) !important;
+  color: #F9A8D4 !important;
+}
+[data-theme="dark"] .cal-chip--linkedin {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #93C5FD !important;
+}
+[data-theme="dark"] .cal-chip--twitter {
+  background: rgba(14, 165, 233, 0.2) !important;
+  color: #7DD3FC !important;
+}
+[data-theme="dark"] .cal-modal {
+  box-shadow: 0 24px 80px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.05) !important;
+}
+
+/* ── Global styles ───────────────────────────────── */
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -246,7 +344,7 @@ button:focus, input:focus, select:focus, textarea:focus {
 .error-message {
   background: var(--error-bg);
   color: var(--error-text);
-  border: 1px solid #FECACA;
+  border: 1px solid rgba(239,68,68,0.3);
   padding: 12px 16px;
   border-radius: var(--radius-sm);
   font-size: 13px;
@@ -257,7 +355,7 @@ button:focus, input:focus, select:focus, textarea:focus {
 .success-message {
   background: var(--success-bg);
   color: var(--success-text);
-  border: 1px solid #A7F3D0;
+  border: 1px solid rgba(16,185,129,0.35);
   padding: 12px 16px;
   border-radius: var(--radius-sm);
   font-size: 13px;

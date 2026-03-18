@@ -26,10 +26,15 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('username');
-      window.location.href = '/login';
-      return Promise.reject(error);
+      const url = error.config?.url || '';
+      const isAuthEndpoint = url.includes('/login/') || url.includes('/register/');
+      if (!isAuthEndpoint) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        localStorage.removeItem('token_expires_at');
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
     }
 
     if (error.response?.data?.error) {
@@ -55,7 +60,7 @@ export const authAPI = {
 };
 
 export const postsAPI = {
-  getAll: () => api.get('/posts/'),
+  getAll: (params) => api.get('/posts/', { params }),
   getOne: (id) => api.get(`/posts/${id}/`),
   create: (postData) => api.post('/posts/', postData),
   update: (id, postData) => api.put(`/posts/${id}/`, postData),
@@ -75,6 +80,12 @@ export const aiAPI = {
   generateContent: (data) => api.post('/generate-content/', data),
   generateImage: (prompt, platform = 'instagram') => api.post('/generate-image/', { prompt, platform }),
   polishContent: (data) => api.post('/polish-content/', data),
+};
+
+export const profileAPI = {
+  get: () => api.get('/profile/'),
+  update: (data) => api.patch('/profile/', data),
+  changePassword: (data) => api.post('/change-password/', data),
 };
 
 export default api;

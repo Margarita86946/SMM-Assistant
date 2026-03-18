@@ -17,4 +17,7 @@ urlpatterns = [
     path('generate-content/', views.generate_content, name='generate-content'),
     path('polish-content/', views.polish_content_view, name='polish-content'),
     path('generate-image/', views.generate_image, name='generate-image'),
+
+    path('profile/', views.profile_view, name='profile'),
+    path('change-password/', views.change_password, name='change-password'),
 ]

@@ -1,14 +1,28 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from rest_framework.authtoken.models import Token
 
 class User(AbstractUser):
     email = models.EmailField(unique=True)
+    avatar = models.TextField(blank=True, null=True)
 
     class Meta:
         db_table = 'users'
 
     def __str__(self):
         return self.username
+
+
+class TokenExpiry(models.Model):
+    token = models.OneToOneField(Token, on_delete=models.CASCADE, related_name='expiry')
+    expires_at = models.DateTimeField()
+    is_revoked = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'token_expiry'
+
+    def __str__(self):
+        return f"{self.token.user.username} - expires {self.expires_at}"
 
 
 class Post(models.Model):

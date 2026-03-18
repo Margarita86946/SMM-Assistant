@@ -91,6 +91,53 @@
   margin-bottom: 6px;
 }
 
+.create-field-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.create-field-label-row label {
+  margin-bottom: 0;
+}
+
+.btn-regen {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.btn-regen svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.btn-regen:hover:not(:disabled) {
+  border-color: #F59E0B;
+  color: #D97706;
+  background: #FFFBEB;
+}
+
+.btn-regen--loading,
+.btn-regen--loading:hover {
+  border-color: #F59E0B;
+  color: #D97706;
+  background: #FFFBEB;
+  cursor: not-allowed;
+}
+
 .label-required {
   color: var(--error);
   margin-left: 2px;
@@ -111,7 +158,7 @@
   border-radius: var(--radius-sm);
   font-size: 13.5px;
   color: var(--text-primary);
-  background: #FAFAFA;
+  background: var(--surface-2);
   box-sizing: border-box;
   font-family: inherit;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
@@ -128,8 +175,15 @@
 .create-form-group textarea:focus {
   outline: none;
   border-color: var(--primary);
-  background: #FFFFFF;
+  background: var(--surface);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.create-form-group input:disabled,
+.create-form-group textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .create-form-row {
@@ -170,6 +224,31 @@
 }
 
 .btn-ai-assist:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-save-draft {
+  width: 100%;
+  padding: 11px;
+  background: transparent;
+  color: var(--success);
+  border: 1.5px solid rgba(16, 185, 129, 0.35);
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+  margin-top: 8px;
+}
+
+.btn-save-draft:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: var(--success);
+  transform: translateY(-1px);
+}
+
+.btn-save-draft:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

@@ -6,13 +6,21 @@ import '../styles/NotFound.css';
 function NotFound() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const isLoggedIn = localStorage.getItem('token');
+  const isLoggedIn = !!localStorage.getItem('token');
+
+  const lastPublicPath = sessionStorage.getItem('lastPublicPath');
+
+  const getButtonLabel = () => {
+    if (isLoggedIn) return t('notFound.backToHome');
+    if (lastPublicPath === '/register') return t('notFound.backToRegister');
+    return t('notFound.backToLogin');
+  };
 
   const handleGoBack = () => {
     if (isLoggedIn) {
       navigate('/dashboard');
     } else {
-      navigate('/login');
+      navigate(lastPublicPath === '/register' ? '/register' : '/login');
     }
   };
 
@@ -22,7 +30,7 @@ function NotFound() {
       <h2 className="not-found__title">{t('notFound.title')}</h2>
       <p className="not-found__message">{t('notFound.message')}</p>
       <button className="not-found__btn" onClick={handleGoBack}>
-        {isLoggedIn ? t('notFound.goToDashboard') : t('notFound.goToLogin')}
+        {getButtonLabel()}
       </button>
     </div>
   );

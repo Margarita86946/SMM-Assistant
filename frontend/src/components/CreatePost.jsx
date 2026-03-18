@@ -4,6 +4,25 @@ import { aiAPI, postsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import '../styles/CreatePost.css';
 
+function RegenButton({ onClick, loading, t }) {
+  return (
+    <button
+      className={`btn-regen${loading ? ' btn-regen--loading' : ''}`}
+      onClick={onClick}
+      disabled={loading}
+      title={t('generate.regen')}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        style={loading ? { animation: 'spin 0.7s linear infinite' } : {}}>
+        <polyline points="23 4 23 10 17 10"/>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+      </svg>
+      {loading ? t('generate.regenLoading') : t('generate.regen')}
+    </button>
+  );
+}
+
 function CreatePost() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -13,14 +32,13 @@ function CreatePost() {
   const [hashtags, setHashtags] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
   const [platform, setPlatform] = useState('instagram');
-  const [status, setStatus] = useState('draft');
-  const [scheduledTime, setScheduledTime] = useState('');
 
   const [tone, setTone] = useState('professional');
   const [polishing, setPolishing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [regenLoading, setRegenLoading] = useState({ caption: false, hashtags: false, image_prompt: false });
 
   const handlePolish = async () => {
     if (!caption.trim()) {
@@ -41,6 +59,25 @@ function CreatePost() {
     }
   };
 
+  const handleRegen = async (field) => {
+    if (!topic.trim()) {
+      setError(t('create.topicRequiredRegen'));
+      return;
+    }
+    setRegenLoading(prev => ({ ...prev, [field]: true }));
+    setError('');
+    try {
+      const res = await aiAPI.generateContent({ topic, platform, tone });
+      if (field === 'caption') setCaption(res.data.caption);
+      else if (field === 'hashtags') setHashtags(res.data.hashtags);
+      else if (field === 'image_prompt') setImagePrompt(res.data.image_prompt);
+    } catch {
+      setError(t('generate.failedRegen'));
+    } finally {
+      setRegenLoading(prev => ({ ...prev, [field]: false }));
+    }
+  };
+
   const handleSave = async () => {
     if (!caption.trim()) {
       setError(t('create.captionRequired'));
@@ -49,7 +86,7 @@ function CreatePost() {
     setSaving(true);
     setError('');
     try {
-      await postsAPI.create({ topic, caption, hashtags, tone, image_prompt: imagePrompt, platform, status, scheduled_time: scheduledTime || null });
+      await postsAPI.create({ topic, caption, hashtags, tone, image_prompt: imagePrompt, platform, status: 'draft', scheduled_time: null });
       setSuccessMsg(t('create.savedMsg'));
       setTimeout(() => navigate('/posts'), 1500);
     } catch {
@@ -108,32 +145,44 @@ function CreatePost() {
         </div>
 
         <div className="create-form-group">
-          <label>{t('create.caption')} <span className="label-required">*</span></label>
+          <div className="create-field-label-row">
+            <label>{t('create.caption')} <span className="label-required">*</span></label>
+            <RegenButton onClick={() => handleRegen('caption')} loading={regenLoading.caption} t={t} />
+          </div>
           <textarea
             rows={6}
             placeholder={t('create.captionPlaceholder')}
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
+            disabled={regenLoading.caption}
           />
         </div>
 
         <div className="create-form-group">
-          <label>{t('create.hashtags')}</label>
+          <div className="create-field-label-row">
+            <label>{t('create.hashtags')}</label>
+            <RegenButton onClick={() => handleRegen('hashtags')} loading={regenLoading.hashtags} t={t} />
+          </div>
           <input
             type="text"
             placeholder={t('create.hashtagsPlaceholder')}
             value={hashtags}
             onChange={(e) => setHashtags(e.target.value)}
+            disabled={regenLoading.hashtags}
           />
         </div>
 
         <div className="create-form-group">
-          <label>{t('create.imagePrompt')} <span className="label-optional">{t('create.optional')}</span></label>
+          <div className="create-field-label-row">
+            <label>{t('create.imagePrompt')} <span className="label-optional">{t('create.optional')}</span></label>
+            <RegenButton onClick={() => handleRegen('image_prompt')} loading={regenLoading.image_prompt} t={t} />
+          </div>
           <textarea
             rows={3}
             placeholder={t('create.imagePromptPlaceholder')}
             value={imagePrompt}
             onChange={(e) => setImagePrompt(e.target.value)}
+            disabled={regenLoading.image_prompt}
           />
         </div>
 
@@ -144,36 +193,9 @@ function CreatePost() {
             <>{t('common.polishWithAI')}</>
           )}
         </button>
-      </div>
 
-      <div className="create-card">
-        <div className="card-title">
-          <span className="card-title-icon">⚙️</span>
-          {t('create.postSettings')}
-        </div>
-
-        <div className="create-form-row">
-          <div className="create-form-group">
-            <label>{t('create.status')}</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="draft">{t('create.draft')}</option>
-              <option value="scheduled">{t('create.scheduled')}</option>
-              <option value="ready_to_post">{t('create.readyToPost')}</option>
-              <option value="posted">{t('create.posted')}</option>
-            </select>
-          </div>
-          <div className="create-form-group">
-            <label>{t('create.scheduledTime')} <span className="label-optional">{t('create.optional')}</span></label>
-            <input
-              type="datetime-local"
-              value={scheduledTime}
-              onChange={(e) => setScheduledTime(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <button className="btn-save-post" onClick={handleSave} disabled={saving}>
-          {saving ? t('common.saving') : t('create.savePost')}
+        <button className="btn-save-draft" onClick={handleSave} disabled={saving}>
+          {saving ? t('common.saving') : t('generate.saveAsDraft')}
         </button>
       </div>
     </div>

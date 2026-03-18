@@ -4,7 +4,7 @@ import { aiAPI, postsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import '../styles/ContentGenerator.css';
 
-function CopyButton({ text }) {
+function CopyButton({ text, disabled }) {
     const [copied, setCopied] = useState(false);
     const { t } = useTranslation();
 
@@ -13,12 +13,11 @@ function CopyButton({ text }) {
             await navigator.clipboard.writeText(text);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
-        } catch {
-        }
+        } catch {}
     };
 
     return (
-        <button className={`btn-copy${copied ? ' btn-copy--done' : ''}`} onClick={handleCopy} title={t('generate.copy')}>
+        <button className={`btn-copy${copied ? ' btn-copy--done' : ''}`} onClick={handleCopy} title={t('generate.copy')} disabled={disabled}>
             {copied ? (
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -32,6 +31,25 @@ function CopyButton({ text }) {
                 </svg>
             )}
             {copied ? t('generate.copied') : t('generate.copy')}
+        </button>
+    );
+}
+
+function RegenButton({ onClick, loading, t }) {
+    return (
+        <button
+            className={`btn-regen${loading ? ' btn-regen--loading' : ''}`}
+            onClick={onClick}
+            disabled={loading}
+            title={t('generate.regen')}
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                style={loading ? { animation: 'spin 0.7s linear infinite' } : {}}>
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            {loading ? t('generate.regenLoading') : t('generate.regen')}
         </button>
     );
 }
@@ -52,6 +70,7 @@ function ContentGenerator() {
     const [imageUrl, setImageUrl] = useState(null);
     const [imageLoading, setImageLoading] = useState(false);
     const [downloading, setDownloading] = useState(false);
+    const [regenLoading, setRegenLoading] = useState({ caption: false, hashtags: false, image_prompt: false, image: false });
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -79,10 +98,28 @@ function ContentGenerator() {
             } finally {
                 setImageLoading(false);
             }
-        } catch (err) {
+        } catch {
             setError(t('generate.failedGenerate'));
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleRegenSection = async (section) => {
+        setRegenLoading(prev => ({ ...prev, [section]: true }));
+        setError('');
+        try {
+            if (section === 'image') {
+                const imgRes = await aiAPI.generateImage(formData.topic, formData.platform);
+                setImageUrl(imgRes.data.image_url);
+            } else {
+                const response = await aiAPI.generateContent(formData);
+                setGeneratedContent(prev => ({ ...prev, [section]: response.data[section] }));
+            }
+        } catch {
+            setError(t('generate.failedRegen'));
+        } finally {
+            setRegenLoading(prev => ({ ...prev, [section]: false }));
         }
     };
 
@@ -104,7 +141,7 @@ function ContentGenerator() {
             });
             setSuccessMsg(t('generate.savedDraft'));
             setTimeout(() => navigate('/posts'), 1500);
-        } catch (err) {
+        } catch {
             setError(t('generate.failedSave'));
         } finally {
             setSaving(false);
@@ -189,35 +226,47 @@ function ContentGenerator() {
                 <div className="generator-results-card">
                     <h3>{t('generate.results')}</h3>
 
-                    <div className="gen-result-block">
+                    <div className={`gen-result-block${regenLoading.caption ? ' gen-result-block--loading' : ''}`}>
                         <div className="gen-result-label-row">
                             <strong>{t('generate.caption')}</strong>
-                            <CopyButton text={generatedContent.caption} />
+                            <div className="gen-result-actions">
+                                <RegenButton onClick={() => handleRegenSection('caption')} loading={regenLoading.caption} t={t} />
+                                <CopyButton text={generatedContent.caption} disabled={regenLoading.caption} />
+                            </div>
                         </div>
                         <p>{generatedContent.caption}</p>
                     </div>
 
-                    <div className="gen-result-block">
+                    <div className={`gen-result-block${regenLoading.hashtags ? ' gen-result-block--loading' : ''}`}>
                         <div className="gen-result-label-row">
                             <strong>{t('generate.hashtags')}</strong>
-                            <CopyButton text={generatedContent.hashtags} />
+                            <div className="gen-result-actions">
+                                <RegenButton onClick={() => handleRegenSection('hashtags')} loading={regenLoading.hashtags} t={t} />
+                                <CopyButton text={generatedContent.hashtags} disabled={regenLoading.hashtags} />
+                            </div>
                         </div>
                         <p>{generatedContent.hashtags}</p>
                     </div>
 
-                    <div className="gen-result-block">
+                    <div className={`gen-result-block${regenLoading.image_prompt ? ' gen-result-block--loading' : ''}`}>
                         <div className="gen-result-label-row">
                             <strong>{t('generate.imagePrompt')}</strong>
-                            <CopyButton text={generatedContent.image_prompt} />
+                            <div className="gen-result-actions">
+                                <RegenButton onClick={() => handleRegenSection('image_prompt')} loading={regenLoading.image_prompt} t={t} />
+                                <CopyButton text={generatedContent.image_prompt} disabled={regenLoading.image_prompt} />
+                            </div>
                         </div>
                         <p>{generatedContent.image_prompt}</p>
                         {imageLoading && <p className="gen-image-status">{t('generate.generatingImage')}</p>}
                         {!imageLoading && imageUrl && (
                             <>
                                 <img src={imageUrl} alt="AI generated" className="gen-result-image" />
-                                <button className="btn-download-image" onClick={handleDownload} disabled={downloading}>
-                                    {downloading ? t('generate.downloading') : t('generate.download')}
-                                </button>
+                                <div className="gen-image-buttons">
+                                    <RegenButton onClick={() => handleRegenSection('image')} loading={regenLoading.image} t={t} />
+                                    <button className="btn-download-image" onClick={handleDownload} disabled={downloading || regenLoading.image}>
+                                        {downloading ? t('generate.downloading') : t('generate.download')}
+                                    </button>
+                                </div>
                             </>
                         )}
                         {!imageLoading && !imageUrl && <p className="gen-image-status gen-image-error">{t('generate.imageFailed')}</p>}

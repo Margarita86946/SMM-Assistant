@@ -27,7 +27,6 @@
   margin: 0;
 }
 
-/* Hide the legacy logout button — sidebar handles this */
 .btn-logout {
   display: none;
 }
@@ -188,7 +187,7 @@
 }
 
 .post-card:hover {
-  background: #FAFAFA;
+  background: var(--surface-2);
 }
 
 .post-header {
@@ -265,71 +264,139 @@
   padding: 8px 0;
 }
 
-/* ---- Quick Actions ---- */
-.quick-actions {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-}
-
-.quick-actions h2 {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 18px;
-  letter-spacing: -0.2px;
-}
-
-.actions-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-}
-
-@media (max-width: 700px) {
-  .actions-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-.action-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 18px 16px;
-  background: var(--bg);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-primary);
-  font-size: 13px;
+/* ---- View Details Button ---- */
+.btn-view-details {
+  margin-top: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
   font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-light);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.15s;
-  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.action-btn:hover {
+.btn-view-details:hover {
+  background: #e0e7ff;
   border-color: var(--primary);
-  background: var(--primary-light);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
-  transform: translateY(-2px);
 }
 
-.action-icon {
-  width: 36px;
-  height: 36px;
-  background: var(--primary-light);
-  border-radius: 9px;
+/* ---- Post Detail Modal ---- */
+.post-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  transition: background 0.2s;
+  z-index: 1000;
+  padding: 20px;
 }
 
-.action-btn:hover .action-icon {
-  background: var(--primary-muted);
+.post-modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 520px;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
 }
+
+.post-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+.post-modal-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.post-modal-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.post-modal-close:hover {
+  background: var(--bg);
+  color: var(--text-primary);
+}
+
+.post-modal-body {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.post-modal-image {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.post-modal-image img {
+  width: 100%;
+  display: block;
+  max-height: 280px;
+  object-fit: cover;
+}
+
+.post-modal-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.post-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.post-modal-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.post-modal-field p {
+  font-size: 13.5px;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.post-modal-hashtags {
+  color: var(--primary) !important;
+  font-weight: 500;
+}
+
 
 @media (max-width: 768px) {
   .dashboard-container { padding: 24px 16px; }

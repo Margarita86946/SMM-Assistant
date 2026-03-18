@@ -1,7 +1,7 @@
 .auth-container {
   min-height: 100vh;
   display: flex;
-  background: #FFFFFF;
+  background: var(--surface);
 }
 
 /* ---- Left branding panel ---- */
@@ -126,7 +126,7 @@
   align-items: center;
   justify-content: center;
   padding: 48px 48px;
-  background: #FFFFFF;
+  background: var(--surface);
 }
 
 .auth-box {
@@ -171,7 +171,7 @@
   border-radius: var(--radius-sm);
   font-size: 14px;
   color: var(--text-primary);
-  background: #FAFAFA;
+  background: var(--surface-2);
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   box-sizing: border-box;
 }
@@ -183,7 +183,7 @@
 .form-group input:focus {
   outline: none;
   border-color: var(--primary);
-  background: #FFFFFF;
+  background: var(--surface);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
 }
 
@@ -228,7 +228,7 @@
 .error-message {
   background: var(--error-bg);
   color: var(--error-text);
-  border: 1px solid #FECACA;
+  border: 1px solid rgba(239,68,68,0.3);
   padding: 11px 14px;
   border-radius: var(--radius-sm);
   margin-bottom: 18px;
@@ -253,6 +253,45 @@
 
 .toggle-link:hover {
   text-decoration: underline;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.password-input-wrapper {
+  position: relative;
+}
+
+.password-input-wrapper input {
+  padding-right: 42px;
+}
+
+.btn-password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.btn-password-toggle:hover {
+  color: var(--text-secondary);
+}
+
+.btn-password-toggle svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* Responsive */

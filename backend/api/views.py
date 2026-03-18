@@ -8,8 +8,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import Q
 from rest_framework.authtoken.models import Token
-from .models import Post, User
+from django.conf import settings
+from .models import Post, User, TokenExpiry
 from .serializers import PostSerializer, PostCreateSerializer, UserSerializer
 from datetime import timedelta
 from django.utils import timezone
@@ -29,13 +33,16 @@ def register(request):
     if serializer.is_valid():
         user = serializer.save()
 
-        token, created = Token.objects.get_or_create(user=user)
+        token, _ = Token.objects.get_or_create(user=user)
+        expires_at = timezone.now() + timedelta(days=settings.TOKEN_EXPIRY_DAYS)
+        TokenExpiry.objects.create(token=token, expires_at=expires_at)
 
         return Response({
             'token': token.key,
             'user_id': user.id,
             'username': user.username,
             'email': user.email,
+            'expires_at': expires_at.isoformat(),
             'message': 'User registered successfully'
         }, status=status.HTTP_201_CREATED)
 
@@ -52,7 +59,7 @@ def login_view(request):
         User.objects.get(username=username)
     except User.DoesNotExist:
         return Response(
-            {'error': 'Invalid credentials'},
+            {'error': 'user_not_found'},
             status=status.HTTP_401_UNAUTHORIZED
         )
 
@@ -60,17 +67,26 @@ def login_view(request):
 
     if user is None:
         return Response(
-            {'error': 'Invalid credentials'},
+            {'error': 'wrong_password'},
             status=status.HTTP_401_UNAUTHORIZED
         )
 
-    token, created = Token.objects.get_or_create(user=user)
+    user.last_login = timezone.now()
+    user.save(update_fields=['last_login'])
+
+    token, _ = Token.objects.get_or_create(user=user)
+    expires_at = timezone.now() + timedelta(days=settings.TOKEN_EXPIRY_DAYS)
+    TokenExpiry.objects.update_or_create(
+        token=token,
+        defaults={'expires_at': expires_at, 'is_revoked': False}
+    )
 
     return Response({
         'token': token.key,
         'user_id': user.id,
         'username': user.username,
-        'email': user.email
+        'email': user.email,
+        'expires_at': expires_at.isoformat(),
     }, status=status.HTTP_200_OK)
 
 
@@ -78,10 +94,80 @@ def login_view(request):
 @permission_classes([IsAuthenticated])
 def logout_view(request):
     try:
-        request.user.auth_token.delete()
+        token = request.user.auth_token
+        TokenExpiry.objects.update_or_create(
+            token=token,
+            defaults={'is_revoked': True, 'expires_at': timezone.now()}
+        )
         return Response({'message': 'Successfully logged out'}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def profile_view(request):
+    user = request.user
+    if request.method == 'GET':
+        return Response({
+            'username': user.username,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'date_joined': user.date_joined,
+            'last_login': user.last_login,
+            'avatar': user.avatar,
+        })
+    allowed_fields = ['first_name', 'last_name', 'email', 'avatar']
+    data = {k: v for k, v in request.data.items() if k in allowed_fields}
+    if 'email' in data and data['email'] != user.email:
+        if User.objects.filter(email=data['email']).exclude(pk=user.pk).exists():
+            return Response({'error': 'email_taken'}, status=status.HTTP_400_BAD_REQUEST)
+    if 'avatar' in data:
+        avatar_val = data['avatar']
+        if avatar_val and not avatar_val.startswith('data:image/'):
+            return Response({'error': 'Invalid image format'}, status=status.HTTP_400_BAD_REQUEST)
+        if avatar_val and len(avatar_val) > 2_000_000:
+            return Response({'error': 'avatar_too_large'}, status=status.HTTP_400_BAD_REQUEST)
+    for key, value in data.items():
+        setattr(user, key, value)
+    user.save(update_fields=list(data.keys()))
+    return Response({
+        'username': user.username,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'date_joined': user.date_joined,
+        'last_login': user.last_login,
+        'avatar': user.avatar,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    user = request.user
+    current_password = request.data.get('current_password', '')
+    new_password = request.data.get('new_password', '')
+    if not current_password or not new_password:
+        return Response({'error': 'Both fields are required'}, status=status.HTTP_400_BAD_REQUEST)
+    if not user.check_password(current_password):
+        return Response({'error': 'wrong_current_password'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        validate_password(new_password, user)
+    except DjangoValidationError as e:
+        return Response({'error': ' '.join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+    user.set_password(new_password)
+    user.save()
+    try:
+        token = user.auth_token
+        TokenExpiry.objects.update_or_create(
+            token=token,
+            defaults={'is_revoked': True, 'expires_at': timezone.now()}
+        )
+    except Exception:
+        pass
+    return Response({'message': 'Password changed successfully. Please log in again.'})
 
 
 @api_view(['GET', 'POST'])
@@ -89,8 +175,24 @@ def logout_view(request):
 def posts_list(request):
     if request.method == 'GET':
         posts = Post.objects.filter(user=request.user).order_by('-created_at')
+
+        search = request.query_params.get('search', '').strip()
+        platform = request.query_params.get('platform', '').strip()
+        post_status = request.query_params.get('status', '').strip()
+
+        if search:
+            posts = posts.filter(
+                Q(caption__icontains=search) |
+                Q(hashtags__icontains=search) |
+                Q(topic__icontains=search)
+            )
+        if platform:
+            posts = posts.filter(platform=platform)
+        if post_status:
+            posts = posts.filter(status=post_status)
+
         paginator = PageNumberPagination()
-        paginator.page_size = 50
+        paginator.page_size = 3
         page = paginator.paginate_queryset(posts, request)
         serializer = PostSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
@@ -165,10 +267,15 @@ def today_posts(request):
 def dashboard_stats(request):
     total_posts = Post.objects.filter(user=request.user).count()
 
-    week_ago = timezone.now() - timedelta(days=7)
+    now = timezone.now()
+    days_until_next_monday = 7 - now.weekday()  # weekday(): Mon=0, Sun=6
+    start_of_next_week = (now + timedelta(days=days_until_next_monday)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     posts_this_week = Post.objects.filter(
         user=request.user,
-        created_at__gte=week_ago
+        scheduled_time__gte=now,
+        scheduled_time__lt=start_of_next_week
     ).count()
 
     draft_posts = Post.objects.filter(user=request.user, status='draft').count()

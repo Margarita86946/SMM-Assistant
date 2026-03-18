@@ -76,6 +76,7 @@ function Sidebar() {
         </svg>
       ),
     },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [language]);
 
   const isActive = (path) => {
@@ -86,6 +87,8 @@ function Sidebar() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
+    localStorage.removeItem('token_expires_at');
+    localStorage.removeItem('avatar');
     window.location.href = '/login';
   };
 
@@ -129,7 +132,10 @@ function Sidebar() {
       <div className="sidebar-footer">
         <div className="sidebar-user">
           <div className="sidebar-avatar">
-            {username.charAt(0).toUpperCase()}
+            {localStorage.getItem('avatar')
+              ? <img src={localStorage.getItem('avatar')} alt="avatar" className="sidebar-avatar-img" />
+              : username.charAt(0).toUpperCase()
+            }
           </div>
           <div className="sidebar-user-info">
             <span className="sidebar-username">{username}</span>
@@ -166,10 +172,26 @@ function Sidebar() {
                 </select>
               </div>
 
+              <div className="settings-row settings-row--link" onClick={() => { navigate('/account'); setSettingsOpen(false); }}>
+                <span className="settings-row-label">{t('settings.account')}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  className="settings-row-chevron">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+
               <div className="settings-divider" />
 
               <button className="settings-logout-btn" onClick={handleLogout}>
-                🚪 {t('settings.logout')}
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                {t('settings.logout')}
               </button>
             </div>
           )}

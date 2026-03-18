@@ -217,6 +217,22 @@
   background: #F5F3FF;
 }
 
+@keyframes cal-today-flash {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.cal-today-flash-overlay {
+  position: absolute;
+  inset: 0;
+  background: #A78BFA;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: cal-today-flash 1.2s ease-out forwards;
+  z-index: 1;
+}
+
+
 .cal-day-num {
   font-size: 12px;
   font-weight: 600;

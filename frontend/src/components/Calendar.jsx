@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { calendarAPI } from '../services/api';
 import { useTranslation } from '../i18n';
@@ -130,6 +130,8 @@ function Calendar() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedPost, setSelectedPost] = useState(null);
+  const [flashKey, setFlashKey] = useState(0);
+  const pendingFlash = useRef(false);
 
   const month = currentDate.getMonth() + 1;
   const year  = currentDate.getFullYear();
@@ -144,10 +146,20 @@ function Calendar() {
       setError('calendar.failedLoad');
     } finally {
       setLoading(false);
+      if (pendingFlash.current) {
+        pendingFlash.current = false;
+        setFlashKey(k => k + 1);
+      }
     }
   }, [month, year]);
 
   useEffect(() => { loadPosts(); }, [loadPosts]);
+
+  useEffect(() => {
+    if (flashKey === 0) return;
+    const el = document.getElementById('cal-today-cell');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [flashKey]);
 
   const daysInMonth  = new Date(year, month, 0).getDate();
   const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
@@ -167,9 +179,17 @@ function Calendar() {
   const monthLabel = currentDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
   const DAYS_OF_WEEK = ['daySun', 'dayMon', 'dayTue', 'dayWed', 'dayThu', 'dayFri', 'daySat'].map(k => t(`calendar.${k}`));
 
-  const prevMonth = () => { setPosts([]); setLoading(true); setCurrentDate(new Date(year, month - 2, 1)); };
-  const nextMonth = () => { setPosts([]); setLoading(true); setCurrentDate(new Date(year, month, 1)); };
-  const goToday   = () => { setPosts([]); setLoading(true); setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1)); };
+  const prevMonth = () => { setPosts([]); setCurrentDate(new Date(year, month - 2, 1)); };
+  const nextMonth = () => { setPosts([]); setCurrentDate(new Date(year, month, 1)); };
+  const goToday   = () => {
+    if (year !== today.getFullYear() || month !== today.getMonth() + 1) {
+      pendingFlash.current = true;
+      setPosts([]);
+      setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
+    } else {
+      setFlashKey(k => k + 1);
+    }
+  };
 
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
@@ -239,7 +259,14 @@ function Calendar() {
               const isToday = key === todayKey;
 
               return (
-                <div key={key} className={`cal-cell${isToday ? ' cal-cell--today' : ''}`}>
+                <div
+                  key={key}
+                  id={isToday ? 'cal-today-cell' : undefined}
+                  className={`cal-cell${isToday ? ' cal-cell--today' : ''}`}
+                >
+                  {isToday && flashKey > 0 && (
+                    <div key={flashKey} className="cal-today-flash-overlay" />
+                  )}
                   <div className={`cal-day-num${isToday ? ' cal-day-num--today' : ''}`}>{day}</div>
 
                   <div className="cal-posts">

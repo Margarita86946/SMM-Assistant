@@ -33,6 +33,7 @@
 }
 
 .edit-post-header h2 {
+  flex: 1;
   font-size: 22px;
   font-weight: 800;
   color: var(--text-primary);
@@ -82,7 +83,7 @@
   border-radius: var(--radius-sm);
   font-size: 14px;
   color: var(--text-primary);
-  background: #FAFAFA;
+  background: var(--surface-2);
   box-sizing: border-box;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   font-family: inherit;
@@ -99,8 +100,13 @@
 .edit-form-group select:focus {
   outline: none;
   border-color: var(--primary);
-  background: #FFFFFF;
+  background: var(--surface);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.edit-form-group select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .edit-form-row {
@@ -113,10 +119,22 @@
   .edit-form-row { grid-template-columns: 1fr; }
 }
 
+.edit-dirty-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #D97706;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 20px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
 .edit-form-actions {
   margin-top: 8px;
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
 }
 
 .btn-save {
@@ -143,6 +161,125 @@
 .btn-save:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.btn-discard {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 20px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-discard:hover {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+/* Unsaved changes modal */
+.edit-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 20px;
+  animation: edit-fade-in 0.15s ease;
+}
+
+@keyframes edit-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.edit-modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  width: 100%;
+  max-width: 400px;
+  padding: 28px;
+  animation: edit-slide-up 0.2s ease;
+}
+
+@keyframes edit-slide-up {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.edit-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.edit-modal-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.edit-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.edit-modal-msg {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 24px;
+}
+
+.edit-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.edit-modal-leave-btn {
+  padding: 9px 18px;
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.edit-modal-leave-btn:hover {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.edit-modal-stay-btn {
+  padding: 9px 18px;
+  background: var(--primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.edit-modal-stay-btn:hover {
+  background: var(--primary-dark);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
 @media (max-width: 768px) {

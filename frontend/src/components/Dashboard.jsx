@@ -5,6 +5,60 @@ import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import '../styles/Dashboard.css';
 
+function PostDetailModal({ post, onClose, t, formatDate, getStatusBadge }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div className="post-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="post-modal">
+        <div className="post-modal-header">
+          <h3>{t('dashboard.postDetails')}</h3>
+          <button className="post-modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="post-modal-body">
+          {post.image_url && (
+            <div className="post-modal-image">
+              <img src={post.image_url} alt="Post visual" />
+            </div>
+          )}
+          <div className="post-modal-meta">
+            <span className="post-platform">
+              {post.platform === 'instagram' && '📷 Instagram'}
+              {post.platform === 'linkedin' && '💼 LinkedIn'}
+              {post.platform === 'twitter' && '🐦 Twitter'}
+            </span>
+            {getStatusBadge(post.status)}
+          </div>
+          {post.topic && (
+            <div className="post-modal-field">
+              <span className="post-modal-label">{t('dashboard.topic')}</span>
+              <p>{post.topic}</p>
+            </div>
+          )}
+          <div className="post-modal-field">
+            <span className="post-modal-label">{t('dashboard.caption')}</span>
+            <p>{post.caption}</p>
+          </div>
+          {post.hashtags && (
+            <div className="post-modal-field">
+              <span className="post-modal-label">{t('dashboard.hashtags')}</span>
+              <p className="post-modal-hashtags">{post.hashtags}</p>
+            </div>
+          )}
+          <div className="post-modal-field">
+            <span className="post-modal-label">{t('dashboard.scheduledTime')}</span>
+            <p>{formatDate(post.scheduled_time)}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard() {
   const [stats, setStats] = useState({
     total_posts: 0,
@@ -16,6 +70,7 @@ function Dashboard() {
   const [recentPosts, setRecentPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedPost, setSelectedPost] = useState(null);
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { language } = useSettings();
@@ -79,6 +134,15 @@ function Dashboard() {
 
   return (
     <div className="dashboard-container">
+      {selectedPost && (
+        <PostDetailModal
+          post={selectedPost}
+          onClose={() => setSelectedPost(null)}
+          t={t}
+          formatDate={formatDate}
+          getStatusBadge={getStatusBadge}
+        />
+      )}
 
       <div className="dashboard-header">
         <div>
@@ -178,33 +242,15 @@ function Dashboard() {
                     ? post.hashtags.substring(0, 60) + '...'
                     : post.hashtags}
                 </div>
+                <button className="btn-view-details" onClick={() => setSelectedPost(post)}>
+                  {t('dashboard.viewDetails')}
+                </button>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div className="quick-actions">
-        <h2>{t('dashboard.quickActions')}</h2>
-        <div className="actions-grid">
-          <button className="action-btn" onClick={() => navigate('/create')}>
-            <span className="action-icon">✨</span>
-            <span>{t('dashboard.createNew')}</span>
-          </button>
-          <button className="action-btn" onClick={() => navigate('/posts')}>
-            <span className="action-icon">📋</span>
-            <span>{t('dashboard.viewAllPosts')}</span>
-          </button>
-          <button className="action-btn" onClick={() => navigate('/calendar')}>
-            <span className="action-icon">📅</span>
-            <span>{t('dashboard.calendarView')}</span>
-          </button>
-          <button className="action-btn" onClick={() => navigate('/generate')}>
-            <span className="action-icon">🤖</span>
-            <span>{t('dashboard.aiGenerate')}</span>
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

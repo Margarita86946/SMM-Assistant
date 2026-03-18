@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { createBrowserRouter, RouterProvider, Outlet, Navigate, useLocation } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import PostsList from './components/PostsList';
@@ -8,8 +8,23 @@ import EditPost from './components/EditPost';
 import Calendar from './components/Calendar';
 import NotFound from './components/NotFound';
 import ContentGenerator from './components/ContentGenerator';
+import Account from './components/Account';
 import Sidebar from './components/Sidebar';
 import './App.css';
+
+function RouteTracker() {
+  const location = useLocation();
+  const prevPath = useRef(location.pathname);
+
+  useEffect(() => {
+    if (prevPath.current !== location.pathname) {
+      sessionStorage.setItem('previousPath', prevPath.current);
+      prevPath.current = location.pathname;
+    }
+  }, [location.pathname]);
+
+  return null;
+}
 
 function AppLayout({ children }) {
   return (
@@ -25,37 +40,48 @@ function AppLayout({ children }) {
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/login" replace />;
+  const expiresAt = localStorage.getItem('token_expires_at');
+  if (expiresAt && new Date(expiresAt) < new Date()) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    localStorage.removeItem('token_expires_at');
+    return <Navigate to="/login" replace />;
+  }
   return <AppLayout>{children}</AppLayout>;
 }
 
-function PublicRoute({ children }) {
-  const token = localStorage.getItem('token');
-  if (token) return <Navigate to="/dashboard" replace />;
-  return children;
+function RootLayout() {
+  return (
+    <>
+      <RouteTracker />
+      <div className="App">
+        <Outlet />
+      </div>
+    </>
+  );
 }
 
+const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
+      { path: '/', element: <Navigate to="/login" replace /> },
+      { path: '/login', element: <Login isLoginMode={true} /> },
+      { path: '/register', element: <Login isLoginMode={false} /> },
+      { path: '/dashboard', element: <ProtectedRoute><Dashboard /></ProtectedRoute> },
+      { path: '/posts', element: <ProtectedRoute><PostsList /></ProtectedRoute> },
+      { path: '/create', element: <ProtectedRoute><CreatePost /></ProtectedRoute> },
+      { path: '/edit/:id', element: <ProtectedRoute><EditPost /></ProtectedRoute> },
+      { path: '/calendar', element: <ProtectedRoute><Calendar /></ProtectedRoute> },
+      { path: '/generate', element: <ProtectedRoute><ContentGenerator /></ProtectedRoute> },
+      { path: '/account', element: <ProtectedRoute><Account /></ProtectedRoute> },
+      { path: '*', element: <NotFound /> },
+    ],
+  },
+]);
+
 function App() {
-  return (
-    <Router>
-      <div className="App">
-        <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-
-          <Route path="/login" element={<PublicRoute><Login isLoginMode={true} /></PublicRoute>} />
-          <Route path="/register" element={<PublicRoute><Login isLoginMode={false} /></PublicRoute>} />
-
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/posts" element={<ProtectedRoute><PostsList /></ProtectedRoute>} />
-          <Route path="/create" element={<ProtectedRoute><CreatePost /></ProtectedRoute>} />
-          <Route path="/edit/:id" element={<ProtectedRoute><EditPost /></ProtectedRoute>} />
-          <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
-          <Route path="/generate" element={<ProtectedRoute><ContentGenerator /></ProtectedRoute>} />
-
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </div>
-    </Router>
-  );
+  return <RouterProvider router={router} />;
 }
 
 export default App;

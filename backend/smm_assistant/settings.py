@@ -133,9 +133,11 @@ LOGGING = {
 
 AUTH_USER_MODEL = 'api.User'
 
+TOKEN_EXPIRY_DAYS = int(os.getenv('TOKEN_EXPIRY_DAYS', '30'))
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'api.authentication.ExpiringTokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
