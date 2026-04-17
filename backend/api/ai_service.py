@@ -16,7 +16,7 @@ client = Groq(api_key=GROQ_API_KEY)
 
 def generate_caption(topic, platform, tone):
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
         timeout=30,
         messages=[{
             "role": "user",
@@ -35,7 +35,7 @@ Rules:
 
 def generate_hashtags(topic, platform):
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
         timeout=30,
         messages=[{
             "role": "user",
@@ -53,7 +53,7 @@ Rules:
 
 def generate_image_prompt(topic, caption):
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
         timeout=30,
         messages=[{
             "role": "user",
@@ -71,7 +71,7 @@ Rules:
 
 def polish_content(caption, hashtags, platform, tone='professional', image_prompt='', topic=''):
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
         timeout=30,
         messages=[{
             "role": "user",
