@@ -211,19 +211,20 @@ def instagram_oauth_callback(request):
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
-def instagram_disconnect(request):
+def instagram_disconnect(request, pk):
     try:
         account = SocialAccount.objects.get(
-            user=request.user, platform='instagram', is_client_account=False
+            pk=pk, user=request.user, platform='instagram',
         )
     except SocialAccount.DoesNotExist:
-        return Response({'error': 'No Instagram account connected'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'No Instagram account found'}, status=status.HTTP_404_NOT_FOUND)
     username_snapshot = account.account_username
     account.is_active = False
     account.access_token = ''
     account.token_expires_at = None
     account.save(update_fields=['is_active', 'access_token', 'token_expires_at'])
-    Post.objects.filter(user=request.user, auto_publish=True, status='scheduled').update(auto_publish=False)
+    if not account.is_client_account:
+        Post.objects.filter(user=request.user, auto_publish=True, status='scheduled').update(auto_publish=False)
     log_action(
         request.user,
         'account_disconnected',
@@ -237,18 +238,20 @@ def instagram_disconnect(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def instagram_status(request):
-    try:
-        account = SocialAccount.objects.get(
-            user=request.user, platform='instagram',
-            is_client_account=False, is_active=True,
-        )
-    except SocialAccount.DoesNotExist:
-        return Response({'connected': False})
+    accounts = SocialAccount.objects.filter(
+        user=request.user, platform='instagram', is_active=True,
+    ).order_by('created_at')
     return Response({
-        'connected': True,
-        'username': account.account_username,
-        'account_type': account.account_type,
-        'expires_at': account.token_expires_at.isoformat() if account.token_expires_at else None,
+        'accounts': [
+            {
+                'id': a.id,
+                'username': a.account_username,
+                'account_type': a.account_type,
+                'is_client_account': a.is_client_account,
+                'expires_at': a.token_expires_at.isoformat() if a.token_expires_at else None,
+            }
+            for a in accounts
+        ]
     })
 
 

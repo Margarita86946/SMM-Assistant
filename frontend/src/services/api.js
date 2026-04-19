@@ -108,7 +108,7 @@ export const profileAPI = {
 export const instagramAPI = {
   getStatus: () => api.get('/auth/instagram/status/'),
   getOAuthUrl: () => api.get('/auth/instagram/'),
-  disconnect: () => api.delete('/auth/instagram/disconnect/'),
+  disconnect: (id) => api.delete(`/auth/instagram/disconnect/${id}/`),
   publishNow: (postId) => api.post(`/posts/${postId}/publish-now/`),
 };
 

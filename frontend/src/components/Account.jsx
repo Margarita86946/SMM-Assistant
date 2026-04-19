@@ -59,19 +59,19 @@ function Account() {
   const [brandMsg, setBrandMsg] = useState('');
   const [brandError, setBrandError] = useState('');
 
-  const [igStatus, setIgStatus] = useState(null);
+  const [igAccounts, setIgAccounts] = useState([]);
   const [igLoading, setIgLoading] = useState(true);
   const [igConnecting, setIgConnecting] = useState(false);
-  const [igDisconnecting, setIgDisconnecting] = useState(false);
+  const [igDisconnecting, setIgDisconnecting] = useState(null);
   const [igMsg, setIgMsg] = useState('');
   const [igError, setIgError] = useState('');
 
   const loadIgStatus = async () => {
     try {
       const res = await instagramAPI.getStatus();
-      setIgStatus(res.data);
+      setIgAccounts(res.data.accounts || []);
     } catch {
-      setIgStatus({ connected: false });
+      setIgAccounts([]);
     } finally {
       setIgLoading(false);
     }
@@ -111,19 +111,19 @@ function Account() {
     }
   };
 
-  const handleInstagramDisconnect = async () => {
+  const handleInstagramDisconnect = async (accountId) => {
     if (!window.confirm(t('instagram.disconnectConfirm'))) return;
-    setIgDisconnecting(true);
+    setIgDisconnecting(accountId);
     setIgError('');
     try {
-      await instagramAPI.disconnect();
+      await instagramAPI.disconnect(accountId);
       await loadIgStatus();
       setIgMsg(t('instagram.disconnectedMsg'));
       setTimeout(() => setIgMsg(''), 3000);
     } catch (err) {
       setIgError(err.message || t('instagram.disconnectError'));
     } finally {
-      setIgDisconnecting(false);
+      setIgDisconnecting(null);
     }
   };
 
@@ -410,62 +410,77 @@ function Account() {
         {igError && <div className="error-message">{igError}</div>}
         {igMsg && <div className="success-message">{igMsg}</div>}
 
-        <div className={`ig-card ${igStatus?.connected ? 'ig-card--connected' : 'ig-card--disconnected'}`}>
-          <div className={`ig-icon ${igStatus?.connected ? 'ig-icon--active' : ''}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-            </svg>
-          </div>
-
-          <div className="ig-info">
-            {igLoading ? (
-              <span className="ig-info-name ig-info-muted">{t('common.loading')}</span>
-            ) : igStatus?.connected ? (
-              <>
-                <div className="ig-info-head">
-                  <span className="ig-info-name">@{igStatus.username}</span>
-                  <span className="ig-badge">
-                    <span className="ig-badge-dot" />
-                    {t('instagram.connected')}
-                  </span>
-                </div>
-                {igStatus.expires_at && (
-                  <span className="ig-info-meta">
-                    {t('instagram.accessExpires')} {formatDate(igStatus.expires_at)}
-                  </span>
-                )}
-              </>
-            ) : (
-              <>
-                <span className="ig-info-name ig-info-muted">{t('instagram.notConnected')}</span>
-                <span className="ig-info-meta">{t('instagram.notConnectedHint')}</span>
-              </>
-            )}
-          </div>
-
-          <div className="ig-actions">
-            {igLoading ? null : igStatus?.connected ? (
-              <button
-                className="account-btn-save account-btn-danger ig-btn"
-                onClick={handleInstagramDisconnect}
-                disabled={igDisconnecting}
-              >
-                {igDisconnecting ? t('instagram.disconnecting') : t('instagram.disconnect')}
-              </button>
-            ) : (
-              <button
-                className="account-btn-save ig-btn ig-btn--connect"
-                onClick={handleInstagramConnect}
-                disabled={igConnecting}
-              >
+        {igLoading ? (
+          <div className="ig-card"><span className="ig-info-name ig-info-muted">{t('common.loading')}</span></div>
+        ) : igAccounts.length === 0 ? (
+          <div className="ig-card ig-card--disconnected">
+            <div className="ig-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+              </svg>
+            </div>
+            <div className="ig-info">
+              <span className="ig-info-name ig-info-muted">{t('instagram.notConnected')}</span>
+              <span className="ig-info-meta">{t('instagram.notConnectedHint')}</span>
+            </div>
+            <div className="ig-actions">
+              <button className="account-btn-save ig-btn ig-btn--connect" onClick={handleInstagramConnect} disabled={igConnecting}>
                 {igConnecting ? t('instagram.redirecting') : t('instagram.connect')}
               </button>
-            )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            {igAccounts.map(acc => (
+              <div key={acc.id} className="ig-card ig-card--connected" style={{ marginBottom: 10 }}>
+                <div className="ig-icon ig-icon--active">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                  </svg>
+                </div>
+                <div className="ig-info">
+                  <div className="ig-info-head">
+                    <span className="ig-info-name">@{acc.username}</span>
+                    <span className="ig-badge">
+                      <span className="ig-badge-dot" />
+                      {t('instagram.connected')}
+                    </span>
+                    {acc.is_client_account && (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 999, padding: '2px 8px' }}>
+                        Client
+                      </span>
+                    )}
+                  </div>
+                  {acc.expires_at && (
+                    <span className="ig-info-meta">
+                      {t('instagram.accessExpires')} {formatDate(acc.expires_at)}
+                    </span>
+                  )}
+                </div>
+                <div className="ig-actions">
+                  <button
+                    className="account-btn-save account-btn-danger ig-btn"
+                    onClick={() => handleInstagramDisconnect(acc.id)}
+                    disabled={igDisconnecting === acc.id}
+                  >
+                    {igDisconnecting === acc.id ? t('instagram.disconnecting') : t('instagram.disconnect')}
+                  </button>
+                </div>
+              </div>
+            ))}
+            <div style={{ marginTop: 14 }}>
+              <button className="account-btn-save ig-btn ig-btn--connect" onClick={handleInstagramConnect} disabled={igConnecting}>
+                {igConnecting ? t('instagram.redirecting') : t('instagram.connect')}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Brand Profile */}

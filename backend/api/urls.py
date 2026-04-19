@@ -38,7 +38,7 @@ urlpatterns = [
     # Instagram Integration
     path('auth/instagram/', views.instagram_oauth_start, name='instagram-oauth-start'),
     path('auth/instagram/callback/', views.instagram_oauth_callback, name='instagram-oauth-callback'),
-    path('auth/instagram/disconnect/', views.instagram_disconnect, name='instagram-disconnect'),
+    path('auth/instagram/disconnect/<int:pk>/', views.instagram_disconnect, name='instagram-disconnect'),
     path('auth/instagram/status/', views.instagram_status, name='instagram-status'),
 
     # Client Invitations
