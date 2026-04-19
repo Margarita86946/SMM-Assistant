@@ -355,16 +355,16 @@
 }
 
 .btn-regen:hover:not(:disabled) {
-  border-color: #F59E0B;
-  color: #D97706;
-  background: #FFFBEB;
+  border-color: var(--warning);
+  color: var(--warning-text);
+  background: var(--warning-bg);
 }
 
 .btn-regen--loading,
 .btn-regen--loading:hover {
-  border-color: #F59E0B;
-  color: #D97706;
-  background: #FFFBEB;
+  border-color: var(--warning);
+  color: var(--warning-text);
+  background: var(--warning-bg);
   cursor: not-allowed;
 }
 
@@ -389,14 +389,14 @@
   border: 1px solid;
 }
 .brand-banner--ok {
-  background: #ECFDF5;
-  border-color: #A7F3D0;
-  color: #065F46;
+  background: var(--success-bg);
+  border-color: var(--success);
+  color: var(--success-text);
 }
 .brand-banner--warn {
-  background: #FFFBEB;
-  border-color: #FDE68A;
-  color: #92400E;
+  background: var(--warning-bg);
+  border-color: var(--warning);
+  color: var(--warning-text);
 }
 .brand-banner-link {
   background: none;
@@ -411,8 +411,8 @@
 
 /* --- Model settings card --- */
 .gen-model-card {
-  background: #F9FAFB;
-  border: 1px solid var(--border, #E5E7EB);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 18px;
@@ -444,9 +444,9 @@
   margin-top: 10px;
 }
 .btn-variants {
-  background: #EEF2FF;
-  color: #4F46E5;
-  border: 1px solid #C7D2FE;
+  background: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid rgba(99, 102, 241, 0.3);
   padding: 8px 14px;
   border-radius: 8px;
   font-size: 13px;
@@ -454,7 +454,7 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.btn-variants:hover:not(:disabled) { background: #E0E7FF; }
+.btn-variants:hover:not(:disabled) { background: var(--primary-muted); }
 .btn-variants:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .gen-variants-grid {
@@ -464,8 +464,8 @@
   margin-top: 12px;
 }
 .gen-variant-card {
-  background: #FFFFFF;
-  border: 1px solid var(--border, #E5E7EB);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px;
   display: flex;

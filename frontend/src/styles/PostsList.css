@@ -608,16 +608,16 @@
 }
 
 .post-rejection-note {
-  color: #B91C1C;
+  color: var(--error-text);
   font-size: 12px;
   margin: 6px 0 0;
   font-style: italic;
 }
 
 .btn-submit-approval {
-  background: #EEF2FF;
-  color: #4F46E5;
-  border: 1px solid #C7D2FE;
+  background: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid rgba(99, 102, 241, 0.3);
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 12px;
@@ -625,7 +625,7 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.btn-submit-approval:hover { background: #E0E7FF; }
+.btn-submit-approval:hover { background: var(--primary-muted); }
 
 .btn-publish-ig {
   display: inline-flex;
