@@ -9,6 +9,7 @@ import Calendar from './components/Calendar';
 import NotFound from './components/NotFound';
 import ContentGenerator from './components/ContentGenerator';
 import Account from './components/Account';
+import ClientDashboard from './components/ClientDashboard';
 import Sidebar from './components/Sidebar';
 import './App.css';
 
@@ -38,6 +39,7 @@ function AppLayout({ children }) {
 }
 
 function ProtectedRoute({ children }) {
+  const location = useLocation();
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/login" replace />;
   const expiresAt = localStorage.getItem('token_expires_at');
@@ -45,7 +47,11 @@ function ProtectedRoute({ children }) {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     localStorage.removeItem('token_expires_at');
+    localStorage.removeItem('role');
     return <Navigate to="/login" replace />;
+  }
+  if (localStorage.getItem('role') === 'client' && location.pathname === '/dashboard') {
+    return <Navigate to="/client" replace />;
   }
   return <AppLayout>{children}</AppLayout>;
 }
@@ -69,6 +75,7 @@ const router = createBrowserRouter([
       { path: '/login', element: <Login isLoginMode={true} /> },
       { path: '/register', element: <Login isLoginMode={false} /> },
       { path: '/dashboard', element: <ProtectedRoute><Dashboard /></ProtectedRoute> },
+      { path: '/client', element: <ProtectedRoute><ClientDashboard /></ProtectedRoute> },
       { path: '/posts', element: <ProtectedRoute><PostsList /></ProtectedRoute> },
       { path: '/create', element: <ProtectedRoute><CreatePost /></ProtectedRoute> },
       { path: '/edit/:id', element: <ProtectedRoute><EditPost /></ProtectedRoute> },

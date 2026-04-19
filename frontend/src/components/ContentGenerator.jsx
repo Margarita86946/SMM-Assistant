@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { aiAPI, postsAPI } from '../services/api';
+import { aiAPI, postsAPI, brandAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import '../styles/ContentGenerator.css';
 
@@ -62,6 +62,10 @@ function ContentGenerator() {
         platform: 'instagram',
         tone: 'professional'
     });
+    const [textProvider, setTextProvider] = useState('groq');
+    const [imageProvider, setImageProvider] = useState('flux');
+    const [ollamaStatus, setOllamaStatus] = useState({ ollama: false, models: [] });
+    const [brandProfile, setBrandProfile] = useState(null);
     const [generatedContent, setGeneratedContent] = useState(null);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -69,11 +73,46 @@ function ContentGenerator() {
     const [successMsg, setSuccessMsg] = useState('');
     const [imageUrl, setImageUrl] = useState(null);
     const [imageLoading, setImageLoading] = useState(false);
+    const [imageRetry, setImageRetry] = useState(0);
     const [downloading, setDownloading] = useState(false);
     const [regenLoading, setRegenLoading] = useState({ caption: false, hashtags: false, image_prompt: false, image: false });
+    const [variants, setVariants] = useState(null);
+    const [variantsLoading, setVariantsLoading] = useState(false);
+
+    useEffect(() => {
+        aiAPI.getStatus().then(res => setOllamaStatus(res.data)).catch(() => {});
+        brandAPI.get().then(res => setBrandProfile(res.data)).catch(() => setBrandProfile(null));
+    }, []);
+
+    const hasBrandContext = brandProfile && (
+        brandProfile.brand_name || brandProfile.voice_tone ||
+        brandProfile.target_audience || brandProfile.keywords || brandProfile.banned_words
+    );
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const fetchImage = async (richPrompt) => {
+        const topic = (formData.topic || '').trim();
+        const rich = (richPrompt || '').replace(/^["'`]+|["'`]+$/g, '').replace(/\s+/g, ' ').trim();
+        let prompt = topic;
+        if (imageProvider === 'flux') {
+            prompt = topic ? `${topic}, professional photography, high quality` : rich.slice(0, 150);
+        } else {
+            prompt = rich || topic;
+            if (prompt.length > 200) {
+                const cut = prompt.slice(0, 200);
+                const lastSpace = cut.lastIndexOf(' ');
+                prompt = lastSpace > 80 ? cut.slice(0, lastSpace) : cut;
+            }
+        }
+        const imgRes = await aiAPI.generateImage({
+            prompt,
+            platform: formData.platform,
+            image_provider: imageProvider,
+        });
+        return imgRes.data.image_url;
     };
 
     const handleGenerate = async () => {
@@ -86,15 +125,18 @@ function ContentGenerator() {
         setGeneratedContent(null);
         setImageUrl(null);
         setDownloading(false);
+        setVariants(null);
 
         try {
-            const response = await aiAPI.generateContent(formData);
+            const response = await aiAPI.generateContent({ ...formData, provider: textProvider });
             setGeneratedContent(response.data);
             setImageLoading(true);
+            setImageRetry(0);
             try {
-                const imgRes = await aiAPI.generateImage(formData.topic, formData.platform);
-                setImageUrl(imgRes.data.image_url);
-            } catch {
+                const url = await fetchImage(response.data.image_prompt);
+                setImageUrl(url);
+            } catch (err) {
+                setError(err.response?.data?.error || err.message || t('generate.imageFailed'));
             } finally {
                 setImageLoading(false);
             }
@@ -110,17 +152,40 @@ function ContentGenerator() {
         setError('');
         try {
             if (section === 'image') {
-                const imgRes = await aiAPI.generateImage(formData.topic, formData.platform);
-                setImageUrl(imgRes.data.image_url);
+                const url = await fetchImage(generatedContent?.image_prompt);
+                setImageUrl(url);
             } else {
-                const response = await aiAPI.generateContent(formData);
+                const response = await aiAPI.generateContent({ ...formData, provider: textProvider });
                 setGeneratedContent(prev => ({ ...prev, [section]: response.data[section] }));
             }
-        } catch {
-            setError(t('generate.failedRegen'));
+        } catch (err) {
+            setError(err.message || t('generate.failedRegen'));
         } finally {
             setRegenLoading(prev => ({ ...prev, [section]: false }));
         }
+    };
+
+    const handleGenerateVariants = async () => {
+        setVariantsLoading(true);
+        setError('');
+        try {
+            const res = await aiAPI.generateVariants({
+                topic: formData.topic,
+                platform: formData.platform,
+                tone: formData.tone,
+                provider: textProvider,
+            });
+            setVariants(res.data.variants);
+        } catch {
+            setError(t('generate.failedVariants'));
+        } finally {
+            setVariantsLoading(false);
+        }
+    };
+
+    const handleUseVariant = (caption) => {
+        setGeneratedContent(prev => ({ ...prev, caption }));
+        setVariants(null);
     };
 
     const handleSaveAsDraft = async () => {
@@ -184,6 +249,16 @@ function ContentGenerator() {
             {error && <div className="error-message">{error}</div>}
             {successMsg && <div className="success-message">{successMsg}</div>}
 
+            <div className={`brand-banner ${hasBrandContext ? 'brand-banner--ok' : 'brand-banner--warn'}`}>
+                {hasBrandContext ? (
+                    <span>✓ Using brand context: <strong>{brandProfile.brand_name || 'your brand'}</strong></span>
+                ) : (
+                    <span>
+                        ⚠ Set up your <button className="brand-banner-link" onClick={() => navigate('/account')}>Brand Profile</button> for better AI results
+                    </span>
+                )}
+            </div>
+
             <div className="generator-form-card">
                 <div className="gen-form-group">
                     <label>{t('generate.topic')}</label>
@@ -217,6 +292,38 @@ function ContentGenerator() {
                     </div>
                 </div>
 
+                <div className="gen-model-card">
+                    <h4 className="gen-model-title">Model Settings</h4>
+                    <div className="gen-form-row">
+                        <div className="gen-form-group">
+                            <label>Text Model</label>
+                            <select value={textProvider} onChange={(e) => setTextProvider(e.target.value)}>
+                                <option value="groq">Groq / Llama 4 Scout (Cloud)</option>
+                                <option value="ollama">
+                                    Gemma 3 12B / Local (Ollama) {ollamaStatus.ollama ? '● Online' : '● Offline'}
+                                </option>
+                            </select>
+                            {textProvider === 'ollama' && (
+                                <p className={`gen-model-status ${ollamaStatus.ollama ? 'gen-model-status--ok' : 'gen-model-status--err'}`}
+                                   title={ollamaStatus.ollama ? '' : 'Run `ollama serve` in terminal'}>
+                                    {ollamaStatus.ollama ? '● Online' : '● Offline (run `ollama serve`)'}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="gen-form-group">
+                            <label>Image Source</label>
+                            <select value={imageProvider} onChange={(e) => setImageProvider(e.target.value)}>
+                                <option value="unsplash">Unsplash (Stock Photos)</option>
+                                <option value="flux">Flux AI / Pollinations (Generated)</option>
+                            </select>
+                            {imageProvider === 'flux' && (
+                                <p className="gen-model-note">⚡ Flux generates original AI images, not stock photos.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 <button className="btn-generate" onClick={handleGenerate} disabled={loading}>
                     {loading ? t('generate.generating') : t('generate.button')}
                 </button>
@@ -235,6 +342,32 @@ function ContentGenerator() {
                             </div>
                         </div>
                         <p>{generatedContent.caption}</p>
+
+                        <div className="gen-variants-row">
+                            <button
+                                className="btn-variants"
+                                onClick={handleGenerateVariants}
+                                disabled={variantsLoading}
+                            >
+                                {variantsLoading ? 'Generating variants…' : 'Generate 3 Variants'}
+                            </button>
+                        </div>
+
+                        {variants && (
+                            <div className="gen-variants-grid">
+                                {variants.map((v, idx) => (
+                                    <div key={idx} className="gen-variant-card">
+                                        <p className="gen-variant-text">{v}</p>
+                                        <button
+                                            className="btn-use-variant"
+                                            onClick={() => handleUseVariant(v)}
+                                        >
+                                            Use This
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className={`gen-result-block${regenLoading.hashtags ? ' gen-result-block--loading' : ''}`}>
@@ -260,7 +393,23 @@ function ContentGenerator() {
                         {imageLoading && <p className="gen-image-status">{t('generate.generatingImage')}</p>}
                         {!imageLoading && imageUrl && (
                             <>
-                                <img src={imageUrl} alt="AI generated" className="gen-result-image" />
+                                <img
+                                    src={imageUrl}
+                                    alt="AI generated"
+                                    className="gen-result-image"
+                                    referrerPolicy="no-referrer"
+                                    onError={() => {
+                                        console.error('Image failed to load:', imageUrl);
+                                        if (imageRetry < 2) {
+                                            setImageRetry(imageRetry + 1);
+                                            setImageUrl(imageUrl.replace(/seed=\d+/, `seed=${Math.floor(Math.random() * 10000000)}`));
+                                        } else {
+                                            setError(`${t('generate.imageFailed')} URL: ${imageUrl}`);
+                                            setImageUrl(null);
+                                            setImageRetry(0);
+                                        }
+                                    }}
+                                />
                                 <div className="gen-image-buttons">
                                     <RegenButton onClick={() => handleRegenSection('image')} loading={regenLoading.image} t={t} />
                                     <button className="btn-download-image" onClick={handleDownload} disabled={downloading || regenLoading.image}>
@@ -278,7 +427,7 @@ function ContentGenerator() {
                         </button>
                         <button
                             className="btn-generate-new"
-                            onClick={() => { setGeneratedContent(null); setImageUrl(null); setFormData({ topic: '', platform: 'instagram', tone: 'professional' }); }}
+                            onClick={() => { setGeneratedContent(null); setImageUrl(null); setVariants(null); setFormData({ topic: '', platform: 'instagram', tone: 'professional' }); }}
                         >
                             {t('generate.generateNew')}
                         </button>

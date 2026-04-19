@@ -2,22 +2,54 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Authentication
     path('register/', views.register, name='register'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('profile/', views.profile_view, name='profile'),
+    path('change-password/', views.change_password, name='change-password'),
 
+    # Posts
     path('posts/', views.posts_list, name='posts-list'),
     path('posts/<int:pk>/', views.post_detail, name='post-detail'),
+    path('posts/<int:pk>/submit/', views.submit_post, name='submit-post'),
+    path('posts/<int:pk>/approve/', views.approve_post, name='approve-post'),
+    path('posts/<int:pk>/reject/', views.reject_post, name='reject-post'),
+    path('posts/<int:pk>/publish-now/', views.publish_post_now, name='publish-post-now'),
 
+    # Calendar
     path('calendar/', views.calendar_view, name='calendar'),
     path('calendar/today/', views.today_posts, name='today-posts'),
 
+    # Dashboard
     path('dashboard/stats/', views.dashboard_stats, name='dashboard-stats'),
+    path('dashboard/activity/', views.dashboard_activity, name='dashboard-activity'),
 
+    # AI Content Generation
     path('generate-content/', views.generate_content, name='generate-content'),
     path('polish-content/', views.polish_content_view, name='polish-content'),
     path('generate-image/', views.generate_image, name='generate-image'),
+    path('generate-variants/', views.generate_variants, name='generate-variants'),
+    path('ai-status/', views.ai_status, name='ai-status'),
 
-    path('profile/', views.profile_view, name='profile'),
-    path('change-password/', views.change_password, name='change-password'),
+    # Brand Profile
+    path('brand-profile/', views.brand_profile, name='brand-profile'),
+
+    # Instagram Integration
+    path('auth/instagram/', views.instagram_oauth_start, name='instagram-oauth-start'),
+    path('auth/instagram/callback/', views.instagram_oauth_callback, name='instagram-oauth-callback'),
+    path('auth/instagram/disconnect/', views.instagram_disconnect, name='instagram-disconnect'),
+    path('auth/instagram/status/', views.instagram_status, name='instagram-status'),
+
+    # Client Invitations
+    path('invitations/', views.invitations_list, name='invitations-list'),
+    path('invitations/<int:pk>/', views.invitation_detail, name='invitation-detail'),
+    path('invitations/lookup/<str:token>/', views.invitation_lookup, name='invitation-lookup'),
+    path('invitations/start/<str:token>/', views.invitation_oauth_start, name='invitation-oauth-start'),
+
+    # Email Configuration
+    path('email-config/', views.email_config_view, name='email-config'),
+
+    # Audit Logs
+    path('audit-logs/', views.audit_logs_view, name='audit-logs'),
 ]

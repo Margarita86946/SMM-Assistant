@@ -341,6 +341,21 @@ button:focus, input:focus, select:focus, textarea:focus {
   color: var(--success-text);
 }
 
+.badge-pending {
+  background: #F3E8FF;
+  color: #6B21A8;
+}
+
+.badge-approved {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.badge-rejected {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
 .error-message {
   background: var(--error-bg);
   color: var(--error-text);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { postsAPI } from '../services/api';
+import { postsAPI, approvalAPI, instagramAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import '../styles/PostsList.css';
@@ -18,10 +18,13 @@ const PLATFORM_LABELS = {
 };
 
 const STATUS_CLS = {
-  draft:         'badge-draft',
-  scheduled:     'badge-scheduled',
-  ready_to_post: 'badge-ready',
-  posted:        'badge-posted',
+  draft:            'badge-draft',
+  scheduled:        'badge-scheduled',
+  ready_to_post:    'badge-ready',
+  pending_approval: 'badge-pending',
+  approved:         'badge-approved',
+  rejected:         'badge-rejected',
+  posted:           'badge-posted',
 };
 
 function PostViewModal({ post, onClose, onEdit, t, locale }) {
@@ -125,6 +128,9 @@ function PostsList() {
   const [filterPlatform, setFilterPlatform] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [page, setPage] = useState(1);
+  const [publishingId, setPublishingId] = useState(null);
+  const [publishMsg, setPublishMsg] = useState('');
+  const [publishError, setPublishError] = useState('');
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { language } = useSettings();
@@ -193,13 +199,49 @@ function PostsList() {
 
   const getStatusBadge = (status) => {
     const badges = {
-      draft:         { text: t('posts.draft'),        cls: 'badge-draft'     },
-      scheduled:     { text: t('posts.scheduled'),    cls: 'badge-scheduled' },
-      ready_to_post: { text: t('posts.ready'),        cls: 'badge-ready'     },
-      posted:        { text: t('posts.posted'),       cls: 'badge-posted'    },
+      draft:            { text: t('posts.draft'),        cls: 'badge-draft'     },
+      scheduled:        { text: t('posts.scheduled'),    cls: 'badge-scheduled' },
+      ready_to_post:    { text: t('posts.ready'),        cls: 'badge-ready'     },
+      pending_approval: { text: 'Pending Approval',      cls: 'badge-pending'   },
+      approved:         { text: 'Approved',              cls: 'badge-approved'  },
+      rejected:         { text: 'Rejected',              cls: 'badge-rejected'  },
+      posted:           { text: t('posts.posted'),       cls: 'badge-posted'    },
     };
     const badge = badges[status] || { text: status, cls: 'badge-default' };
     return <span className={`status-badge ${badge.cls}`}>{badge.text}</span>;
+  };
+
+  const handleSubmitForApproval = async (e, id) => {
+    e.stopPropagation();
+    try {
+      await approvalAPI.submit(id);
+      loadPosts(page, debouncedSearch, filterPlatform, filterStatus);
+    } catch (err) {
+      alert(err.message || 'Failed to submit for approval');
+    }
+  };
+
+  const handlePublishNow = async (e, post) => {
+    e.stopPropagation();
+    setPublishError('');
+    setPublishMsg('');
+    setPublishingId(post.id);
+    try {
+      await instagramAPI.publishNow(post.id);
+      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, status: 'posted' } : p));
+      setPublishMsg(t('instagram.publishSuccess'));
+      setTimeout(() => setPublishMsg(''), 4000);
+    } catch (err) {
+      const msg = err.message || '';
+      if (msg.toLowerCase().includes('no active instagram')) {
+        setPublishError(t('instagram.publishNoAccount'));
+      } else {
+        setPublishError(msg || t('instagram.publishFailed'));
+      }
+      setTimeout(() => setPublishError(''), 5000);
+    } finally {
+      setPublishingId(null);
+    }
   };
 
   const hasActiveFilter = debouncedSearch || filterPlatform !== 'all' || filterStatus !== 'all';
@@ -241,6 +283,8 @@ function PostsList() {
       </div>
 
       {error && <div className="error-message">{t(error)}</div>}
+      {publishError && <div className="error-message">{publishError}</div>}
+      {publishMsg && <div className="success-message">{publishMsg}</div>}
 
       <div className="posts-filter-bar">
         <div className="posts-search-wrap">
@@ -339,6 +383,10 @@ function PostsList() {
                   <span>📅 {formatDate(post.scheduled_time)}</span>
                 </div>
 
+                {post.status === 'rejected' && post.approval_note && (
+                  <p className="post-rejection-note">✗ {post.approval_note}</p>
+                )}
+
                 <div className="post-actions">
                   <button
                     className="btn-edit"
@@ -346,6 +394,34 @@ function PostsList() {
                   >
                     {t('posts.edit')}
                   </button>
+                  {(post.status === 'draft' || post.status === 'ready_to_post') && (
+                    <button className="btn-submit-approval" onClick={(e) => handleSubmitForApproval(e, post.id)}>
+                      Submit for Approval
+                    </button>
+                  )}
+                  {post.platform === 'instagram'
+                    && post.status !== 'posted'
+                    && post.image_url && (
+                    <button
+                      className="btn-publish-ig"
+                      onClick={(e) => handlePublishNow(e, post)}
+                      disabled={publishingId === post.id}
+                    >
+                      {publishingId === post.id ? (
+                        <><span className="btn-publish-ig-spinner" /> {t('instagram.publishing')}</>
+                      ) : (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                          </svg>
+                          {t('instagram.publishBtn')}
+                        </>
+                      )}
+                    </button>
+                  )}
                   <button className="btn-delete" onClick={(e) => handleDelete(e, post.id)}>
                     {t('posts.delete')}
                   </button>

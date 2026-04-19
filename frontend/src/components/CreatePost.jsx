@@ -34,6 +34,7 @@ function CreatePost() {
   const [platform, setPlatform] = useState('instagram');
 
   const [tone, setTone] = useState('professional');
+  const [autoPublish, setAutoPublish] = useState(false);
   const [polishing, setPolishing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -86,7 +87,14 @@ function CreatePost() {
     setSaving(true);
     setError('');
     try {
-      await postsAPI.create({ topic, caption, hashtags, tone, image_prompt: imagePrompt, platform, status: 'draft', scheduled_time: null });
+      await postsAPI.create({
+        topic, caption, hashtags, tone,
+        image_prompt: imagePrompt,
+        platform,
+        status: 'draft',
+        scheduled_time: null,
+        auto_publish: platform === 'instagram' ? autoPublish : false,
+      });
       setSuccessMsg(t('create.savedMsg'));
       setTimeout(() => navigate('/posts'), 1500);
     } catch {
@@ -127,7 +135,11 @@ function CreatePost() {
         <div className="create-form-row">
           <div className="create-form-group">
             <label>{t('create.platform')}</label>
-            <select value={platform} onChange={(e) => setPlatform(e.target.value)}>
+            <select value={platform} onChange={(e) => {
+              const next = e.target.value;
+              setPlatform(next);
+              if (next !== 'instagram') setAutoPublish(false);
+            }}>
               <option value="instagram">Instagram</option>
               <option value="linkedin">LinkedIn</option>
               <option value="twitter">Twitter</option>
@@ -185,6 +197,23 @@ function CreatePost() {
             disabled={regenLoading.image_prompt}
           />
         </div>
+
+        {platform === 'instagram' && (
+          <label className="create-toggle-row">
+            <input
+              type="checkbox"
+              checked={autoPublish}
+              onChange={(e) => setAutoPublish(e.target.checked)}
+            />
+            <span className="create-toggle-switch" aria-hidden="true">
+              <span className="create-toggle-thumb" />
+            </span>
+            <span className="create-toggle-text">
+              <span className="create-toggle-title">{t('instagram.autoPublishTitle')}</span>
+              <span className="create-toggle-hint">{t('instagram.autoPublishHint')}</span>
+            </span>
+          </label>
+        )}
 
         <button className="btn-ai-assist" onClick={handlePolish} disabled={polishing}>
           {polishing ? (

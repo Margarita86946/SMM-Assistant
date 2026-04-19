@@ -376,3 +376,117 @@
 .gen-image-error {
   color: #EF4444;
 }
+
+/* --- Brand context banner --- */
+.brand-banner {
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid;
+}
+.brand-banner--ok {
+  background: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #065F46;
+}
+.brand-banner--warn {
+  background: #FFFBEB;
+  border-color: #FDE68A;
+  color: #92400E;
+}
+.brand-banner-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: inherit;
+}
+
+/* --- Model settings card --- */
+.gen-model-card {
+  background: #F9FAFB;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 18px;
+}
+.gen-model-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 12px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.gen-model-status {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.gen-model-status--ok { color: #059669; }
+.gen-model-status--err { color: #DC2626; }
+.gen-model-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #6366F1;
+  font-weight: 500;
+}
+
+/* --- Variants --- */
+.gen-variants-row {
+  margin-top: 10px;
+}
+.btn-variants {
+  background: #EEF2FF;
+  color: #4F46E5;
+  border: 1px solid #C7D2FE;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-variants:hover:not(:disabled) { background: #E0E7FF; }
+.btn-variants:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.gen-variants-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.gen-variant-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gen-variant-text {
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  margin: 0;
+  line-height: 1.5;
+}
+.btn-use-variant {
+  background: #6366F1;
+  color: #FFF;
+  border: none;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.btn-use-variant:hover { background: #4F46E5; }

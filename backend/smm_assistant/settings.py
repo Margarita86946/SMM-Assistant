@@ -16,7 +16,7 @@ if not DB_PASSWORD:
 
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'granddad-unneeded-divisible.ngrok-free.dev']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -88,10 +88,36 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 _cors_env = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000')
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _cors_env.split(',') if origin.strip()]
+
+INSTAGRAM_APP_ID = os.environ.get('INSTAGRAM_APP_ID')
+INSTAGRAM_APP_SECRET = os.environ.get('INSTAGRAM_APP_SECRET')
+INSTAGRAM_REDIRECT_URI = os.environ.get('INSTAGRAM_REDIRECT_URI')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+BACKEND_PUBLIC_URL = os.environ.get('BACKEND_PUBLIC_URL', 'http://localhost:8000').rstrip('/')
+
+MASTER_ENCRYPTION_KEY = os.environ.get('MASTER_ENCRYPTION_KEY', '')
+if not DEBUG and not MASTER_ENCRYPTION_KEY:
+    raise ValueError('MASTER_ENCRYPTION_KEY must be set in production')
+
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend',
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'SMM Assistant <noreply@smm-assistant.local>')
+
+INVITATION_TTL_DAYS = int(os.environ.get('INVITATION_TTL_DAYS', '7'))
 
 CORS_ALLOW_CREDENTIALS = True
 

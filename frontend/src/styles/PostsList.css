@@ -606,3 +606,57 @@
   border-color: var(--primary);
   color: var(--primary);
 }
+
+.post-rejection-note {
+  color: #B91C1C;
+  font-size: 12px;
+  margin: 6px 0 0;
+  font-style: italic;
+}
+
+.btn-submit-approval {
+  background: #EEF2FF;
+  color: #4F46E5;
+  border: 1px solid #C7D2FE;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-submit-approval:hover { background: #E0E7FF; }
+
+.btn-publish-ig {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #F58529 0%, #DD2A7B 50%, #8134AF 100%);
+  border: none;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+}
+
+.btn-publish-ig:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-publish-ig:active:not(:disabled) { transform: translateY(1px); }
+.btn-publish-ig:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.btn-publish-ig svg { width: 14px; height: 14px; }
+
+.btn-publish-ig-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #FFFFFF;
+  border-radius: 50%;
+  animation: btn-publish-ig-spin 0.7s linear infinite;
+}
+
+@keyframes btn-publish-ig-spin {
+  to { transform: rotate(360deg); }
+}

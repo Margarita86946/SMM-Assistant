@@ -13,7 +13,20 @@ function Sidebar() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef(null);
 
+  const role = localStorage.getItem('role');
+  const isClient = role === 'client';
+
   const NAV_ITEMS = useMemo(() => [
+    ...(isClient ? [{
+      path: '/client',
+      label: 'Client View',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      ),
+    }] : []),
     {
       path: '/dashboard',
       label: t('nav.dashboard'),
@@ -77,7 +90,7 @@ function Sidebar() {
       ),
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [language]);
+  ], [language, isClient]);
 
   const isActive = (path) => {
     if (path === '/dashboard') return location.pathname === '/dashboard';
@@ -89,6 +102,7 @@ function Sidebar() {
     localStorage.removeItem('username');
     localStorage.removeItem('token_expires_at');
     localStorage.removeItem('avatar');
+    localStorage.removeItem('role');
     window.location.href = '/login';
   };
 

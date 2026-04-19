@@ -30,6 +30,7 @@ function Login({ isLoginMode }) {
     last_name: '',
     password: '',
     password2: '',
+    role: 'specialist',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
@@ -60,10 +61,11 @@ function Login({ isLoginMode }) {
         });
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('username', formData.username);
+        if (response.data.role) localStorage.setItem('role', response.data.role);
         if (response.data.expires_at) {
           localStorage.setItem('token_expires_at', response.data.expires_at);
         }
-        navigate('/dashboard');
+        navigate(response.data.role === 'client' ? '/client' : '/dashboard');
       } else {
         if (formData.password !== formData.password2) {
           setError(t('auth.passwordMismatch'));
@@ -76,6 +78,7 @@ function Login({ isLoginMode }) {
           first_name: formData.first_name,
           last_name: formData.last_name,
           password: formData.password,
+          role: formData.role,
         });
         const loginResponse = await authAPI.login({
           username: formData.username,
@@ -83,10 +86,11 @@ function Login({ isLoginMode }) {
         });
         localStorage.setItem('token', loginResponse.data.token);
         localStorage.setItem('username', formData.username);
+        if (loginResponse.data.role) localStorage.setItem('role', loginResponse.data.role);
         if (loginResponse.data.expires_at) {
           localStorage.setItem('token_expires_at', loginResponse.data.expires_at);
         }
-        navigate('/dashboard');
+        navigate(loginResponse.data.role === 'client' ? '/client' : '/dashboard');
       }
     } catch (err) {
       const errorMap = {
@@ -101,7 +105,7 @@ function Login({ isLoginMode }) {
 
   const toggleMode = () => {
     setError('');
-    setFormData({ username: '', email: '', first_name: '', last_name: '', password: '', password2: '' });
+    setFormData({ username: '', email: '', first_name: '', last_name: '', password: '', password2: '', role: 'specialist' });
     setShowPassword(false);
     setShowPassword2(false);
     navigate(isLogin ? '/register' : '/login');
@@ -211,6 +215,21 @@ function Login({ isLoginMode }) {
                     placeholder={t('auth.lastNamePlaceholder')}
                   />
                 </div>
+              </div>
+            )}
+
+            {!isLogin && (
+              <div className="form-group">
+                <label>Account Type</label>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  disabled={loading}
+                >
+                  <option value="specialist">Specialist (create content)</option>
+                  <option value="client">Client (approve content)</option>
+                </select>
               </div>
             )}
 

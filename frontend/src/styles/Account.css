@@ -279,6 +279,119 @@
   font-style: italic;
 }
 
+.ig-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg, #F8FAFC);
+}
+
+.ig-card--connected {
+  background: #FFFFFF;
+  border-color: #E5E7EB;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.ig-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9CA3AF;
+  background: #F3F4F6;
+  flex-shrink: 0;
+}
+
+.ig-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.ig-icon--active {
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #F58529 0%, #DD2A7B 50%, #8134AF 100%);
+}
+
+.ig-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ig-info-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ig-info-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.ig-info-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-primary, #111827);
+}
+
+.ig-info-muted {
+  color: var(--text-secondary, #6B7280);
+  font-weight: 500;
+}
+
+.ig-info-meta {
+  font-size: 13px;
+  color: var(--text-secondary, #6B7280);
+}
+
+.ig-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #065F46;
+  background: #D1FAE5;
+  border-radius: 999px;
+}
+
+.ig-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.ig-actions { flex-shrink: 0; }
+
+.ig-btn {
+  width: auto;
+  padding: 10px 18px;
+  font-size: 14px;
+}
+
+.ig-btn--connect {
+  background: linear-gradient(135deg, #F58529 0%, #DD2A7B 50%, #8134AF 100%);
+  border: none;
+}
+
+.ig-btn--connect:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
 @media (max-width: 640px) {
   .account-container { padding: 24px 16px; }
   .account-hero-card { flex-direction: column; align-items: flex-start; }
@@ -287,4 +400,7 @@
   .account-hero-stats { margin-left: 0; }
   .account-stat { text-align: left; }
   .account-form-row { grid-template-columns: 1fr; }
+  .ig-card { flex-direction: column; align-items: flex-start; }
+  .ig-actions { width: 100%; }
+  .ig-btn { width: 100%; }
 }

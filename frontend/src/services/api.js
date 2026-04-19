@@ -32,13 +32,16 @@ api.interceptors.response.use(
         localStorage.removeItem('token');
         localStorage.removeItem('username');
         localStorage.removeItem('token_expires_at');
+        localStorage.removeItem('role');
         window.location.href = '/login';
         return Promise.reject(error);
       }
     }
 
     if (error.response?.data?.error) {
-      error.message = error.response.data.error;
+      error.message = error.response.data.detail
+        ? `${error.response.data.error} (${error.response.data.detail})`
+        : error.response.data.error;
     } else if (error.response?.data) {
       const errors = error.response.data;
       const errorMessages = Object.entries(errors)
@@ -69,6 +72,7 @@ export const postsAPI = {
 
 export const dashboardAPI = {
   getStats: () => api.get('/dashboard/stats/'),
+  getActivity: () => api.get('/dashboard/activity/'),
 };
 
 export const calendarAPI = {
@@ -77,15 +81,35 @@ export const calendarAPI = {
 };
 
 export const aiAPI = {
+  getStatus: () => api.get('/ai-status/'),
   generateContent: (data) => api.post('/generate-content/', data),
-  generateImage: (prompt, platform = 'instagram') => api.post('/generate-image/', { prompt, platform }),
+  generateImage: (data) => api.post('/generate-image/', data),
   polishContent: (data) => api.post('/polish-content/', data),
+  generateVariants: (data) => api.post('/generate-variants/', data),
+};
+
+export const brandAPI = {
+  get: () => api.get('/brand-profile/'),
+  update: (data) => api.put('/brand-profile/', data),
+};
+
+export const approvalAPI = {
+  submit: (id) => api.post(`/posts/${id}/submit/`),
+  approve: (id) => api.post(`/posts/${id}/approve/`),
+  reject: (id, note) => api.post(`/posts/${id}/reject/`, { note }),
 };
 
 export const profileAPI = {
   get: () => api.get('/profile/'),
   update: (data) => api.patch('/profile/', data),
   changePassword: (data) => api.post('/change-password/', data),
+};
+
+export const instagramAPI = {
+  getStatus: () => api.get('/auth/instagram/status/'),
+  getOAuthUrl: () => api.get('/auth/instagram/'),
+  disconnect: () => api.delete('/auth/instagram/disconnect/'),
+  publishNow: (postId) => api.post(`/posts/${postId}/publish-now/`),
 };
 
 export default api;

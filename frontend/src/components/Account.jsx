@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { profileAPI } from '../services/api';
+import { profileAPI, brandAPI, instagramAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import '../styles/Account.css';
@@ -52,6 +52,81 @@ function Account() {
   const [pwError, setPwError] = useState('');
   const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false });
 
+  const [brandData, setBrandData] = useState({
+    brand_name: '', voice_tone: '', target_audience: '', keywords: '', banned_words: '',
+  });
+  const [brandSaving, setBrandSaving] = useState(false);
+  const [brandMsg, setBrandMsg] = useState('');
+  const [brandError, setBrandError] = useState('');
+
+  const [igStatus, setIgStatus] = useState(null);
+  const [igLoading, setIgLoading] = useState(true);
+  const [igConnecting, setIgConnecting] = useState(false);
+  const [igDisconnecting, setIgDisconnecting] = useState(false);
+  const [igMsg, setIgMsg] = useState('');
+  const [igError, setIgError] = useState('');
+
+  const loadIgStatus = async () => {
+    try {
+      const res = await instagramAPI.getStatus();
+      setIgStatus(res.data);
+    } catch {
+      setIgStatus({ connected: false });
+    } finally {
+      setIgLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadIgStatus();
+    const params = new URLSearchParams(window.location.search);
+    const igParam = params.get('instagram');
+    if (igParam === 'connected') {
+      setIgMsg(t('instagram.connectedMsg'));
+      setTimeout(() => setIgMsg(''), 4000);
+    } else if (igParam === 'personal') {
+      setIgError(t('instagram.personalError'));
+      setTimeout(() => setIgError(''), 6000);
+    } else if (igParam === 'error') {
+      setIgError(t('instagram.connectError'));
+      setTimeout(() => setIgError(''), 5000);
+    }
+    if (igParam) {
+      params.delete('instagram');
+      const q = params.toString();
+      const url = window.location.pathname + (q ? `?${q}` : '') + window.location.hash;
+      window.history.replaceState({}, '', url);
+    }
+  }, []);
+
+  const handleInstagramConnect = async () => {
+    setIgConnecting(true);
+    setIgError('');
+    try {
+      const res = await instagramAPI.getOAuthUrl();
+      window.location.href = res.data.oauth_url;
+    } catch (err) {
+      setIgError(err.message || t('instagram.connectError'));
+      setIgConnecting(false);
+    }
+  };
+
+  const handleInstagramDisconnect = async () => {
+    if (!window.confirm(t('instagram.disconnectConfirm'))) return;
+    setIgDisconnecting(true);
+    setIgError('');
+    try {
+      await instagramAPI.disconnect();
+      await loadIgStatus();
+      setIgMsg(t('instagram.disconnectedMsg'));
+      setTimeout(() => setIgMsg(''), 3000);
+    } catch (err) {
+      setIgError(err.message || t('instagram.disconnectError'));
+    } finally {
+      setIgDisconnecting(false);
+    }
+  };
+
   useEffect(() => {
     profileAPI.get().then(res => {
       setProfile(res.data);
@@ -60,7 +135,32 @@ function Account() {
       else localStorage.removeItem('avatar');
     }).catch(() => {
     }).finally(() => setLoading(false));
+
+    brandAPI.get().then(res => {
+      setBrandData({
+        brand_name: res.data.brand_name || '',
+        voice_tone: res.data.voice_tone || '',
+        target_audience: res.data.target_audience || '',
+        keywords: res.data.keywords || '',
+        banned_words: res.data.banned_words || '',
+      });
+    }).catch(() => {});
   }, []);
+
+  const handleBrandSave = async () => {
+    setBrandSaving(true);
+    setBrandMsg('');
+    setBrandError('');
+    try {
+      await brandAPI.update(brandData);
+      setBrandMsg(t('account.savedMsg'));
+      setTimeout(() => setBrandMsg(''), 3000);
+    } catch (err) {
+      setBrandError(err.message || t('account.failedSave'));
+    } finally {
+      setBrandSaving(false);
+    }
+  };
 
   const handleAvatarClick = () => {
     setAvatarError('');
@@ -293,6 +393,132 @@ function Account() {
 
         <button className="account-btn-save account-btn-danger" onClick={handlePwSave} disabled={pwSaving}>
           {pwSaving ? t('common.saving') : t('account.changePasswordBtn')}
+        </button>
+      </div>
+
+      {/* Connected Accounts */}
+      <div className="account-card">
+        <div className="account-card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          {t('instagram.cardTitle')}
+        </div>
+
+        {igError && <div className="error-message">{igError}</div>}
+        {igMsg && <div className="success-message">{igMsg}</div>}
+
+        <div className={`ig-card ${igStatus?.connected ? 'ig-card--connected' : 'ig-card--disconnected'}`}>
+          <div className={`ig-icon ${igStatus?.connected ? 'ig-icon--active' : ''}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+            </svg>
+          </div>
+
+          <div className="ig-info">
+            {igLoading ? (
+              <span className="ig-info-name ig-info-muted">{t('common.loading')}</span>
+            ) : igStatus?.connected ? (
+              <>
+                <div className="ig-info-head">
+                  <span className="ig-info-name">@{igStatus.username}</span>
+                  <span className="ig-badge">
+                    <span className="ig-badge-dot" />
+                    {t('instagram.connected')}
+                  </span>
+                </div>
+                {igStatus.expires_at && (
+                  <span className="ig-info-meta">
+                    {t('instagram.accessExpires')} {formatDate(igStatus.expires_at)}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <span className="ig-info-name ig-info-muted">{t('instagram.notConnected')}</span>
+                <span className="ig-info-meta">{t('instagram.notConnectedHint')}</span>
+              </>
+            )}
+          </div>
+
+          <div className="ig-actions">
+            {igLoading ? null : igStatus?.connected ? (
+              <button
+                className="account-btn-save account-btn-danger ig-btn"
+                onClick={handleInstagramDisconnect}
+                disabled={igDisconnecting}
+              >
+                {igDisconnecting ? t('instagram.disconnecting') : t('instagram.disconnect')}
+              </button>
+            ) : (
+              <button
+                className="account-btn-save ig-btn ig-btn--connect"
+                onClick={handleInstagramConnect}
+                disabled={igConnecting}
+              >
+                {igConnecting ? t('instagram.redirecting') : t('instagram.connect')}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Brand Profile */}
+      <div className="account-card">
+        <div className="account-card-title">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+            <line x1="7" y1="7" x2="7.01" y2="7"/>
+          </svg>
+          Brand Profile
+        </div>
+
+        {brandError && <div className="error-message">{brandError}</div>}
+        {brandMsg && <div className="success-message">{brandMsg}</div>}
+
+        <p className="account-pw-hint" style={{ marginTop: 0, marginBottom: 16 }}>
+          Fill this in to give the AI consistent brand context across all generations.
+        </p>
+
+        <div className="account-form-group">
+          <label>Brand Name</label>
+          <input type="text" value={brandData.brand_name}
+            onChange={e => setBrandData({ ...brandData, brand_name: e.target.value })}
+            placeholder="e.g. Acme Co." />
+        </div>
+        <div className="account-form-group">
+          <label>Voice &amp; Tone</label>
+          <input type="text" value={brandData.voice_tone}
+            onChange={e => setBrandData({ ...brandData, voice_tone: e.target.value })}
+            placeholder="e.g. Friendly, concise, witty" />
+        </div>
+        <div className="account-form-group">
+          <label>Target Audience</label>
+          <input type="text" value={brandData.target_audience}
+            onChange={e => setBrandData({ ...brandData, target_audience: e.target.value })}
+            placeholder="e.g. Small-business owners in the US" />
+        </div>
+        <div className="account-form-group">
+          <label>Keywords (comma-separated)</label>
+          <input type="text" value={brandData.keywords}
+            onChange={e => setBrandData({ ...brandData, keywords: e.target.value })}
+            placeholder="productivity, automation, growth" />
+        </div>
+        <div className="account-form-group">
+          <label>Banned Words (comma-separated)</label>
+          <input type="text" value={brandData.banned_words}
+            onChange={e => setBrandData({ ...brandData, banned_words: e.target.value })}
+            placeholder="cheap, synergy, disrupt" />
+        </div>
+
+        <button className="account-btn-save" onClick={handleBrandSave} disabled={brandSaving}>
+          {brandSaving ? t('common.saving') : t('account.saveChanges')}
         </button>
       </div>
     </div>

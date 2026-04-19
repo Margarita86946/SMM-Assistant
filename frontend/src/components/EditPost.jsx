@@ -42,6 +42,7 @@ function EditPost() {
     platform: 'instagram',
     status: 'draft',
     scheduled_time: '',
+    auto_publish: false,
   });
   const [originalData, setOriginalData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -88,6 +89,7 @@ function EditPost() {
             return '';
           }
         })(),
+        auto_publish: !!post.auto_publish,
       };
       setFormData(data);
       setOriginalData(data);
@@ -107,10 +109,14 @@ function EditPost() {
   }, [loadPost]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    const updates = { [name]: value };
+    const { name, value, type, checked } = e.target;
+    const next = type === 'checkbox' ? checked : value;
+    const updates = { [name]: next };
     if (name === 'scheduled_time') {
       updates.status = value ? 'scheduled' : 'draft';
+    }
+    if (name === 'platform' && value !== 'instagram') {
+      updates.auto_publish = false;
     }
     setFormData({ ...formData, ...updates });
   };
@@ -266,6 +272,24 @@ function EditPost() {
             onChange={handleChange}
           />
         </div>
+
+        {formData.platform === 'instagram' && (
+          <label className="edit-toggle-row">
+            <input
+              type="checkbox"
+              name="auto_publish"
+              checked={formData.auto_publish}
+              onChange={handleChange}
+            />
+            <span className="edit-toggle-switch" aria-hidden="true">
+              <span className="edit-toggle-thumb" />
+            </span>
+            <span className="edit-toggle-text">
+              <span className="edit-toggle-title">{t('instagram.autoPublishTitle')}</span>
+              <span className="edit-toggle-hint">{t('instagram.autoPublishHint')}</span>
+            </span>
+          </label>
+        )}
 
         <div className="edit-form-actions">
           {isDirty && (

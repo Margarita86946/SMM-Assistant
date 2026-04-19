@@ -3,7 +3,29 @@ import { useNavigate } from 'react-router-dom';
 import { dashboardAPI, postsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
+import {
+  PieChart, Pie, Cell, Tooltip, Legend,
+  BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid,
+} from 'recharts';
 import '../styles/Dashboard.css';
+
+const STATUS_COLORS = {
+  draft: '#F59E0B',
+  scheduled: '#3B82F6',
+  pending_approval: '#8B5CF6',
+  approved: '#10B981',
+  posted: '#6B7280',
+  rejected: '#EF4444',
+};
+
+const STATUS_LABELS = {
+  draft: 'Draft',
+  scheduled: 'Scheduled',
+  pending_approval: 'Pending',
+  approved: 'Approved',
+  posted: 'Posted',
+  rejected: 'Rejected',
+};
 
 function PostDetailModal({ post, onClose, t, formatDate, getStatusBadge }) {
   useEffect(() => {
@@ -65,8 +87,13 @@ function Dashboard() {
     posts_this_week: 0,
     draft_posts: 0,
     scheduled_posts: 0,
+    pending_approval_posts: 0,
+    approved_posts: 0,
+    posted_posts: 0,
+    rejected_posts: 0,
     most_used_hashtags: [],
   });
+  const [activity, setActivity] = useState([]);
   const [recentPosts, setRecentPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -81,14 +108,16 @@ function Dashboard() {
     try {
       setLoading(true);
 
-      const [statsResponse, postsResponse] = await Promise.all([
+      const [statsResponse, postsResponse, activityResponse] = await Promise.all([
         dashboardAPI.getStats(),
         postsAPI.getAll(),
+        dashboardAPI.getActivity(),
       ]);
 
       setStats(statsResponse.data);
       const allPosts = postsResponse.data.results ?? postsResponse.data;
       setRecentPosts(allPosts.slice(0, 5));
+      setActivity(activityResponse.data);
 
     } catch {
       setError('dashboard.failedLoad');
@@ -118,11 +147,27 @@ function Dashboard() {
       draft: { text: t('posts.draft'), class: 'badge-draft' },
       scheduled: { text: t('posts.scheduled'), class: 'badge-scheduled' },
       ready_to_post: { text: t('posts.ready'), class: 'badge-ready' },
+      pending_approval: { text: 'Pending', class: 'badge-pending' },
+      approved: { text: 'Approved', class: 'badge-approved' },
+      rejected: { text: 'Rejected', class: 'badge-rejected' },
       posted: { text: t('posts.posted'), class: 'badge-posted' },
     };
     const badge = badges[status] || { text: status, class: 'badge-default' };
     return <span className={`status-badge ${badge.class}`}>{badge.text}</span>;
   };
+
+  const pieData = [
+    { key: 'draft', value: stats.draft_posts || 0 },
+    { key: 'scheduled', value: stats.scheduled_posts || 0 },
+    { key: 'pending_approval', value: stats.pending_approval_posts || 0 },
+    { key: 'approved', value: stats.approved_posts || 0 },
+    { key: 'posted', value: stats.posted_posts || 0 },
+  ].filter(d => d.value > 0).map(d => ({ name: STATUS_LABELS[d.key], value: d.value, key: d.key }));
+
+  const activityData = activity.map(d => ({
+    date: new Date(d.date).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
+    count: d.count,
+  }));
 
   if (loading) {
     return (
@@ -181,6 +226,40 @@ function Dashboard() {
             <h3>{stats.scheduled_posts}</h3>
             <p>{t('dashboard.scheduled')}</p>
           </div>
+        </div>
+      </div>
+
+      <div className="dashboard-charts-grid">
+        <div className="dashboard-chart-card">
+          <h2 className="dashboard-chart-title">Posts by Status</h2>
+          {pieData.length === 0 ? (
+            <p className="hashtag-empty">No posts yet</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                  {pieData.map(entry => (
+                    <Cell key={entry.key} fill={STATUS_COLORS[entry.key]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend verticalAlign="bottom" height={32} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="dashboard-chart-card">
+          <h2 className="dashboard-chart-title">Posts Created (Last 7 Days)</h2>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={activityData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Bar dataKey="count" fill="#6366F1" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
