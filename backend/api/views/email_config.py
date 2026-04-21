@@ -13,15 +13,10 @@ from ..audit import log_action
 
 def _serialize_email_config(cfg):
     return {
-        'provider': cfg.provider,
-        'smtp_host': cfg.smtp_host,
-        'smtp_port': cfg.smtp_port,
-        'smtp_user': cfg.smtp_user,
-        'from_name': cfg.from_name,
         'from_email': cfg.from_email,
+        'from_name': cfg.from_name,
         'is_verified': cfg.is_verified,
         'last_test_sent': cfg.last_test_sent.isoformat() if cfg.last_test_sent else None,
-        'updated_at': cfg.updated_at.isoformat(),
     }
 
 
@@ -49,46 +44,43 @@ def email_config_view(request):
         )
         return Response({'message': 'Email configuration removed.'})
 
-    provider = (request.data.get('provider') or 'gmail').lower()
-    if provider not in dict(EmailConfiguration.PROVIDER_CHOICES):
-        return Response({'error': 'Invalid provider'}, status=status.HTTP_400_BAD_REQUEST)
-    smtp_host = (request.data.get('smtp_host') or '').strip() or 'smtp.gmail.com'
-    try:
-        smtp_port = int(request.data.get('smtp_port') or 587)
-    except (TypeError, ValueError):
-        return Response({'error': 'smtp_port must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
-    smtp_user = (request.data.get('smtp_user') or '').strip().lower()
-    smtp_password = request.data.get('smtp_password') or ''
-    from_name = (request.data.get('from_name') or '').strip()
-    from_email = (request.data.get('from_email') or '').strip().lower()
-
-    if not smtp_user or '@' not in smtp_user:
-        return Response({'error': 'smtp_user must be a valid email'}, status=status.HTTP_400_BAD_REQUEST)
-    if not from_email or '@' not in from_email:
-        return Response({'error': 'from_email must be a valid email'}, status=status.HTTP_400_BAD_REQUEST)
-    if not from_name:
-        return Response({'error': 'from_name is required'}, status=status.HTTP_400_BAD_REQUEST)
-    if not smtp_password:
+    # POST — only requires app_password; everything else is derived from the user's account
+    app_password = (request.data.get('app_password') or '').strip()
+    if not app_password:
         existing = EmailConfiguration.objects.filter(user=request.user).first()
         if existing is None:
-            return Response({'error': 'smtp_password is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'App password is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    user_email = request.user.email
+    if not user_email or '@' not in user_email:
+        return Response(
+            {'error': 'Your account has no email address. Add one in Account settings first.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from_name = (request.user.get_full_name() or request.user.username).strip()
 
     active_key = EncryptionKey.get_active()
-    try:
-        if smtp_password:
-            encrypted_pw = encrypt(smtp_password, active_key.id)
-        else:
-            encrypted_pw = None
-    except DecryptionError as e:
-        return Response({'error': 'Failed to secure credentials'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    encrypted_pw = None
+    if app_password:
+        try:
+            encrypted_pw = encrypt(app_password, active_key.id)
+        except DecryptionError:
+            return Response(
+                {'error': 'Failed to secure credentials.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     defaults = {
-        'provider': provider,
-        'smtp_host': smtp_host,
-        'smtp_port': smtp_port,
-        'smtp_user': smtp_user,
+        'provider': 'gmail',
+        'smtp_host': 'smtp.gmail.com',
+        'smtp_port': 587,
+        'smtp_user': user_email,
         'from_name': from_name,
-        'from_email': from_email,
+        'from_email': user_email,
         'encryption_key': active_key,
     }
     if encrypted_pw is not None:
@@ -104,8 +96,8 @@ def email_config_view(request):
     try:
         email_service.send_test_email(cfg)
         verified = True
-    except email_service.EmailDeliveryError as e:
-        test_error = 'Test email failed. Credentials were saved but not verified.'
+    except email_service.EmailDeliveryError:
+        test_error = 'Could not verify — check that the App Password is correct.'
 
     cfg.is_verified = verified
     cfg.last_test_sent = timezone.now()
@@ -115,7 +107,7 @@ def email_config_view(request):
         request.user,
         'credentials_updated',
         request=request,
-        metadata={'component': 'email_config', 'verified': verified, 'provider': provider},
+        metadata={'component': 'email_config', 'verified': verified},
     )
 
     response_body = {'configured': True, **_serialize_email_config(cfg)}

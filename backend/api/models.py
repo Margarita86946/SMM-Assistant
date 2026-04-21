@@ -48,12 +48,22 @@ class EncryptionKey(models.Model):
 
     @classmethod
     def get_active(cls):
+        from django.db import transaction
         key = cls.objects.filter(is_active=True).order_by('-created_at').first()
-        if key is None:
-            key = cls.objects.create(
-                key_identifier=f'key_v1_{timezone.now().strftime("%Y%m%d%H%M%S")}',
-                is_active=True,
+        if key is not None:
+            return key
+        # No active key exists — create one. Use get_or_create with a fixed
+        # sentinel identifier so concurrent calls converge on the same row
+        # instead of each creating their own key.
+        with transaction.atomic():
+            key, _ = cls.objects.get_or_create(
+                key_identifier='key_v1_default',
+                defaults={'is_active': True},
             )
+            if not key.is_active:
+                key.is_active = True
+                key.retired_at = None
+                key.save(update_fields=['is_active', 'retired_at'])
         return key
 
 
@@ -145,7 +155,6 @@ class SocialAccount(models.Model):
     instagram_user_id = models.CharField(max_length=100)
     account_username = models.CharField(max_length=100)
     account_type = models.CharField(max_length=20, blank=True, default='')
-    account_avatar_url = models.URLField(max_length=1000, blank=True, default='')
     access_token = models.TextField(blank=True, default='')
     token_expires_at = models.DateTimeField(null=True, blank=True)
     token_last_refreshed = models.DateTimeField(null=True, blank=True)
@@ -298,33 +307,6 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.action} by {self.workspace_user_id} at {self.created_at}"
-
-
-class TokenRefreshLog(models.Model):
-    TRIGGER_CHOICES = [
-        ('scheduled', 'Scheduled'),
-        ('manual', 'Manual'),
-        ('pre_expiry', 'Pre-expiry Check'),
-    ]
-
-    connected_account = models.ForeignKey(
-        SocialAccount, on_delete=models.CASCADE,
-        related_name='refresh_logs',
-    )
-    refresh_attempted_at = models.DateTimeField(auto_now_add=True)
-    success = models.BooleanField()
-    error_message = models.CharField(max_length=200, blank=True, default='')
-    new_expires_at = models.DateTimeField(null=True, blank=True)
-    triggered_by = models.CharField(
-        max_length=20, choices=TRIGGER_CHOICES, default='scheduled'
-    )
-
-    class Meta:
-        db_table = 'token_refresh_logs'
-        ordering = ['-refresh_attempted_at']
-
-    def __str__(self):
-        return f"Refresh {self.connected_account_id} success={self.success}"
 
 
 class EmailConfiguration(models.Model):

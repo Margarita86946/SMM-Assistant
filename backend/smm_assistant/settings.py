@@ -70,6 +70,9 @@ DATABASES = {
         'PASSWORD': DB_PASSWORD,
         'HOST': os.getenv('DATABASE_HOST', 'localhost'),
         'PORT': os.getenv('DATABASE_PORT', '5432'),
+        # Wrap every request in a transaction. Any unhandled exception will
+        # automatically roll back all DB writes made during that request.
+        'ATOMIC_REQUESTS': True,
     }
 }
 

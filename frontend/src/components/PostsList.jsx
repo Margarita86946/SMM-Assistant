@@ -5,113 +5,20 @@ import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import '../styles/PostsList.css';
 
-const PLATFORM_META = {
-  instagram: { icon: '📷', label: 'Instagram' },
-  linkedin:  { icon: '💼', label: 'LinkedIn'  },
-  twitter:   { icon: '🐦', label: 'Twitter'   },
-};
-
 const PLATFORM_LABELS = {
   instagram: '📷 Instagram',
   linkedin:  '💼 LinkedIn',
   twitter:   '🐦 Twitter',
 };
 
-const STATUS_CLS = {
-  draft:            'badge-draft',
-  scheduled:        'badge-scheduled',
-  ready_to_post:    'badge-ready',
-  pending_approval: 'badge-pending',
-  approved:         'badge-approved',
-  rejected:         'badge-rejected',
-  posted:           'badge-posted',
+const STATUS_META = {
+  draft:            { text: 'Draft',               cls: 'badge-draft'     },
+  pending_approval: { text: 'Awaiting Approval',   cls: 'badge-pending'   },
+  approved:         { text: 'Ready to Post',        cls: 'badge-approved'  },
+  ready_to_post:    { text: 'Ready to Post',        cls: 'badge-approved'  },
+  scheduled:        { text: 'Scheduled',            cls: 'badge-scheduled' },
+  posted:           { text: 'Posted',               cls: 'badge-posted'    },
 };
-
-function PostViewModal({ post, onClose, onEdit, t, locale }) {
-  const platform = PLATFORM_META[post.platform] || { icon: '📄', label: post.platform };
-  const statusCls = STATUS_CLS[post.status] || 'badge-draft';
-  const statusText = {
-    draft: t('posts.draft'),
-    scheduled: t('posts.scheduled'),
-    ready_to_post: t('posts.ready'),
-    posted: t('posts.posted'),
-  }[post.status] || post.status;
-
-  const formatFullDate = (dateStr) => {
-    if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString(locale, {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
-  };
-
-  useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
-
-  return (
-    <div className="post-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="post-modal">
-        <div className="post-modal-header">
-          <div className="post-modal-platform">
-            <span className="post-modal-platform-icon">{platform.icon}</span>
-            <span className="post-modal-platform-label">{platform.label}</span>
-            <span className={`status-badge ${statusCls}`}>{statusText}</span>
-          </div>
-          <button className="post-modal-close" onClick={onClose} aria-label="Close">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-
-        <div className="post-modal-body">
-          <div className="post-modal-section">
-            <p className="post-modal-label">{t('calendar.labelScheduled')}</p>
-            <p className="post-modal-value post-modal-date">
-              {formatFullDate(post.scheduled_time) || t('posts.notScheduled')}
-            </p>
-          </div>
-
-          <div className="post-modal-section">
-            <p className="post-modal-label">{t('calendar.labelCaption')}</p>
-            <p className="post-modal-value post-modal-caption">{post.caption}</p>
-          </div>
-
-          {post.hashtags && (
-            <div className="post-modal-section">
-              <p className="post-modal-label">{t('calendar.labelHashtags')}</p>
-              <p className="post-modal-value post-modal-hashtags">{post.hashtags}</p>
-            </div>
-          )}
-
-          {post.image_prompt && (
-            <div className="post-modal-section">
-              <p className="post-modal-label">{t('calendar.labelImagePrompt')}</p>
-              <p className="post-modal-value post-modal-caption">{post.image_prompt}</p>
-            </div>
-          )}
-        </div>
-
-        <div className="post-modal-footer">
-          <button className="post-modal-edit-btn" onClick={() => onEdit(post.id)}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-            {t('calendar.editPost')}
-          </button>
-          <button className="post-modal-cancel-btn" onClick={onClose}>{t('calendar.close')}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const PAGE_SIZE = 3;
 
@@ -122,12 +29,12 @@ function PostsList() {
   const [loading, setLoading] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
   const [error, setError] = useState('');
-  const [selectedPost, setSelectedPost] = useState(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterPlatform, setFilterPlatform] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [page, setPage] = useState(1);
+  const [submitting, setSubmitting] = useState(null);
   const [publishingId, setPublishingId] = useState(null);
   const [publishMsg, setPublishMsg] = useState('');
   const [publishError, setPublishError] = useState('');
@@ -147,22 +54,17 @@ function PostsList() {
       const count = response.data.count ?? 0;
       setPosts(response.data.results ?? response.data);
       setTotalCount(count);
-      if (!srch && platform === 'all' && st === 'all') {
-        setTotalAllCount(count);
-      }
+      if (!srch && platform === 'all' && st === 'all') setTotalAllCount(count);
+    } catch {
+      setError(t('posts.failedLoad'));
+    } finally {
       setLoading(false);
       setInitialLoad(false);
-    } catch {
-      setError('posts.failedLoad');
-      setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 400);
+    const timer = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 400);
     return () => clearTimeout(timer);
   }, [search]);
 
@@ -170,54 +72,33 @@ function PostsList() {
     loadPosts(page, debouncedSearch, filterPlatform, filterStatus);
   }, [page, debouncedSearch, filterPlatform, filterStatus, loadPosts]);
 
+  const reload = () => loadPosts(page, debouncedSearch, filterPlatform, filterStatus);
+
   const handleDelete = async (e, id) => {
     e.stopPropagation();
-    if (window.confirm(t('posts.confirmDelete'))) {
-      try {
-        await postsAPI.delete(id);
-        const newTotal = totalCount - 1;
-        const newTotalPages = Math.ceil(newTotal / PAGE_SIZE);
-        const newPage = page > newTotalPages ? Math.max(1, newTotalPages) : page;
-        if (newPage !== page) {
-          setPage(newPage);
-        } else {
-          loadPosts(page, debouncedSearch, filterPlatform, filterStatus);
-        }
-      } catch {
-        alert(t('posts.failedDelete'));
-      }
+    if (!window.confirm(t('posts.confirmDelete'))) return;
+    try {
+      await postsAPI.delete(id);
+      const newTotal = totalCount - 1;
+      const newTotalPages = Math.ceil(newTotal / PAGE_SIZE);
+      const newPage = page > newTotalPages ? Math.max(1, newTotalPages) : page;
+      if (newPage !== page) setPage(newPage);
+      else reload();
+    } catch {
+      alert(t('posts.failedDelete'));
     }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return t('posts.notScheduled');
-    return new Date(dateString).toLocaleDateString(locale, {
-      month: 'short', day: 'numeric', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
-  };
-
-  const getStatusBadge = (status) => {
-    const badges = {
-      draft:            { text: t('posts.draft'),        cls: 'badge-draft'     },
-      scheduled:        { text: t('posts.scheduled'),    cls: 'badge-scheduled' },
-      ready_to_post:    { text: t('posts.ready'),        cls: 'badge-ready'     },
-      pending_approval: { text: 'Pending Approval',      cls: 'badge-pending'   },
-      approved:         { text: 'Approved',              cls: 'badge-approved'  },
-      rejected:         { text: 'Rejected',              cls: 'badge-rejected'  },
-      posted:           { text: t('posts.posted'),       cls: 'badge-posted'    },
-    };
-    const badge = badges[status] || { text: status, cls: 'badge-default' };
-    return <span className={`status-badge ${badge.cls}`}>{badge.text}</span>;
   };
 
   const handleSubmitForApproval = async (e, id) => {
     e.stopPropagation();
+    setSubmitting(id);
     try {
       await approvalAPI.submit(id);
-      loadPosts(page, debouncedSearch, filterPlatform, filterStatus);
+      reload();
     } catch (err) {
       alert(err.message || 'Failed to submit for approval');
+    } finally {
+      setSubmitting(null);
     }
   };
 
@@ -233,31 +114,26 @@ function PostsList() {
       setTimeout(() => setPublishMsg(''), 4000);
     } catch (err) {
       const msg = err.message || '';
-      if (msg.toLowerCase().includes('no active instagram')) {
-        setPublishError(t('instagram.publishNoAccount'));
-      } else {
-        setPublishError(msg || t('instagram.publishFailed'));
-      }
-      setTimeout(() => setPublishError(''), 5000);
+      setPublishError(msg.toLowerCase().includes('no active instagram')
+        ? t('instagram.publishNoAccount')
+        : msg || t('instagram.publishFailed'));
+      setTimeout(() => setPublishError(''), 6000);
     } finally {
       setPublishingId(null);
     }
   };
 
-  const hasActiveFilter = debouncedSearch || filterPlatform !== 'all' || filterStatus !== 'all';
-
-  const clearFilters = () => {
-    setSearch('');
-    setFilterPlatform('all');
-    setFilterStatus('all');
-    setPage(1);
+  const formatDate = (ds) => {
+    if (!ds) return t('posts.notScheduled');
+    return new Date(ds).toLocaleDateString(locale, {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
   };
 
+  const hasActiveFilter = debouncedSearch || filterPlatform !== 'all' || filterStatus !== 'all';
+  const clearFilters = () => { setSearch(''); setFilterPlatform('all'); setFilterStatus('all'); setPage(1); };
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-
-  const handleSearchChange = (val) => { setSearch(val); };
-  const handlePlatformChange = (val) => { setFilterPlatform(val); setPage(1); };
-  const handleStatusChange = (val) => { setFilterStatus(val); setPage(1); };
 
   const getPageNumbers = () => {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -273,16 +149,14 @@ function PostsList() {
       <div className="posts-header">
         <h1>
           {t('posts.title')}
-          {totalAllCount > 0 && (
-            <span className="posts-count-badge">{totalAllCount}</span>
-          )}
+          {totalAllCount > 0 && <span className="posts-count-badge">{totalAllCount}</span>}
         </h1>
         <div className="header-actions">
           <button onClick={() => navigate('/generate')} className="btn-create">{t('posts.createNew')}</button>
         </div>
       </div>
 
-      {error && <div className="error-message">{t(error)}</div>}
+      {error && <div className="error-message">{error}</div>}
       {publishError && <div className="error-message">{publishError}</div>}
       {publishMsg && <div className="success-message">{publishMsg}</div>}
 
@@ -290,48 +164,34 @@ function PostsList() {
         <div className="posts-search-wrap">
           <svg className="posts-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
             fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <input
-            type="text"
-            className="posts-search-input"
-            placeholder={t('posts.searchPlaceholder')}
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-          />
-          {search && (
-            <button className="posts-search-clear" onClick={() => setSearch('')} aria-label="Clear search">×</button>
-          )}
+          <input type="text" className="posts-search-input"
+            placeholder={t('posts.searchPlaceholder')} value={search}
+            onChange={e => setSearch(e.target.value)} />
+          {search && <button className="posts-search-clear" onClick={() => setSearch('')}>×</button>}
         </div>
 
-        <select
-          className="posts-filter-select"
-          value={filterPlatform}
-          onChange={(e) => handlePlatformChange(e.target.value)}
-        >
+        <select className="posts-filter-select" value={filterPlatform}
+          onChange={e => { setFilterPlatform(e.target.value); setPage(1); }}>
           <option value="all">{t('posts.allPlatforms')}</option>
           <option value="instagram">Instagram</option>
           <option value="linkedin">LinkedIn</option>
           <option value="twitter">Twitter</option>
         </select>
 
-        <select
-          className="posts-filter-select"
-          value={filterStatus}
-          onChange={(e) => handleStatusChange(e.target.value)}
-        >
+        <select className="posts-filter-select" value={filterStatus}
+          onChange={e => { setFilterStatus(e.target.value); setPage(1); }}>
           <option value="all">{t('posts.allStatuses')}</option>
-          <option value="draft">{t('posts.draft')}</option>
+          <option value="draft">Draft</option>
+          <option value="pending_approval">Awaiting Approval</option>
+          <option value="approved">Ready to Post</option>
           <option value="scheduled">{t('posts.scheduled')}</option>
-          <option value="ready_to_post">{t('posts.readyToPost')}</option>
           <option value="posted">{t('posts.posted')}</option>
         </select>
 
         {hasActiveFilter && (
-          <button className="posts-filter-clear" onClick={clearFilters}>
-            {t('posts.clearFilters')}
-          </button>
+          <button className="posts-filter-clear" onClick={clearFilters}>{t('posts.clearFilters')}</button>
         )}
       </div>
 
@@ -354,80 +214,119 @@ function PostsList() {
       ) : (
         <div className="posts-content">
           <div className="posts-grid">
-            {posts.map((post) => (
-              <div
-                key={post.id}
-                className="post-item"
-                onClick={() => setSelectedPost(post)}
-              >
-                <div className="post-item-header">
-                  <div className="post-platform">
-                    {PLATFORM_LABELS[post.platform] || post.platform}
+            {posts.map(post => {
+              const meta = STATUS_META[post.status] || { text: post.status, cls: 'badge-draft' };
+              const isApproved = post.status === 'approved' || post.status === 'ready_to_post';
+              const isRejectedDraft = post.status === 'draft' && post.approval_note;
+
+              return (
+                <div key={post.id} className={`post-item${isRejectedDraft ? ' post-item--rejected' : ''}`}>
+
+                  <div className="post-item-header">
+                    <div className="post-platform">{PLATFORM_LABELS[post.platform] || post.platform}</div>
+                    <span className={`status-badge ${meta.cls}`}>{meta.text}</span>
                   </div>
-                  {getStatusBadge(post.status)}
-                </div>
 
-                <div className="post-caption">
-                  {post.caption.length > 100 ? post.caption.substring(0, 100) + '...' : post.caption}
-                </div>
+                  {/* Rejection note callout — shown on draft posts that were previously rejected */}
+                  {isRejectedDraft && (
+                    <div className="post-rejection-callout">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      <div>
+                        <strong>Client rejected this post</strong>
+                        {post.approval_note && <p>{post.approval_note}</p>}
+                      </div>
+                    </div>
+                  )}
 
-                <div className="post-hashtags">{post.hashtags}</div>
+                  {/* Awaiting approval callout */}
+                  {post.status === 'pending_approval' && (
+                    <div className="post-pending-callout">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                      </svg>
+                      Waiting for client to review
+                    </div>
+                  )}
 
-                {post.image_prompt && (
-                  <div className="post-image-prompt">
-                    {post.image_prompt.length > 80 ? post.image_prompt.substring(0, 80) + '...' : post.image_prompt}
+                  {/* Approved callout */}
+                  {isApproved && (
+                    <div className="post-approved-callout">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      Client approved — set a schedule to publish
+                    </div>
+                  )}
+
+                  <div className="post-caption">
+                    {post.caption.length > 100 ? post.caption.substring(0, 100) + '…' : post.caption}
                   </div>
-                )}
 
-                <div className="post-meta">
-                  <span>📅 {formatDate(post.scheduled_time)}</span>
+                  {post.hashtags && <div className="post-hashtags">{post.hashtags}</div>}
+
+                  <div className="post-meta">
+                    <span>📅 {formatDate(post.scheduled_time)}</span>
+                  </div>
+
+                  <div className="post-actions">
+                    {/* Edit — available on draft, approved, scheduled */}
+                    {(isApproved || ['draft', 'scheduled'].includes(post.status)) && (
+                      <button className="btn-edit"
+                        onClick={e => { e.stopPropagation(); navigate(`/edit/${post.id}`); }}>
+                        {isApproved ? '📅 Schedule' : t('posts.edit')}
+                      </button>
+                    )}
+
+                    {/* Submit for Approval — only on draft */}
+                    {post.status === 'draft' && (
+                      <button className="btn-submit-approval"
+                        onClick={e => handleSubmitForApproval(e, post.id)}
+                        disabled={submitting === post.id}>
+                        {submitting === post.id ? 'Submitting…' : 'Submit for Approval'}
+                      </button>
+                    )}
+
+                    {/* Publish Now — only on approved or scheduled Instagram posts with image */}
+                    {post.platform === 'instagram'
+                      && (isApproved || post.status === 'scheduled')
+                      && post.image_url && (
+                      <button className="btn-publish-ig"
+                        onClick={e => handlePublishNow(e, post)}
+                        disabled={publishingId === post.id}>
+                        {publishingId === post.id ? (
+                          <><span className="btn-publish-ig-spinner" /> {t('instagram.publishing')}</>
+                        ) : (
+                          <>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                            </svg>
+                            {t('instagram.publishBtn')}
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {/* Delete — not on pending_approval or posted */}
+                    {!['pending_approval', 'posted'].includes(post.status) && (
+                      <button className="btn-delete" onClick={e => handleDelete(e, post.id)}>
+                        {t('posts.delete')}
+                      </button>
+                    )}
+                  </div>
                 </div>
-
-                {post.status === 'rejected' && post.approval_note && (
-                  <p className="post-rejection-note">✗ {post.approval_note}</p>
-                )}
-
-                <div className="post-actions">
-                  <button
-                    className="btn-edit"
-                    onClick={(e) => { e.stopPropagation(); navigate(`/edit/${post.id}`); }}
-                  >
-                    {t('posts.edit')}
-                  </button>
-                  {(post.status === 'draft' || post.status === 'ready_to_post') && (
-                    <button className="btn-submit-approval" onClick={(e) => handleSubmitForApproval(e, post.id)}>
-                      Submit for Approval
-                    </button>
-                  )}
-                  {post.platform === 'instagram'
-                    && post.status !== 'posted'
-                    && post.image_url && (
-                    <button
-                      className="btn-publish-ig"
-                      onClick={(e) => handlePublishNow(e, post)}
-                      disabled={publishingId === post.id}
-                    >
-                      {publishingId === post.id ? (
-                        <><span className="btn-publish-ig-spinner" /> {t('instagram.publishing')}</>
-                      ) : (
-                        <>
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-                            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-                          </svg>
-                          {t('instagram.publishBtn')}
-                        </>
-                      )}
-                    </button>
-                  )}
-                  <button className="btn-delete" onClick={(e) => handleDelete(e, post.id)}>
-                    {t('posts.delete')}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {Array.from({ length: PAGE_SIZE - posts.length }).map((_, i) => (
               <div key={`ghost-${i}`} className="post-item post-item--ghost" aria-hidden="true" />
             ))}
@@ -435,47 +334,20 @@ function PostsList() {
 
           {totalPages > 1 && (
             <div className="pagination">
-              <button
-                className="pagination-btn"
-                onClick={() => setPage(p => p - 1)}
-                disabled={page === 1}
-              >
-                ←
-              </button>
-
+              <button className="pagination-btn" onClick={() => setPage(p => p - 1)} disabled={page === 1}>←</button>
               {getPageNumbers().map((p, i) =>
                 p === '…' ? (
-                  <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
+                  <span key={`e-${i}`} className="pagination-ellipsis">…</span>
                 ) : (
-                  <button
-                    key={p}
+                  <button key={p}
                     className={`pagination-btn${page === p ? ' pagination-btn--active' : ''}`}
-                    onClick={() => setPage(p)}
-                  >
-                    {p}
-                  </button>
+                    onClick={() => setPage(p)}>{p}</button>
                 )
               )}
-
-              <button
-                className="pagination-btn"
-                onClick={() => setPage(p => p + 1)}
-                disabled={page === totalPages}
-              >
-                →
-              </button>
+              <button className="pagination-btn" onClick={() => setPage(p => p + 1)} disabled={page === totalPages}>→</button>
             </div>
           )}
         </div>
-      )}
-      {selectedPost && (
-        <PostViewModal
-          post={selectedPost}
-          t={t}
-          locale={locale}
-          onClose={() => setSelectedPost(null)}
-          onEdit={(id) => { setSelectedPost(null); navigate(`/edit/${id}`); }}
-        />
       )}
     </div>
   );

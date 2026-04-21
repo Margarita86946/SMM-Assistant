@@ -21,6 +21,7 @@ def _connection_and_from(specialist):
     if cfg is not None:
         password = cfg.decrypted_smtp_password
         connection = get_connection(
+            backend='django.core.mail.backends.smtp.EmailBackend',
             host=cfg.smtp_host,
             port=cfg.smtp_port,
             username=cfg.smtp_user,
@@ -98,6 +99,7 @@ def send_invitation_email(specialist, client_email, raw_token):
 
 def send_test_email(email_config):
     connection = get_connection(
+        backend='django.core.mail.backends.smtp.EmailBackend',
         host=email_config.smtp_host,
         port=email_config.smtp_port,
         username=email_config.smtp_user,

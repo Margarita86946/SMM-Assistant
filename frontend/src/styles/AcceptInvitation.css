@@ -1,0 +1,292 @@
+.accept-page {
+  min-height: 100vh;
+  background: var(--bg, #F8FAFC);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.accept-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--surface, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 16px;
+  padding: 40px 36px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+/* Logo */
+.accept-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.accept-logo-icon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.accept-logo-icon svg {
+  color: white;
+}
+
+.accept-logo-text {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  letter-spacing: -0.3px;
+}
+
+/* Instagram icon */
+.accept-ig-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #F58529 0%, #DD2A7B 50%, #8134AF 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  color: white;
+}
+
+.accept-ig-icon svg {
+  width: 34px;
+  height: 34px;
+}
+
+.accept-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  margin: 0 0 12px;
+  letter-spacing: -0.4px;
+}
+
+.accept-specialist {
+  font-size: 14px;
+  color: var(--text-secondary, #6B7280);
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+.accept-email-chip {
+  display: inline-block;
+  padding: 6px 14px;
+  background: var(--primary-light, #EEF2FF);
+  color: var(--primary, #6366F1);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+/* Steps */
+.accept-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.accept-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--text-primary, #111827);
+}
+
+.accept-step-num {
+  width: 24px;
+  height: 24px;
+  background: var(--primary, #6366F1);
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.accept-requirement {
+  font-size: 12.5px;
+  color: var(--text-tertiary, #9CA3AF);
+  background: var(--surface-2, #F9FAFB);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 24px;
+  text-align: left;
+  line-height: 1.5;
+}
+
+.accept-inline-error {
+  background: rgba(239, 68, 68, 0.08);
+  color: #B91C1C;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+/* Connect button */
+.accept-connect-btn {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #F58529 0%, #DD2A7B 50%, #8134AF 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: filter 0.2s, transform 0.15s;
+  letter-spacing: 0.1px;
+  margin-bottom: 16px;
+}
+
+.accept-connect-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.accept-connect-btn:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.accept-connect-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.accept-btn-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: accept-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes accept-spin {
+  to { transform: rotate(360deg); }
+}
+
+.accept-expiry {
+  font-size: 12px;
+  color: var(--text-tertiary, #9CA3AF);
+  margin: 0;
+}
+
+/* Result states */
+.accept-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.accept-result-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.accept-result-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.accept-result-icon--success {
+  background: var(--success-bg, #D1FAE5);
+  color: var(--success, #10B981);
+}
+
+.accept-result-icon--error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+}
+
+.accept-result-icon--warn {
+  background: var(--warning-bg, #FEF3C7);
+  color: var(--warning, #D97706);
+}
+
+.accept-result-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.accept-result-msg {
+  font-size: 14px;
+  color: var(--text-secondary, #6B7280);
+  line-height: 1.6;
+  margin: 0;
+  max-width: 340px;
+}
+
+/* Loading */
+.accept-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 0;
+}
+
+.accept-loading p {
+  font-size: 14px;
+  color: var(--text-secondary, #6B7280);
+  margin: 0;
+}
+
+.accept-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border, #E5E7EB);
+  border-top-color: var(--primary, #6366F1);
+  border-radius: 50%;
+  animation: accept-spin 0.7s linear infinite;
+}
+
+.accept-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+@media (max-width: 480px) {
+  .accept-card { padding: 32px 20px; }
+}

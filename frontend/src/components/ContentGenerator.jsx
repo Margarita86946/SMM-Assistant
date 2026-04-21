@@ -100,12 +100,8 @@ function ContentGenerator() {
         if (imageProvider === 'flux') {
             prompt = topic ? `${topic}, professional photography, high quality` : rich.slice(0, 150);
         } else {
-            prompt = rich || topic;
-            if (prompt.length > 200) {
-                const cut = prompt.slice(0, 200);
-                const lastSpace = cut.lastIndexOf(' ');
-                prompt = lastSpace > 80 ? cut.slice(0, lastSpace) : cut;
-            }
+            // Unsplash is keyword-based — the topic gives far better results than the verbose AI image prompt
+            prompt = topic || rich.split(' ').slice(0, 5).join(' ');
         }
         const imgRes = await aiAPI.generateImage({
             prompt,
@@ -299,9 +295,7 @@ function ContentGenerator() {
                             <label>Text Model</label>
                             <select value={textProvider} onChange={(e) => setTextProvider(e.target.value)}>
                                 <option value="groq">Groq / Llama 4 Scout (Cloud)</option>
-                                <option value="ollama">
-                                    Gemma 3 12B / Local (Ollama) {ollamaStatus.ollama ? '● Online' : '● Offline'}
-                                </option>
+                                <option value="ollama">Gemma 4 E2B / Local (Ollama)</option>
                             </select>
                             {textProvider === 'ollama' && (
                                 <p className={`gen-model-status ${ollamaStatus.ollama ? 'gen-model-status--ok' : 'gen-model-status--err'}`}

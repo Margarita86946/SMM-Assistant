@@ -34,15 +34,16 @@ def instagram_oauth_start(request):
     try:
         nonce = secrets.token_urlsafe(32)
         expires_at = timezone.now() + timedelta(minutes=OAUTH_STATE_TTL_MINUTES)
-        OAuthState.objects.filter(
-            Q(user=request.user, platform='instagram') | Q(expires_at__lt=timezone.now())
-        ).delete()
-        OAuthState.objects.create(
-            user=request.user,
-            platform='instagram',
-            nonce=nonce,
-            expires_at=expires_at,
-        )
+        with transaction.atomic():
+            OAuthState.objects.filter(
+                Q(user=request.user, platform='instagram') | Q(expires_at__lt=timezone.now())
+            ).delete()
+            OAuthState.objects.create(
+                user=request.user,
+                platform='instagram',
+                nonce=nonce,
+                expires_at=expires_at,
+            )
         url = instagram_service.get_oauth_url(state=nonce)
         return Response({'oauth_url': url})
     except instagram_service.InstagramAPIError as e:
@@ -219,12 +220,13 @@ def instagram_disconnect(request, pk):
     except SocialAccount.DoesNotExist:
         return Response({'error': 'No Instagram account found'}, status=status.HTTP_404_NOT_FOUND)
     username_snapshot = account.account_username
-    account.is_active = False
-    account.access_token = ''
-    account.token_expires_at = None
-    account.save(update_fields=['is_active', 'access_token', 'token_expires_at'])
-    if not account.is_client_account:
-        Post.objects.filter(user=request.user, auto_publish=True, status='scheduled').update(auto_publish=False)
+    with transaction.atomic():
+        account.is_active = False
+        account.access_token = ''
+        account.token_expires_at = None
+        account.save(update_fields=['is_active', 'access_token', 'token_expires_at'])
+        if not account.is_client_account:
+            Post.objects.filter(user=request.user, auto_publish=True, status='scheduled').update(auto_publish=False)
     log_action(
         request.user,
         'account_disconnected',
@@ -240,7 +242,7 @@ def instagram_disconnect(request, pk):
 def instagram_status(request):
     accounts = SocialAccount.objects.filter(
         user=request.user, platform='instagram', is_active=True,
-    ).order_by('created_at')
+    ).order_by('connected_at')
     return Response({
         'accounts': [
             {
@@ -258,6 +260,7 @@ def instagram_status(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def publish_post_now(request, pk):
+    # Phase 1: validate and lock the post row — short transaction, no external I/O
     with transaction.atomic():
         try:
             post = Post.objects.select_for_update().get(pk=pk, user=request.user)
@@ -315,36 +318,58 @@ def publish_post_now(request, pk):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Snapshot values needed outside the transaction before releasing the lock
         caption_text = post.caption or ''
         if post.hashtags:
             caption_text = f'{caption_text}\n\n{post.hashtags}'.strip()
 
         try:
             plaintext_token = account.decrypted_token
-            if not plaintext_token:
-                raise instagram_service.InstagramAPIError('Stored access token is unavailable')
-            instagram_post_id = instagram_service.publish_image_post(
-                plaintext_token,
-                account.instagram_user_id,
-                post.image_url,
-                caption_text,
-            )
-        except (instagram_service.InstagramAPIError, DecryptionError) as e:
-            logger.exception('publish_post_now failed for post=%s: %s', post.pk, e)
-            log_action(
-                request.user,
-                'post_publish_failed',
-                request=request,
-                target=post,
-                metadata={'error': 'instagram_api_error', 'detail': str(e)[:200]},
-            )
-            error_payload = {'error': 'Publishing to Instagram failed. Please try again.'}
-            if settings.DEBUG:
-                error_payload['detail'] = str(e)
-            return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
-        finally:
-            plaintext_token = None
+        except DecryptionError as e:
+            return Response({'error': 'Publishing to Instagram failed. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
 
+        if not plaintext_token:
+            return Response({'error': 'Publishing to Instagram failed. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
+
+    # Phase 2: call Instagram API outside any transaction — avoids holding a DB lock
+    # during slow external I/O (typically 1-30 seconds).
+    try:
+        instagram_post_id = instagram_service.publish_image_post(
+            plaintext_token,
+            account.instagram_user_id,
+            post.image_url,
+            caption_text,
+        )
+    except (instagram_service.InstagramAPIError, DecryptionError) as e:
+        logger.exception('publish_post_now failed for post=%s: %s', post.pk, e)
+        log_action(
+            request.user,
+            'post_publish_failed',
+            request=request,
+            target=post,
+            metadata={'error': 'instagram_api_error', 'detail': str(e)[:200]},
+        )
+        error_payload = {'error': 'Publishing to Instagram failed. Please try again.'}
+        if settings.DEBUG:
+            error_payload['detail'] = str(e)
+        return Response(error_payload, status=status.HTTP_502_BAD_GATEWAY)
+    finally:
+        plaintext_token = None
+
+    # Phase 3: mark the post as published — short transaction again
+    with transaction.atomic():
+        # Re-fetch with lock: another concurrent request may have published between phases
+        try:
+            post = Post.objects.select_for_update().get(pk=pk, user=request.user)
+        except Post.DoesNotExist:
+            return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
+        if post.status == 'posted':
+            # Already marked by a concurrent request — idempotent, treat as success
+            return Response({
+                'message': 'Post published to Instagram',
+                'instagram_post_id': post.instagram_post_id,
+                'post': post.pk,
+            })
         post.status = 'posted'
         post.instagram_post_id = instagram_post_id
         post.auto_publish = False

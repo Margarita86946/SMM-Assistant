@@ -69,6 +69,16 @@ def invitations_list(request):
     except DecryptionError as e:
         return Response({'error': 'Failed to prepare invitation'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    # Send the email BEFORE writing to the DB — if delivery fails we never
+    # create an orphaned invitation row that can't be revoked.
+    try:
+        email_service.send_invitation_email(request.user, client_email, raw_token)
+    except email_service.EmailDeliveryError:
+        return Response(
+            {'error': 'Could not send invitation email. Check your email configuration in Account settings.'},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
     invitation = ClientInvitation.objects.create(
         specialist=request.user,
         client_email=encrypted_email or '',
@@ -77,15 +87,6 @@ def invitations_list(request):
         expires_at=expires_at,
         invited_ip=get_client_ip(request),
     )
-
-    try:
-        email_service.send_invitation_email(request.user, client_email, raw_token)
-    except email_service.EmailDeliveryError as e:
-        invitation.delete()
-        return Response(
-            {'error': 'Could not send invitation email. Check your email configuration in Account settings.'},
-            status=status.HTTP_502_BAD_GATEWAY,
-        )
 
     email_domain = client_email.split('@', 1)[1] if '@' in client_email else ''
     log_action(
@@ -157,15 +158,16 @@ def invitation_oauth_start(request, token):
     try:
         nonce = secrets.token_urlsafe(32)
         expires_at = timezone.now() + timedelta(minutes=10)
-        OAuthState.objects.filter(expires_at__lt=timezone.now()).delete()
-        OAuthState.objects.filter(invitation=invitation).delete()
-        OAuthState.objects.create(
-            user=None,
-            invitation=invitation,
-            platform='instagram',
-            nonce=nonce,
-            expires_at=expires_at,
-        )
+        with transaction.atomic():
+            OAuthState.objects.filter(expires_at__lt=timezone.now()).delete()
+            OAuthState.objects.filter(invitation=invitation).delete()
+            OAuthState.objects.create(
+                user=None,
+                invitation=invitation,
+                platform='instagram',
+                nonce=nonce,
+                expires_at=expires_at,
+            )
         oauth_url = instagram_service.get_oauth_url(state=nonce)
         return Response({'oauth_url': oauth_url})
     except instagram_service.InstagramAPIError as e:

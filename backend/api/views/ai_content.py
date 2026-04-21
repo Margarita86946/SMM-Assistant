@@ -149,7 +149,7 @@ def generate_image(request):
         return Response({'error': 'Image service is not configured'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
     orientation = 'squarish' if platform == 'instagram' else 'landscape'
-    query = ' '.join(prompt.split()[:3])
+    query = prompt[:100]
     url = f"https://api.unsplash.com/photos/random?query={http_requests.utils.quote(query)}&orientation={orientation}"
     headers = {'Authorization': f'Client-ID {access_key}'}
 

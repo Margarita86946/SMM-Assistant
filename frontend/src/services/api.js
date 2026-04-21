@@ -76,7 +76,10 @@ export const dashboardAPI = {
 };
 
 export const calendarAPI = {
-  getMonthPosts: (month, year) => api.get(`/calendar/?month=${month}&year=${year}`),
+  getMonthPosts: (month, year) => {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return api.get(`/calendar/?month=${month}&year=${year}&tz=${encodeURIComponent(tz)}`);
+  },
   getTodayPosts: () => api.get('/calendar/today/'),
 };
 
@@ -110,6 +113,20 @@ export const instagramAPI = {
   getOAuthUrl: () => api.get('/auth/instagram/'),
   disconnect: (id) => api.delete(`/auth/instagram/disconnect/${id}/`),
   publishNow: (postId) => api.post(`/posts/${postId}/publish-now/`),
+};
+
+export const invitationsAPI = {
+  list: () => api.get('/invitations/'),
+  send: (email) => api.post('/invitations/', { client_email: email }),
+  revoke: (id) => api.delete(`/invitations/${id}/`),
+  lookup: (token) => api.get(`/invitations/lookup/${token}/`),
+  startOAuth: (token) => api.post(`/invitations/start/${token}/`),
+};
+
+export const emailConfigAPI = {
+  get: () => api.get('/email-config/'),
+  save: (data) => api.post('/email-config/', data),
+  remove: () => api.delete('/email-config/'),
 };
 
 export default api;

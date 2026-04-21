@@ -10,6 +10,8 @@ import NotFound from './components/NotFound';
 import ContentGenerator from './components/ContentGenerator';
 import Account from './components/Account';
 import ClientDashboard from './components/ClientDashboard';
+import Clients from './components/Clients';
+import AcceptInvitation from './components/AcceptInvitation';
 import Sidebar from './components/Sidebar';
 import './App.css';
 
@@ -82,6 +84,9 @@ const router = createBrowserRouter([
       { path: '/calendar', element: <ProtectedRoute><Calendar /></ProtectedRoute> },
       { path: '/generate', element: <ProtectedRoute><ContentGenerator /></ProtectedRoute> },
       { path: '/account', element: <ProtectedRoute><Account /></ProtectedRoute> },
+      { path: '/clients', element: <ProtectedRoute><Clients /></ProtectedRoute> },
+      { path: '/accept-invitation/:token', element: <AcceptInvitation /> },
+      { path: '/accept-invitation', element: <AcceptInvitation /> },
       { path: '*', element: <NotFound /> },
     ],
   },

@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useSettings } from './context/SettingsContext';
 
 const translations = {
@@ -896,7 +897,7 @@ const translations = {
 export function useTranslation() {
   const { language } = useSettings();
 
-  const t = (key, vars = {}) => {
+  const t = useCallback((key, vars = {}) => {
     const keys = key.split('.');
     let result = translations[language];
     for (const k of keys) {
@@ -913,7 +914,7 @@ export function useTranslation() {
       (str, [k, v]) => str.replace(`{${k}}`, v),
       result
     );
-  };
+  }, [language]);
 
   return { t };
 }

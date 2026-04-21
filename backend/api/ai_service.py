@@ -20,7 +20,7 @@ client = Groq(api_key=GROQ_API_KEY)
 GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
-OLLAMA_MODEL = "gemma3:12b"
+OLLAMA_MODEL = "gemma4:e2b"
 OLLAMA_TIMEOUT = 120
 GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
@@ -408,6 +408,7 @@ def check_ollama_status():
         response = requests.get(OLLAMA_TAGS_URL, timeout=2)
         data = response.json()
         models = [m['name'] for m in data.get('models', [])]
-        return {'ollama': True, 'models': models}
+        model_available = OLLAMA_MODEL in models
+        return {'ollama': model_available, 'models': models}
     except Exception:
         return {'ollama': False, 'models': []}

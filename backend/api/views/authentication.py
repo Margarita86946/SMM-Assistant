@@ -38,15 +38,17 @@ def register(request):
     serializer = UserSerializer(data=request.data)
 
     if serializer.is_valid():
-        user = serializer.save()
-        role = request.data.get('role')
-        if role in {'specialist', 'client'} and user.role != role:
-            user.role = role
-            user.save(update_fields=['role'])
+        from django.db import transaction as _tx
+        with _tx.atomic():
+            user = serializer.save()
+            role = request.data.get('role')
+            if role in {'specialist', 'client'} and user.role != role:
+                user.role = role
+                user.save(update_fields=['role'])
 
-        token, _ = Token.objects.get_or_create(user=user)
-        expires_at = timezone.now() + timedelta(days=settings.TOKEN_EXPIRY_DAYS)
-        TokenExpiry.objects.create(token=token, expires_at=expires_at)
+            token, _ = Token.objects.get_or_create(user=user)
+            expires_at = timezone.now() + timedelta(days=settings.TOKEN_EXPIRY_DAYS)
+            TokenExpiry.objects.create(token=token, expires_at=expires_at)
 
         return Response({
             'token': token.key,
@@ -79,15 +81,16 @@ def login_view(request):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
-    user.last_login = timezone.now()
-    user.save(update_fields=['last_login'])
-
-    token, _ = Token.objects.get_or_create(user=user)
-    expires_at = timezone.now() + timedelta(days=settings.TOKEN_EXPIRY_DAYS)
-    TokenExpiry.objects.update_or_create(
-        token=token,
-        defaults={'expires_at': expires_at, 'is_revoked': False}
-    )
+    from django.db import transaction as _tx
+    with _tx.atomic():
+        user.last_login = timezone.now()
+        user.save(update_fields=['last_login'])
+        token, _ = Token.objects.get_or_create(user=user)
+        expires_at = timezone.now() + timedelta(days=settings.TOKEN_EXPIRY_DAYS)
+        TokenExpiry.objects.update_or_create(
+            token=token,
+            defaults={'expires_at': expires_at, 'is_revoked': False}
+        )
 
     log_action(user, 'login', request=request)
 
