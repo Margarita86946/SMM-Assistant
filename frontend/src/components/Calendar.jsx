@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { calendarAPI, postsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
+import { useActiveClient } from '../context/ActiveClientContext';
 import '../styles/Calendar.css';
 
 const PLATFORM_META = {
@@ -99,7 +100,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
     const [hr, mn] = newTime.split(':').map(Number);
     const scheduled = new Date(yr, mo - 1, dy, hr, mn, 0);
     if (scheduled <= new Date()) {
-      setRescheduleErr('Scheduled time must be in the future.');
+      setRescheduleErr(t('calendar.mustBeFuture'));
       return;
     }
     setRescheduleLoading(true);
@@ -108,7 +109,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
       await onReschedule(post.id, scheduled.toISOString(), 'scheduled');
       close();
     } catch {
-      setRescheduleErr('Failed to reschedule. Try again.');
+      setRescheduleErr(t('calendar.rescheduleFailed'));
       setRescheduleLoading(false);
     }
   };
@@ -146,7 +147,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                       <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                     </svg>
-                    Past
+                    {t('calendar.past')}
                   </span>
                 ) : (
                   <button
@@ -158,7 +159,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
                       <polyline points="23 4 23 10 17 10"/>
                       <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
                     </svg>
-                    Reschedule
+                    {t('calendar.reschedule')}
                   </button>
                 )
               )}
@@ -190,10 +191,10 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
                     onClick={handleConfirmReschedule}
                     disabled={!newDate || !newTime || rescheduleLoading}
                   >
-                    {rescheduleLoading ? <><span className="cal-drawer-confirm-spinner" /> Saving…</> : 'Confirm'}
+                    {rescheduleLoading ? <><span className="cal-drawer-confirm-spinner" /> {t('calendar.saving')}</> : t('calendar.confirm')}
                   </button>
                   <button className="cal-modal-cancel-btn" onClick={() => setRescheduling(false)}>
-                    Cancel
+                    {t('calendar.cancel')}
                   </button>
                 </div>
               </div>
@@ -252,6 +253,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
 }
 
 function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
+  const { t } = useTranslation();
   const [closing, setClosing] = useState(false);
   const close = useCallback(() => {
     setClosing(true);
@@ -302,7 +304,7 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
     const [hr, mn] = time.split(':').map(Number);
     const localDt = new Date(yr, mo - 1, dy, hr, mn, 0);
     if (localDt <= new Date()) {
-      setErr('Scheduled time must be in the future.');
+      setErr(t('calendar.mustBeFuture'));
       return;
     }
     setConfirming(true);
@@ -313,7 +315,7 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
       });
       onScheduled();
     } catch {
-      setErr('Failed to schedule. Try again.');
+      setErr(t('calendar.rescheduleFailed'));
       setConfirming(false);
     }
   };
@@ -324,7 +326,7 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
       <div className={`cal-drawer${closing ? ' cal-drawer--closing' : ''}`} role="dialog" aria-modal="true">
         <div className="cal-drawer-header">
           <div>
-            <p className="cal-drawer-suptitle">Schedule post for</p>
+            <p className="cal-drawer-suptitle">{t('calendar.scheduleDrawerTitle')}</p>
             <h3 className="cal-drawer-title">{displayDate}</h3>
           </div>
           <button className="cal-modal-close" onClick={close} aria-label="Close">
@@ -344,7 +346,7 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
           <input
             ref={searchRef}
             type="text"
-            placeholder="Search approved posts…"
+            placeholder={t('calendar.searchApproved')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="cal-drawer-search-input"
@@ -360,9 +362,9 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
           ) : filtered.length === 0 ? (
             <div className="cal-drawer-empty">
               {approvedPosts.length === 0 ? (
-                <>No approved posts yet.<br /><span>Get a post approved by a client first.</span></>
+                <>{t('calendar.noApprovedYet')}<br /><span>{t('calendar.noApprovedHint')}</span></>
               ) : (
-                'No posts match your search.'
+                t('calendar.noPostsMatch')
               )}
             </div>
           ) : (
@@ -393,7 +395,7 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
                 );
               })}
               {hasMore && !search && (
-                <p className="cal-drawer-has-more">Showing first 50 posts. Use search to find others.</p>
+                <p className="cal-drawer-has-more">{t('calendar.showingFirst50')}</p>
               )}
             </>
           )}
@@ -407,7 +409,7 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
                 stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
-              Publish time
+              {t('calendar.publishTime')}
             </label>
             <input
               type="time"
@@ -422,14 +424,14 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
             disabled={!selectedPost || confirming}
           >
             {confirming ? (
-              <><span className="cal-drawer-confirm-spinner" /> Scheduling…</>
+              <><span className="cal-drawer-confirm-spinner" /> {t('calendar.scheduling')}</>
             ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
-                Confirm Schedule
+                {t('calendar.confirmSchedule')}
               </>
             )}
           </button>
@@ -445,6 +447,7 @@ function Calendar() {
   const { language } = useSettings();
   const locale = LOCALE_MAP[language] || 'en-US';
   const today = new Date();
+  const { activeClientId, activeClient } = useActiveClient();
 
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [posts, setPosts] = useState([]);
@@ -475,7 +478,7 @@ function Calendar() {
     try {
       setLoading(true);
       setError('');
-      const res = await calendarAPI.getMonthPosts(month, year);
+      const res = await calendarAPI.getMonthPosts(month, year, activeClientId);
       setPosts(res.data);
     } catch {
       setError('calendar.failedLoad');
@@ -486,7 +489,7 @@ function Calendar() {
         setFlashKey(k => k + 1);
       }
     }
-  }, [month, year]);
+  }, [month, year, activeClientId]);
 
   useEffect(() => { loadPosts(); }, [loadPosts]);
 
@@ -510,6 +513,23 @@ function Calendar() {
     if (!postsByDay[key]) postsByDay[key] = [];
     postsByDay[key].push(post);
   });
+
+  // Build a deduplicated list of clients present in this month's posts (for legend)
+  const clientsInMonth = !activeClientId ? (() => {
+    const seen = new Map();
+    posts.forEach(p => {
+      if (p.client_username && !seen.has(p.client)) {
+        seen.set(p.client, {
+          id: p.client,
+          name: p.client_first_name || p.client_last_name
+            ? [p.client_first_name, p.client_last_name].filter(Boolean).join(' ')
+            : p.client_username,
+          initial: (p.client_first_name || p.client_username || '').charAt(0).toUpperCase(),
+        });
+      }
+    });
+    return Array.from(seen.values());
+  })() : [];
 
   const cells = [];
   for (let i = 0; i < firstDayOfWeek; i++) cells.push(null);
@@ -748,6 +768,17 @@ function Calendar() {
         </button>
       </div>
 
+      {activeClient && (
+        <div className="cal-client-banner">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+          </svg>
+          {t('calendar.filteredBy', { name: [activeClient.first_name, activeClient.last_name].filter(Boolean).join(' ') || activeClient.username })}
+        </div>
+      )}
+
       {error    && <div className="error-message">{t(error)}</div>}
       {dropError && <div className="error-message">{dropError}</div>}
 
@@ -867,6 +898,13 @@ function Calendar() {
                         >
                           <span className="cal-chip-icon">{p.icon}</span>
                           <span className="cal-chip-time">{formatTime(post.scheduled_time, locale)}</span>
+                          {!activeClientId && post.client_username && (
+                            <span className="cal-chip-client" title={post.client_first_name || post.client_last_name
+                              ? [post.client_first_name, post.client_last_name].filter(Boolean).join(' ')
+                              : post.client_username}>
+                              {(post.client_first_name || post.client_username || '').charAt(0).toUpperCase()}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -881,6 +919,18 @@ function Calendar() {
           {loading && <div className="cal-loading-overlay" />}
         </div>
       </div>
+
+      {clientsInMonth.length > 0 && (
+        <div className="cal-client-legend">
+          <span className="cal-client-legend-label">Clients this month:</span>
+          {clientsInMonth.map(c => (
+            <div key={c.id} className="cal-client-legend-item">
+              <span className="cal-chip-client">{c.initial}</span>
+              <span>{c.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="cal-legend">
         {Object.entries(PLATFORM_META).map(([key, { icon, label }]) => (
@@ -900,7 +950,7 @@ function Calendar() {
             <line x1="2" y1="12" x2="22" y2="12"/>
             <line x1="12" y1="2" x2="12" y2="22"/>
           </svg>
-          <span>Drag chips to reschedule</span>
+          <span>{t('calendar.dragHint')}</span>
         </div>
       </div>
 

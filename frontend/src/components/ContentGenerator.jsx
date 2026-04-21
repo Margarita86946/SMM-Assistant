@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { aiAPI, postsAPI, brandAPI } from '../services/api';
 import { useTranslation } from '../i18n';
+import { useActiveClient } from '../context/ActiveClientContext';
 import '../styles/ContentGenerator.css';
 
 function CopyButton({ text, disabled }) {
@@ -57,6 +58,16 @@ function RegenButton({ onClick, loading, t }) {
 function ContentGenerator() {
     const navigate = useNavigate();
     const { t } = useTranslation();
+    const { activeClientId, clients } = useActiveClient();
+    const role = localStorage.getItem('role');
+    const isSpecialist = role === 'specialist';
+    const [selectedClientId, setSelectedClientId] = useState(() => activeClientId ? String(activeClientId) : '');
+
+    // Keep in sync when sidebar filter changes
+    useEffect(() => {
+        setSelectedClientId(activeClientId ? String(activeClientId) : '');
+    }, [activeClientId]);
+
     const [formData, setFormData] = useState({
         topic: '',
         platform: 'instagram',
@@ -76,33 +87,28 @@ function ContentGenerator() {
     const [imageRetry, setImageRetry] = useState(0);
     const [downloading, setDownloading] = useState(false);
     const [regenLoading, setRegenLoading] = useState({ caption: false, hashtags: false, image_prompt: false, image: false });
-    const [variants, setVariants] = useState(null);
-    const [variantsLoading, setVariantsLoading] = useState(false);
 
     useEffect(() => {
         aiAPI.getStatus().then(res => setOllamaStatus(res.data)).catch(() => {});
-        brandAPI.get().then(res => setBrandProfile(res.data)).catch(() => setBrandProfile(null));
-    }, []);
+        if (!isSpecialist) {
+            brandAPI.get().then(res => setBrandProfile(res.data)).catch(() => setBrandProfile(null));
+        }
+    }, [isSpecialist]);
 
-    const hasBrandContext = brandProfile && (
+    const hasBrandContext = !isSpecialist && brandProfile && (
         brandProfile.brand_name || brandProfile.voice_tone ||
         brandProfile.target_audience || brandProfile.keywords || brandProfile.banned_words
     );
+
+    const selectedClient = isSpecialist ? clients.find(c => String(c.id) === selectedClientId) || null : null;
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     const fetchImage = async (richPrompt) => {
-        const topic = (formData.topic || '').trim();
-        const rich = (richPrompt || '').replace(/^["'`]+|["'`]+$/g, '').replace(/\s+/g, ' ').trim();
-        let prompt = topic;
-        if (imageProvider === 'flux') {
-            prompt = topic ? `${topic}, professional photography, high quality` : rich.slice(0, 150);
-        } else {
-            // Unsplash is keyword-based — the topic gives far better results than the verbose AI image prompt
-            prompt = topic || rich.split(' ').slice(0, 5).join(' ');
-        }
+        const prompt = (richPrompt || '').replace(/^["'`]+|["'`]+$/g, '').replace(/\s+/g, ' ').trim()
+            || (formData.topic || '').trim();
         const imgRes = await aiAPI.generateImage({
             prompt,
             platform: formData.platform,
@@ -121,10 +127,10 @@ function ContentGenerator() {
         setGeneratedContent(null);
         setImageUrl(null);
         setDownloading(false);
-        setVariants(null);
 
+        const clientPayload = selectedClientId ? { client_id: parseInt(selectedClientId, 10) } : {};
         try {
-            const response = await aiAPI.generateContent({ ...formData, provider: textProvider });
+            const response = await aiAPI.generateContent({ ...formData, provider: textProvider, ...clientPayload });
             setGeneratedContent(response.data);
             setImageLoading(true);
             setImageRetry(0);
@@ -151,7 +157,8 @@ function ContentGenerator() {
                 const url = await fetchImage(generatedContent?.image_prompt);
                 setImageUrl(url);
             } else {
-                const response = await aiAPI.generateContent({ ...formData, provider: textProvider });
+                const cp = selectedClientId ? { client_id: parseInt(selectedClientId, 10) } : {};
+                const response = await aiAPI.generateContent({ ...formData, provider: textProvider, ...cp });
                 setGeneratedContent(prev => ({ ...prev, [section]: response.data[section] }));
             }
         } catch (err) {
@@ -161,33 +168,12 @@ function ContentGenerator() {
         }
     };
 
-    const handleGenerateVariants = async () => {
-        setVariantsLoading(true);
-        setError('');
-        try {
-            const res = await aiAPI.generateVariants({
-                topic: formData.topic,
-                platform: formData.platform,
-                tone: formData.tone,
-                provider: textProvider,
-            });
-            setVariants(res.data.variants);
-        } catch {
-            setError(t('generate.failedVariants'));
-        } finally {
-            setVariantsLoading(false);
-        }
-    };
-
-    const handleUseVariant = (caption) => {
-        setGeneratedContent(prev => ({ ...prev, caption }));
-        setVariants(null);
-    };
-
     const handleSaveAsDraft = async () => {
         if (!generatedContent) return;
         setSaving(true);
         setError('');
+
+        const resolvedClientId = activeClientId ?? (selectedClientId ? parseInt(selectedClientId, 10) : null);
 
         try {
             await postsAPI.create({
@@ -199,6 +185,7 @@ function ContentGenerator() {
                 image_url: imageUrl || '',
                 platform: formData.platform,
                 status: 'draft',
+                client: resolvedClientId || null,
             });
             setSuccessMsg(t('generate.savedDraft'));
             setTimeout(() => navigate('/posts'), 1500);
@@ -245,15 +232,19 @@ function ContentGenerator() {
             {error && <div className="error-message">{error}</div>}
             {successMsg && <div className="success-message">{successMsg}</div>}
 
-            <div className={`brand-banner ${hasBrandContext ? 'brand-banner--ok' : 'brand-banner--warn'}`}>
-                {hasBrandContext ? (
-                    <span>✓ Using brand context: <strong>{brandProfile.brand_name || 'your brand'}</strong></span>
-                ) : (
-                    <span>
-                        ⚠ Set up your <button className="brand-banner-link" onClick={() => navigate('/account')}>Brand Profile</button> for better AI results
-                    </span>
-                )}
-            </div>
+            {isSpecialist ? (
+                selectedClient ? (
+                    <div className="brand-banner brand-banner--ok">
+                        <span>✓ Using brand context for <strong>{[selectedClient.first_name, selectedClient.last_name].filter(Boolean).join(' ') || selectedClient.username}</strong></span>
+                    </div>
+                ) : null
+            ) : (
+                hasBrandContext && (
+                    <div className="brand-banner brand-banner--ok">
+                        <span>✓ Using brand context: <strong>{brandProfile.brand_name || 'your brand'}</strong></span>
+                    </div>
+                )
+            )}
 
             <div className="generator-form-card">
                 <div className="gen-form-group">
@@ -288,6 +279,40 @@ function ContentGenerator() {
                     </div>
                 </div>
 
+                {isSpecialist && clients.length > 0 && (
+                    <div className="gen-form-group">
+                        <label>
+                            Client{' '}
+                            {activeClientId
+                                ? <span className="label-context-set">pre-filled from filter</span>
+                                : <span className="label-optional">optional — uses brand profile</span>
+                            }
+                        </label>
+                        {activeClientId ? (
+                            <div className="gen-client-locked">
+                                {(() => {
+                                    const c = clients.find(x => String(x.id) === selectedClientId);
+                                    return c
+                                        ? [c.first_name, c.last_name].filter(Boolean).join(' ') || c.username
+                                        : selectedClientId;
+                                })()}
+                            </div>
+                        ) : (
+                            <select
+                                value={selectedClientId}
+                                onChange={e => setSelectedClientId(e.target.value)}
+                            >
+                                <option value="">— No client (generic content) —</option>
+                                {clients.map(c => (
+                                    <option key={c.id} value={c.id}>
+                                        {[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+                )}
+
                 <div className="gen-model-card">
                     <h4 className="gen-model-title">Model Settings</h4>
                     <div className="gen-form-row">
@@ -311,9 +336,6 @@ function ContentGenerator() {
                                 <option value="unsplash">Unsplash (Stock Photos)</option>
                                 <option value="flux">Flux AI / Pollinations (Generated)</option>
                             </select>
-                            {imageProvider === 'flux' && (
-                                <p className="gen-model-note">⚡ Flux generates original AI images, not stock photos.</p>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -336,32 +358,6 @@ function ContentGenerator() {
                             </div>
                         </div>
                         <p>{generatedContent.caption}</p>
-
-                        <div className="gen-variants-row">
-                            <button
-                                className="btn-variants"
-                                onClick={handleGenerateVariants}
-                                disabled={variantsLoading}
-                            >
-                                {variantsLoading ? 'Generating variants…' : 'Generate 3 Variants'}
-                            </button>
-                        </div>
-
-                        {variants && (
-                            <div className="gen-variants-grid">
-                                {variants.map((v, idx) => (
-                                    <div key={idx} className="gen-variant-card">
-                                        <p className="gen-variant-text">{v}</p>
-                                        <button
-                                            className="btn-use-variant"
-                                            onClick={() => handleUseVariant(v)}
-                                        >
-                                            Use This
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
                     </div>
 
                     <div className={`gen-result-block${regenLoading.hashtags ? ' gen-result-block--loading' : ''}`}>
@@ -384,8 +380,14 @@ function ContentGenerator() {
                             </div>
                         </div>
                         <p>{generatedContent.image_prompt}</p>
-                        {imageLoading && <p className="gen-image-status">{t('generate.generatingImage')}</p>}
-                        {!imageLoading && imageUrl && (
+                        {(imageLoading || regenLoading.image) && (
+                            <div className="gen-image-loading">
+                                <span className="gen-image-spinner" />
+                                <span>{regenLoading.image ? 'Regenerating image…' : t('generate.generatingImage')}</span>
+                                {imageProvider === 'flux' && <span className="gen-image-loading-hint">Flux can take 30–60s</span>}
+                            </div>
+                        )}
+                        {!imageLoading && !regenLoading.image && imageUrl && (
                             <>
                                 <img
                                     src={imageUrl}
@@ -393,12 +395,13 @@ function ContentGenerator() {
                                     className="gen-result-image"
                                     referrerPolicy="no-referrer"
                                     onError={() => {
-                                        console.error('Image failed to load:', imageUrl);
-                                        if (imageRetry < 2) {
+                                        // Seed-swap retry only works for Pollinations URLs that contain ?seed=
+                                        // Flux images saved to /media/ have no seed param — just clear and show error
+                                        if (imageUrl.includes('seed=') && imageRetry < 2) {
                                             setImageRetry(imageRetry + 1);
                                             setImageUrl(imageUrl.replace(/seed=\d+/, `seed=${Math.floor(Math.random() * 10000000)}`));
                                         } else {
-                                            setError(`${t('generate.imageFailed')} URL: ${imageUrl}`);
+                                            setError(t('generate.imageFailed'));
                                             setImageUrl(null);
                                             setImageRetry(0);
                                         }
@@ -412,7 +415,7 @@ function ContentGenerator() {
                                 </div>
                             </>
                         )}
-                        {!imageLoading && !imageUrl && <p className="gen-image-status gen-image-error">{t('generate.imageFailed')}</p>}
+                        {!imageLoading && !regenLoading.image && !imageUrl && <p className="gen-image-status gen-image-error">{t('generate.imageFailed')}</p>}
                     </div>
 
                     <div className="gen-actions">
@@ -421,7 +424,7 @@ function ContentGenerator() {
                         </button>
                         <button
                             className="btn-generate-new"
-                            onClick={() => { setGeneratedContent(null); setImageUrl(null); setVariants(null); setFormData({ topic: '', platform: 'instagram', tone: 'professional' }); }}
+                            onClick={() => { setGeneratedContent(null); setImageUrl(null); setFormData({ topic: '', platform: 'instagram', tone: 'professional' }); }}
                         >
                             {t('generate.generateNew')}
                         </button>

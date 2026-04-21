@@ -240,16 +240,28 @@ def instagram_disconnect(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def instagram_status(request):
-    accounts = SocialAccount.objects.filter(
-        user=request.user, platform='instagram', is_active=True,
-    ).order_by('connected_at')
+    from django.db.models import Q as DQ
+    if request.user.role == 'specialist':
+        # Own accounts + accounts belonging to any of this specialist's clients
+        accounts = SocialAccount.objects.filter(
+            DQ(user=request.user) |
+            DQ(user__specialist=request.user, user__role='client'),
+            platform='instagram',
+            is_active=True,
+        ).select_related('user').order_by('connected_at')
+    else:
+        accounts = SocialAccount.objects.filter(
+            user=request.user, platform='instagram', is_active=True,
+        ).order_by('connected_at')
+
     return Response({
         'accounts': [
             {
                 'id': a.id,
                 'username': a.account_username,
                 'account_type': a.account_type,
-                'is_client_account': a.is_client_account,
+                'is_client_account': a.user_id != request.user.id,
+                'client_username': a.user.username if a.user_id != request.user.id else None,
                 'expires_at': a.token_expires_at.isoformat() if a.token_expires_at else None,
             }
             for a in accounts

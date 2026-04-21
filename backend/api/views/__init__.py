@@ -39,7 +39,9 @@ from .invitations import (
     invitations_list,
     invitation_detail,
     invitation_lookup,
-    invitation_oauth_start,
+    clients_list,
+    client_detail,
 )
 from .email_config import email_config_view
 from .audit_logs import audit_logs_view
+from .notifications import notifications_list, mark_read, mark_all_read

@@ -40,6 +40,8 @@ function Account() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ first_name: '', last_name: '', email: '' });
+  const [autoApprove, setAutoApprove] = useState(false);
+  const [autoApproveSaving, setAutoApproveSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -97,6 +99,7 @@ function Account() {
       const url = window.location.pathname + (q ? `?${q}` : '') + window.location.hash;
       window.history.replaceState({}, '', url);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleInstagramConnect = async () => {
@@ -131,9 +134,15 @@ function Account() {
     profileAPI.get().then(res => {
       setProfile(res.data);
       setFormData({ first_name: res.data.first_name || '', last_name: res.data.last_name || '', email: res.data.email || '' });
+      setAutoApprove(!!res.data.auto_approve);
       if (res.data.avatar) localStorage.setItem('avatar', res.data.avatar);
       else localStorage.removeItem('avatar');
+      // Sync sound preference into localStorage for NotificationsContext
+      if (res.data.notifications_sound !== undefined) {
+        localStorage.setItem('notifications_sound', String(res.data.notifications_sound));
+      }
     }).catch(() => {
+      setProfileError(t('account.failedSave'));
     }).finally(() => setLoading(false));
 
     brandAPI.get().then(res => {
@@ -144,8 +153,8 @@ function Account() {
         keywords: res.data.keywords || '',
         banned_words: res.data.banned_words || '',
       });
-    }).catch(() => {});
-  }, []);
+    }).catch(() => setBrandError(t('account.failedSave')));
+  }, [t]);
 
   const handleBrandSave = async () => {
     setBrandSaving(true);
@@ -159,6 +168,21 @@ function Account() {
       setBrandError(err.message || t('account.failedSave'));
     } finally {
       setBrandSaving(false);
+    }
+  };
+
+  const handleAutoApproveToggle = async () => {
+    const newVal = !autoApprove;
+    setAutoApprove(newVal);
+    setAutoApproveSaving(true);
+    setProfileError('');
+    try {
+      await profileAPI.update({ auto_approve: newVal });
+    } catch {
+      setAutoApprove(!newVal);
+      setProfileError(t('account.failedSave'));
+    } finally {
+      setAutoApproveSaving(false);
     }
   };
 
@@ -453,7 +477,7 @@ function Account() {
                     </span>
                     {acc.is_client_account && (
                       <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 999, padding: '2px 8px' }}>
-                        Client
+                        Client{acc.client_username ? `: @${acc.client_username}` : ''}
                       </span>
                     )}
                   </div>
@@ -463,15 +487,17 @@ function Account() {
                     </span>
                   )}
                 </div>
-                <div className="ig-actions">
-                  <button
-                    className="account-btn-save account-btn-danger ig-btn"
-                    onClick={() => handleInstagramDisconnect(acc.id)}
-                    disabled={igDisconnecting === acc.id}
-                  >
-                    {igDisconnecting === acc.id ? t('instagram.disconnecting') : t('instagram.disconnect')}
-                  </button>
-                </div>
+                {!acc.is_client_account && (
+                  <div className="ig-actions">
+                    <button
+                      className="account-btn-save account-btn-danger ig-btn"
+                      onClick={() => handleInstagramDisconnect(acc.id)}
+                      disabled={igDisconnecting === acc.id}
+                    >
+                      {igDisconnecting === acc.id ? t('instagram.disconnecting') : t('instagram.disconnect')}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             <div style={{ marginTop: 14 }}>
@@ -483,8 +509,36 @@ function Account() {
         )}
       </div>
 
-      {/* Brand Profile */}
-      <div className="account-card">
+      {/* Auto-approve toggle — clients only */}
+      {localStorage.getItem('role') === 'client' && (
+        <div className="account-card">
+          <div className="account-card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 11 12 14 22 4"/>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+            </svg>
+            {t('account.postApprovals')}
+          </div>
+          <div className="auto-approve-row">
+            <div className="auto-approve-info">
+              <span className="auto-approve-label">{t('account.autoApproveLabel')}</span>
+              <span className="auto-approve-desc">{t('account.autoApproveHint')}</span>
+            </div>
+            <button
+              className={`auto-approve-toggle${autoApprove ? ' on' : ''}`}
+              onClick={handleAutoApproveToggle}
+              disabled={autoApproveSaving}
+              title={autoApprove ? 'Disable auto-approve' : 'Enable auto-approve'}
+            >
+              <span className="auto-approve-thumb" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Brand Profile — hidden for specialists (they use each client's profile) */}
+      {localStorage.getItem('role') !== 'specialist' && <div className="account-card">
         <div className="account-card-title">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -498,44 +552,44 @@ function Account() {
         {brandMsg && <div className="success-message">{brandMsg}</div>}
 
         <p className="account-pw-hint" style={{ marginTop: 0, marginBottom: 16 }}>
-          Fill this in to give the AI consistent brand context across all generations.
+          {t('account.brandProfileHint')}
         </p>
 
         <div className="account-form-group">
-          <label>Brand Name</label>
+          <label>{t('account.brandName')}</label>
           <input type="text" value={brandData.brand_name}
             onChange={e => setBrandData({ ...brandData, brand_name: e.target.value })}
-            placeholder="e.g. Acme Co." />
+            placeholder={t('account.brandNamePlaceholder')} />
         </div>
         <div className="account-form-group">
-          <label>Voice &amp; Tone</label>
+          <label>{t('account.voiceTone')}</label>
           <input type="text" value={brandData.voice_tone}
             onChange={e => setBrandData({ ...brandData, voice_tone: e.target.value })}
-            placeholder="e.g. Friendly, concise, witty" />
+            placeholder={t('account.voiceTonePlaceholder')} />
         </div>
         <div className="account-form-group">
-          <label>Target Audience</label>
+          <label>{t('account.targetAudience')}</label>
           <input type="text" value={brandData.target_audience}
             onChange={e => setBrandData({ ...brandData, target_audience: e.target.value })}
-            placeholder="e.g. Small-business owners in the US" />
+            placeholder={t('account.targetAudiencePlaceholder')} />
         </div>
         <div className="account-form-group">
-          <label>Keywords (comma-separated)</label>
+          <label>{t('account.keywords')}</label>
           <input type="text" value={brandData.keywords}
             onChange={e => setBrandData({ ...brandData, keywords: e.target.value })}
-            placeholder="productivity, automation, growth" />
+            placeholder={t('account.keywordsPlaceholder')} />
         </div>
         <div className="account-form-group">
-          <label>Banned Words (comma-separated)</label>
+          <label>{t('account.bannedWords')}</label>
           <input type="text" value={brandData.banned_words}
             onChange={e => setBrandData({ ...brandData, banned_words: e.target.value })}
-            placeholder="cheap, synergy, disrupt" />
+            placeholder={t('account.bannedWordsPlaceholder')} />
         </div>
 
         <button className="account-btn-save" onClick={handleBrandSave} disabled={brandSaving}>
           {brandSaving ? t('common.saving') : t('account.saveChanges')}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

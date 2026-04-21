@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 
 from django.db.models import Q
+from django.utils import timezone
 
 from ..models import Post
 from ..serializers import PostSerializer, PostCreateSerializer
@@ -33,14 +34,24 @@ class StablePageNumberPagination(PageNumberPagination):
 def posts_list(request):
     if request.method == 'GET':
         if request.user.role == 'client':
-            # Clients see all posts currently pending their approval
-            posts = Post.objects.filter(status='pending_approval').order_by('-created_at')
+            # Clients see only posts explicitly assigned to them
+            posts = Post.objects.filter(client=request.user, deleted_at__isnull=True).order_by('-created_at')
         else:
-            posts = Post.objects.filter(user=request.user).order_by('-created_at')
+            # Specialists see their own posts plus posts assigned to any of their clients
+            posts = Post.objects.filter(user=request.user, deleted_at__isnull=True).order_by('-created_at')
 
         search = request.query_params.get('search', '').strip()
         platform = request.query_params.get('platform', '').strip()
         post_status = request.query_params.get('status', '').strip()
+        client_id = request.query_params.get('client_id', '').strip()
+
+        if client_id and request.user.role != 'client':
+            try:
+                from ..models import User
+                client = User.objects.get(id=int(client_id), specialist=request.user, role='client')
+                posts = posts.filter(client=client)
+            except (User.DoesNotExist, ValueError):
+                pass
 
         if search:
             posts = posts.filter(
@@ -63,7 +74,7 @@ def posts_list(request):
         return paginator.get_paginated_response(serializer.data)
 
     elif request.method == 'POST':
-        serializer = PostCreateSerializer(data=request.data)
+        serializer = PostCreateSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             post = serializer.save(user=request.user)
             return Response(PostSerializer(post).data, status=status.HTTP_201_CREATED)
@@ -74,7 +85,7 @@ def posts_list(request):
 @permission_classes([IsAuthenticated])
 def post_detail(request, pk):
     try:
-        post = Post.objects.get(pk=pk, user=request.user)
+        post = Post.objects.get(pk=pk, user=request.user, deleted_at__isnull=True)
     except Post.DoesNotExist:
         return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -87,7 +98,7 @@ def post_detail(request, pk):
         old_status = post.status
         old_content = {f: getattr(post, f, '') or '' for f in _CONTENT_FIELDS}
 
-        serializer = PostCreateSerializer(post, data=request.data, partial=True)
+        serializer = PostCreateSerializer(post, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated = serializer.save()
             # If a scheduled/approved post has content edits (not just time change),
@@ -104,7 +115,8 @@ def post_detail(request, pk):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
-        post.delete()
+        post.deleted_at = timezone.now()
+        post.save(update_fields=['deleted_at'])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -134,13 +146,23 @@ def calendar_view(request):
     month_start = timezone.datetime(year, month, 1, 0, 0, 0, tzinfo=user_tz)
     month_end   = timezone.datetime(year, month, last_day, 23, 59, 59, tzinfo=user_tz)
 
-    posts = Post.objects.filter(
+    qs = Post.objects.filter(
         user=request.user,
         scheduled_time__gte=month_start,
         scheduled_time__lte=month_end,
-    ).order_by('scheduled_time')
+        deleted_at__isnull=True,
+    )
 
-    serializer = PostSerializer(posts, many=True)
+    client_id = request.GET.get('client_id', '').strip()
+    if client_id:
+        try:
+            from ..models import User
+            client = User.objects.get(id=int(client_id), specialist=request.user, role='client')
+            qs = qs.filter(client=client)
+        except (User.DoesNotExist, ValueError):
+            pass
+
+    serializer = PostSerializer(qs.order_by('scheduled_time'), many=True)
     return Response(serializer.data)
 
 
@@ -153,7 +175,8 @@ def today_posts(request):
 
     posts = Post.objects.filter(
         user=request.user,
-        scheduled_time__date=today
+        scheduled_time__date=today,
+        deleted_at__isnull=True,
     ).order_by('scheduled_time')
 
     serializer = PostSerializer(posts, many=True)

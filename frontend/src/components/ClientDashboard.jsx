@@ -25,11 +25,13 @@ function ClientDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await postsAPI.getAll({ status: 'pending_approval', page: 1 });
+      // Backend filters to client=request.user automatically, so no extra params needed.
+      // We show all posts assigned to this client; they can filter by pending_approval locally.
+      const res = await postsAPI.getAll({ page: 1, page_size: 100 });
       const results = res.data.results ?? res.data;
-      setPosts(results);
+      setPosts(results.filter(p => p.status === 'pending_approval'));
     } catch {
-      setError('Failed to load pending posts');
+      setError(t('approval.failedSubmit'));
     } finally {
       setLoading(false);
     }
@@ -38,7 +40,7 @@ function ClientDashboard() {
   useEffect(() => { load(); }, [load]);
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Not scheduled';
+    if (!dateString) return t('dashboard.notScheduled');
     return new Date(dateString).toLocaleDateString(locale, {
       month: 'short', day: 'numeric', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
@@ -83,8 +85,8 @@ function ClientDashboard() {
   return (
     <div className="client-container">
       <div className="client-header">
-        <h1>Pending Approvals</h1>
-        <p className="subtitle">Review and approve or reject posts awaiting your decision.</p>
+        <h1>{t('approval.pendingTitle')}</h1>
+        <p className="subtitle">{t('approval.pendingSubtitle')}</p>
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -92,8 +94,8 @@ function ClientDashboard() {
       {posts.length === 0 ? (
         <div className="client-empty">
           <div className="client-empty-icon">✅</div>
-          <h3>You're all caught up!</h3>
-          <p>No posts are waiting for approval right now.</p>
+          <h3>{t('approval.allCaughtUp')}</h3>
+          <p>{t('approval.noPending')}</p>
         </div>
       ) : (
         <div className="client-grid">
@@ -118,7 +120,7 @@ function ClientDashboard() {
                   <div className="client-reject-box">
                     <textarea
                       className="client-reject-textarea"
-                      placeholder="Reason for rejection (optional)"
+                      placeholder={t('approval.rejectReason')}
                       value={rejectNote}
                       onChange={e => setRejectNote(e.target.value)}
                       rows={3}
@@ -129,10 +131,10 @@ function ClientDashboard() {
                         onClick={submitReject}
                         disabled={acting[post.id] === 'rejecting'}
                       >
-                        {acting[post.id] === 'rejecting' ? 'Rejecting…' : 'Confirm Reject'}
+                        {acting[post.id] === 'rejecting' ? t('approval.rejecting') : t('approval.confirmReject')}
                       </button>
                       <button className="client-btn-cancel" onClick={() => setRejectFor(null)}>
-                        Cancel
+                        {t('calendar.cancel')}
                       </button>
                     </div>
                   </div>
@@ -143,10 +145,10 @@ function ClientDashboard() {
                       onClick={() => handleApprove(post.id)}
                       disabled={acting[post.id] === 'approving'}
                     >
-                      {acting[post.id] === 'approving' ? 'Approving…' : '✓ Approve'}
+                      {acting[post.id] === 'approving' ? t('approval.approving') : t('approval.approve')}
                     </button>
                     <button className="client-btn-reject-open" onClick={() => openReject(post.id)}>
-                      ✗ Reject
+                      {t('approval.reject')}
                     </button>
                   </div>
                 )}

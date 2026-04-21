@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { authAPI } from '../services/api';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { authAPI, invitationsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import SmmLogo from './SmmLogo';
 import '../styles/Auth.css';
@@ -24,6 +24,16 @@ const EyeOffIcon = () => (
 
 function Login({ isLoginMode }) {
   const [isLogin, setIsLogin] = useState(isLoginMode);
+  const [searchParams] = useSearchParams();
+  const invitationToken = searchParams.get('token') || '';
+
+  const [invitation, setInvitation] = useState(null);
+  const [invLoading, setInvLoading] = useState(!!invitationToken && !isLoginMode);
+  const [invError, setInvError] = useState('');
+
+  // Quiz step: null = not yet chosen (only shown for self-registration)
+  const [chosenRole, setChosenRole] = useState(null);
+
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -31,7 +41,6 @@ function Login({ isLoginMode }) {
     last_name: '',
     password: '',
     password2: '',
-    role: 'specialist',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
@@ -39,6 +48,24 @@ function Login({ isLoginMode }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { t } = useTranslation();
+
+  // On register with invitation token: fetch invitation to pre-fill email
+  useEffect(() => {
+    if (isLogin || !invitationToken) return;
+    setInvLoading(true);
+    invitationsAPI.lookup(invitationToken)
+      .then(res => {
+        setInvitation(res.data);
+        setFormData(prev => ({
+          ...prev,
+          email: res.data.client_email || '',
+          // Pre-fill username if this is a reactivation so the field can be locked
+          username: res.data.existing_username || prev.username,
+        }));
+      })
+      .catch(() => setInvError('This invitation link is invalid or has expired.'))
+      .finally(() => setInvLoading(false));
+  }, [isLogin, invitationToken]);
 
   useEffect(() => {
     setIsLogin(isLoginMode);
@@ -66,6 +93,7 @@ function Login({ isLoginMode }) {
         if (response.data.expires_at) {
           localStorage.setItem('token_expires_at', response.data.expires_at);
         }
+        window.dispatchEvent(new StorageEvent('storage', { key: 'role' }));
         navigate(response.data.role === 'client' ? '/client' : '/dashboard');
       } else {
         if (formData.password !== formData.password2) {
@@ -73,30 +101,33 @@ function Login({ isLoginMode }) {
           setLoading(false);
           return;
         }
-        await authAPI.register({
+        const payload = {
           username: formData.username,
           email: formData.email,
           first_name: formData.first_name,
           last_name: formData.last_name,
           password: formData.password,
-          role: formData.role,
-        });
-        const loginResponse = await authAPI.login({
-          username: formData.username,
-          password: formData.password,
-        });
-        localStorage.setItem('token', loginResponse.data.token);
-        localStorage.setItem('username', formData.username);
-        if (loginResponse.data.role) localStorage.setItem('role', loginResponse.data.role);
-        if (loginResponse.data.expires_at) {
-          localStorage.setItem('token_expires_at', loginResponse.data.expires_at);
+        };
+        if (invitationToken) {
+          payload.invitation_token = invitationToken;
+        } else {
+          payload.role = chosenRole;
         }
-        navigate(loginResponse.data.role === 'client' ? '/client' : '/dashboard');
+        const registerResponse = await authAPI.register(payload);
+        localStorage.setItem('token', registerResponse.data.token);
+        localStorage.setItem('username', formData.username);
+        if (registerResponse.data.role) localStorage.setItem('role', registerResponse.data.role);
+        if (registerResponse.data.expires_at) {
+          localStorage.setItem('token_expires_at', registerResponse.data.expires_at);
+        }
+        window.dispatchEvent(new StorageEvent('storage', { key: 'role' }));
+        navigate(registerResponse.data.role === 'client' ? '/client' : '/dashboard');
       }
     } catch (err) {
       const errorMap = {
         user_not_found: t('auth.errorUserNotFound'),
         wrong_password: t('auth.errorWrongPassword'),
+        account_disabled: t('auth.errorAccountDisabled'),
       };
       setError(errorMap[err.message] || err.message || t('auth.genericError'));
     } finally {
@@ -106,11 +137,16 @@ function Login({ isLoginMode }) {
 
   const toggleMode = () => {
     setError('');
-    setFormData({ username: '', email: '', first_name: '', last_name: '', password: '', password2: '', role: 'specialist' });
+    setFormData({ username: '', email: '', first_name: '', last_name: '', password: '', password2: '' });
     setShowPassword(false);
     setShowPassword2(false);
+    setChosenRole(null);
     navigate(isLogin ? '/register' : '/login');
   };
+
+  const isClientInvite = !isLogin && !!invitationToken;
+  // Self-registration without a role chosen yet → show quiz
+  const showQuiz = !isLogin && !isClientInvite && chosenRole === null;
 
   return (
     <div className="auth-container">
@@ -168,133 +204,202 @@ function Login({ isLoginMode }) {
 
       <div className="auth-right">
         <div className="auth-box">
-          <div className="auth-box-header">
-            <h2>{isLogin ? t('auth.loginTitle') : t('auth.registerTitle')}</h2>
-            <p>{isLogin ? t('auth.loginSubtitle') : t('auth.registerSubtitle')}</p>
-          </div>
 
-          {error && <div className="error-message">{error}</div>}
-
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>{t('auth.username')}</label>
-              <input
-                type="text"
-                name="username"
-                value={formData.username}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                placeholder={t('auth.usernamePlaceholder')}
-              />
-            </div>
-
-            {!isLogin && (
-              <div className="form-row">
-                <div className="form-group">
-                  <label>{t('auth.firstName')}</label>
-                  <input
-                    type="text"
-                    name="first_name"
-                    value={formData.first_name}
-                    onChange={handleChange}
-                    disabled={loading}
-                    placeholder={t('auth.firstNamePlaceholder')}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>{t('auth.lastName')}</label>
-                  <input
-                    type="text"
-                    name="last_name"
-                    value={formData.last_name}
-                    onChange={handleChange}
-                    disabled={loading}
-                    placeholder={t('auth.lastNamePlaceholder')}
-                  />
-                </div>
+          {/* ── Quiz step ── */}
+          {showQuiz ? (
+            <>
+              <div className="auth-box-header">
+                <h2>What's your goal?</h2>
+                <p>We'll set up your account based on how you plan to use the platform.</p>
               </div>
-            )}
-
-            {!isLogin && (
-              <div className="form-group">
-                <label>Account Type</label>
-                <select
-                  name="role"
-                  value={formData.role}
-                  onChange={handleChange}
-                  disabled={loading}
-                >
-                  <option value="specialist">Specialist (create content)</option>
-                  <option value="client">Client (approve content)</option>
-                </select>
-              </div>
-            )}
-
-            {!isLogin && (
-              <div className="form-group">
-                <label>{t('auth.email')}</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                  placeholder={t('auth.emailPlaceholder')}
-                />
-              </div>
-            )}
-
-            <div className="form-group">
-              <label>{t('auth.password')}</label>
-              <div className="password-input-wrapper">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                  placeholder={t('auth.passwordPlaceholder')}
-                />
-                <button type="button" className="btn-password-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
-                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              <div className="role-quiz">
+                <button className="role-quiz-card" onClick={() => setChosenRole('owner')}>
+                  <span className="role-quiz-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                      <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                  </span>
+                  <span className="role-quiz-title">Manage my own account</span>
+                  <span className="role-quiz-desc">Create and schedule posts for your personal or business Instagram.</span>
+                </button>
+                <button className="role-quiz-card" onClick={() => setChosenRole('specialist')}>
+                  <span className="role-quiz-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                      <circle cx="9" cy="7" r="4"/>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                  </span>
+                  <span className="role-quiz-title">Manage clients' accounts</span>
+                  <span className="role-quiz-desc">Invite clients, create content on their behalf, and handle approvals.</span>
                 </button>
               </div>
-            </div>
+              <p className="toggle-text">
+                {t('auth.hasAccount')}{' '}
+                <span onClick={toggleMode} className="toggle-link">{t('auth.signIn')}</span>
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="auth-box-header">
+                {isClientInvite ? (
+                  <>
+                    <h2>Create your client account</h2>
+                    {invLoading && <p>Loading invitation…</p>}
+                    {invError && <p className="auth-invite-error">{invError}</p>}
+                    {invitation && (
+                      <p>
+                        You've been invited by <strong>{invitation.specialist_name}</strong>.
+                        Your account will be linked to them automatically.
+                      </p>
+                    )}
+                  </>
+                ) : !isLogin && chosenRole ? (
+                  <>
+                    <h2>{chosenRole === 'owner' ? 'Set up your account' : 'Set up your specialist account'}</h2>
+                    <p>
+                      {chosenRole === 'owner'
+                        ? 'You\'ll manage your own social media.'
+                        : 'You\'ll manage content for your clients.'}
+                      {' '}<span className="toggle-link" style={{fontSize:'0.85em'}} onClick={() => setChosenRole(null)}>Change</span>
+                    </p>
+                  </>
+                ) : (
+                  <h2>{isLogin ? t('auth.loginTitle') : t('auth.registerTitle')}</h2>
+                )}
+                {!isClientInvite && isLogin && (
+                  <p>{t('auth.loginSubtitle')}</p>
+                )}
+              </div>
 
-            {!isLogin && (
-              <div className="form-group">
-                <label>{t('auth.confirmPassword')}</label>
-                <div className="password-input-wrapper">
+              {error && <div className="error-message">{error}</div>}
+
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label>{t('auth.username')}</label>
                   <input
-                    type={showPassword2 ? 'text' : 'password'}
-                    name="password2"
-                    value={formData.password2}
+                    type="text"
+                    name="username"
+                    value={formData.username}
                     onChange={handleChange}
                     required
-                    disabled={loading}
-                    placeholder={t('auth.confirmPasswordPlaceholder')}
+                    disabled={loading || (isClientInvite && !!invitation?.existing_username)}
+                    readOnly={isClientInvite && !!invitation?.existing_username}
+                    placeholder={t('auth.usernamePlaceholder')}
                   />
-                  <button type="button" className="btn-password-toggle" onClick={() => setShowPassword2(!showPassword2)} tabIndex={-1}>
-                    {showPassword2 ? <EyeOffIcon /> : <EyeIcon />}
-                  </button>
+                  {isClientInvite && invitation?.existing_username && (
+                    <span className="auth-field-hint">Your existing username has been pre-filled.</span>
+                  )}
                 </div>
-              </div>
-            )}
 
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? t('auth.pleaseWait') : (isLogin ? t('auth.signIn') : t('auth.createAccount'))}
-            </button>
-          </form>
+                {!isLogin && (
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>{t('auth.firstName')}</label>
+                      <input
+                        type="text"
+                        name="first_name"
+                        value={formData.first_name}
+                        onChange={handleChange}
+                        disabled={loading}
+                        placeholder={t('auth.firstNamePlaceholder')}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>{t('auth.lastName')}</label>
+                      <input
+                        type="text"
+                        name="last_name"
+                        value={formData.last_name}
+                        onChange={handleChange}
+                        disabled={loading}
+                        placeholder={t('auth.lastNamePlaceholder')}
+                      />
+                    </div>
+                  </div>
+                )}
 
-          <p className="toggle-text">
-            {isLogin ? t('auth.noAccount') : t('auth.hasAccount')}{' '}
-            <span onClick={toggleMode} className="toggle-link">
-              {isLogin ? t('auth.registerHere') : t('auth.signIn')}
-            </span>
-          </p>
+                {!isLogin && (
+                  <div className="form-group">
+                    <label>{t('auth.email')}</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      required
+                      disabled={loading || isClientInvite}
+                      placeholder={t('auth.emailPlaceholder')}
+                      readOnly={isClientInvite}
+                    />
+                    {isClientInvite && (
+                      <span className="auth-field-hint">Email is set by your invitation and cannot be changed.</span>
+                    )}
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label>{t('auth.password')}</label>
+                  <div className="password-input-wrapper">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      required
+                      disabled={loading}
+                      placeholder={t('auth.passwordPlaceholder')}
+                    />
+                    <button type="button" className="btn-password-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
+                      {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                    </button>
+                  </div>
+                </div>
+
+                {!isLogin && (
+                  <div className="form-group">
+                    <label>{t('auth.confirmPassword')}</label>
+                    <div className="password-input-wrapper">
+                      <input
+                        type={showPassword2 ? 'text' : 'password'}
+                        name="password2"
+                        value={formData.password2}
+                        onChange={handleChange}
+                        required
+                        disabled={loading}
+                        placeholder={t('auth.confirmPasswordPlaceholder')}
+                      />
+                      <button type="button" className="btn-password-toggle" onClick={() => setShowPassword2(!showPassword2)} tabIndex={-1}>
+                        {showPassword2 ? <EyeOffIcon /> : <EyeIcon />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <button type="submit" className="btn-primary" disabled={loading || (isClientInvite && (invLoading || !!invError))}>
+                  {loading ? t('auth.pleaseWait') : (isLogin ? t('auth.signIn') : t('auth.createAccount'))}
+                </button>
+              </form>
+
+              <p className="toggle-text">
+                {isLogin ? t('auth.noAccount') : t('auth.hasAccount')}{' '}
+                {!isClientInvite && (
+                  <span onClick={toggleMode} className="toggle-link">
+                    {isLogin ? t('auth.registerHere') : t('auth.signIn')}
+                  </span>
+                )}
+                {isClientInvite && (
+                  <span onClick={() => navigate('/login')} className="toggle-link">
+                    {t('auth.signIn')}
+                  </span>
+                )}
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -10,13 +10,26 @@ from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 
-from ..models import Post
+from ..models import Post, User
+
+
+def _client_filtered_posts(request):
+    """Base queryset for the requesting user, optionally filtered by a specific client."""
+    qs = Post.objects.filter(user=request.user)
+    client_id = request.query_params.get('client_id', '').strip()
+    if client_id and request.user.role != 'client':
+        try:
+            client = User.objects.get(id=int(client_id), specialist=request.user, role='client')
+            qs = qs.filter(client=client)
+        except (User.DoesNotExist, ValueError):
+            pass
+    return qs
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
-    user_posts = Post.objects.filter(user=request.user)
+    user_posts = _client_filtered_posts(request)
     total_posts = user_posts.count()
 
     now = timezone.now()
@@ -68,8 +81,8 @@ def dashboard_activity(request):
     start = today - timedelta(days=6)
 
     rows = (
-        Post.objects
-        .filter(user=request.user, created_at__date__gte=start)
+        _client_filtered_posts(request)
+        .filter(created_at__date__gte=start)
         .annotate(day=TruncDate('created_at'))
         .values('day')
         .annotate(count=Count('id'))

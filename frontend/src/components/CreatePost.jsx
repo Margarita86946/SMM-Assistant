@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { aiAPI, postsAPI } from '../services/api';
+import { aiAPI, postsAPI, clientsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
+import { useActiveClient } from '../context/ActiveClientContext';
 import '../styles/CreatePost.css';
 
 function RegenButton({ onClick, loading, t }) {
@@ -34,7 +35,20 @@ function CreatePost() {
   const [platform, setPlatform] = useState('instagram');
 
   const [tone, setTone] = useState('professional');
+  const { activeClientId, clients: contextClients } = useActiveClient();
+  const [clientId, setClientId] = useState(() => activeClientId ? String(activeClientId) : '');
+  const [clients, setClients] = useState([]);
   const [autoPublish, setAutoPublish] = useState(false);
+
+  useEffect(() => {
+    clientsAPI.list().then(res => setClients(res.data)).catch(() => {});
+  }, []);
+
+  // When the active client context changes (e.g. specialist switches client while on this page),
+  // keep the selector in sync — but only if the user hasn't manually overridden it yet.
+  useEffect(() => {
+    setClientId(activeClientId ? String(activeClientId) : '');
+  }, [activeClientId]);
   const [polishing, setPolishing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -49,7 +63,7 @@ function CreatePost() {
     setPolishing(true);
     setError('');
     try {
-      const res = await aiAPI.polishContent({ topic, caption, hashtags, image_prompt: imagePrompt, platform, tone });
+      const res = await aiAPI.polishContent({ topic, caption, hashtags, image_prompt: imagePrompt, platform, tone, client_id: clientId || undefined });
       setCaption(res.data.caption);
       setHashtags(res.data.hashtags);
       if (res.data.image_prompt) setImagePrompt(res.data.image_prompt);
@@ -68,7 +82,7 @@ function CreatePost() {
     setRegenLoading(prev => ({ ...prev, [field]: true }));
     setError('');
     try {
-      const res = await aiAPI.generateContent({ topic, platform, tone });
+      const res = await aiAPI.generateContent({ topic, platform, tone, client_id: clientId || undefined });
       if (field === 'caption') setCaption(res.data.caption);
       else if (field === 'hashtags') setHashtags(res.data.hashtags);
       else if (field === 'image_prompt') setImagePrompt(res.data.image_prompt);
@@ -86,6 +100,9 @@ function CreatePost() {
     }
     setSaving(true);
     setError('');
+    // Use activeClientId from context as authoritative source when a filter is active;
+    // fall back to the manual dropdown selection.
+    const resolvedClientId = activeClientId ?? (clientId ? parseInt(clientId, 10) : null);
     try {
       await postsAPI.create({
         topic, caption, hashtags, tone,
@@ -94,6 +111,7 @@ function CreatePost() {
         status: 'draft',
         scheduled_time: null,
         auto_publish: platform === 'instagram' ? autoPublish : false,
+        client: resolvedClientId || null,
       });
       setSuccessMsg(t('create.savedMsg'));
       setTimeout(() => navigate('/posts'), 1500);
@@ -155,6 +173,50 @@ function CreatePost() {
             </select>
           </div>
         </div>
+
+        {clients.length > 0 && (
+          <div className="create-form-group">
+            <label>
+              Assign to Client{' '}
+              {activeClientId
+                ? <span className="label-context-set">pre-filled from filter</span>
+                : <span className="label-optional">{t('create.optional')}</span>
+              }
+            </label>
+            {activeClientId ? (
+              <div className="create-client-locked">
+                {(() => {
+                  const c = clients.find(x => String(x.id) === clientId);
+                  return c
+                    ? `${[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username} (${c.email})`
+                    : clientId;
+                })()}
+              </div>
+            ) : (
+              <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
+                <option value="">— No client (your own post) —</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username} ({c.email})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
+        {clientId && (() => {
+          const c = clients.find(x => String(x.id) === clientId);
+          return c ? (
+            <div className="create-brand-banner">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Using brand context for <strong>{[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username}</strong>
+            </div>
+          ) : null;
+        })()}
 
         <div className="create-form-group">
           <div className="create-field-label-row">

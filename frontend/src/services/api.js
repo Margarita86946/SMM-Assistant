@@ -33,15 +33,15 @@ api.interceptors.response.use(
         localStorage.removeItem('username');
         localStorage.removeItem('token_expires_at');
         localStorage.removeItem('role');
+        localStorage.removeItem('activeClientId');
+        localStorage.removeItem('notifications_sound');
         window.location.href = '/login';
         return Promise.reject(error);
       }
     }
 
     if (error.response?.data?.error) {
-      error.message = error.response.data.detail
-        ? `${error.response.data.error} (${error.response.data.detail})`
-        : error.response.data.error;
+      error.message = error.response.data.error;
     } else if (error.response?.data) {
       const errors = error.response.data;
       const errorMessages = Object.entries(errors)
@@ -71,14 +71,16 @@ export const postsAPI = {
 };
 
 export const dashboardAPI = {
-  getStats: () => api.get('/dashboard/stats/'),
-  getActivity: () => api.get('/dashboard/activity/'),
+  getStats: (clientId) => api.get('/dashboard/stats/', { params: clientId ? { client_id: clientId } : {} }),
+  getActivity: (clientId) => api.get('/dashboard/activity/', { params: clientId ? { client_id: clientId } : {} }),
 };
 
 export const calendarAPI = {
-  getMonthPosts: (month, year) => {
+  getMonthPosts: (month, year, clientId) => {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return api.get(`/calendar/?month=${month}&year=${year}&tz=${encodeURIComponent(tz)}`);
+    const params = { month, year, tz };
+    if (clientId) params.client_id = clientId;
+    return api.get('/calendar/', { params });
   },
   getTodayPosts: () => api.get('/calendar/today/'),
 };
@@ -88,7 +90,6 @@ export const aiAPI = {
   generateContent: (data) => api.post('/generate-content/', data),
   generateImage: (data) => api.post('/generate-image/', data),
   polishContent: (data) => api.post('/polish-content/', data),
-  generateVariants: (data) => api.post('/generate-variants/', data),
 };
 
 export const brandAPI = {
@@ -120,13 +121,23 @@ export const invitationsAPI = {
   send: (email) => api.post('/invitations/', { client_email: email }),
   revoke: (id) => api.delete(`/invitations/${id}/`),
   lookup: (token) => api.get(`/invitations/lookup/${token}/`),
-  startOAuth: (token) => api.post(`/invitations/start/${token}/`),
+};
+
+export const clientsAPI = {
+  list: () => api.get('/clients/'),
+  remove: (id) => api.delete(`/clients/${id}/`),
 };
 
 export const emailConfigAPI = {
   get: () => api.get('/email-config/'),
   save: (data) => api.post('/email-config/', data),
   remove: () => api.delete('/email-config/'),
+};
+
+export const notificationsAPI = {
+  list: () => api.get('/notifications/'),
+  markRead: (id) => api.post(`/notifications/${id}/read/`),
+  markAllRead: () => api.post('/notifications/read-all/'),
 };
 
 export default api;

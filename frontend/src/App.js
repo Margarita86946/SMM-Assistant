@@ -13,6 +13,9 @@ import ClientDashboard from './components/ClientDashboard';
 import Clients from './components/Clients';
 import AcceptInvitation from './components/AcceptInvitation';
 import Sidebar from './components/Sidebar';
+import { NotificationBell, NotificationToast } from './components/NotificationBell';
+import { ActiveClientProvider } from './context/ActiveClientContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 import './App.css';
 
 function RouteTracker() {
@@ -34,10 +37,23 @@ function AppLayout({ children }) {
     <div className="app-layout">
       <Sidebar />
       <main className="app-main">
+        <NotificationBell />
         {children}
       </main>
     </div>
   );
+}
+
+function homeForRole(role) {
+  if (role === 'client') return '/client';
+  return '/dashboard';
+}
+
+function PublicRoute({ children }) {
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('role');
+  if (token) return <Navigate to={homeForRole(role)} replace />;
+  return children;
 }
 
 function ProtectedRoute({ children }) {
@@ -50,11 +66,27 @@ function ProtectedRoute({ children }) {
     localStorage.removeItem('username');
     localStorage.removeItem('token_expires_at');
     localStorage.removeItem('role');
+    localStorage.removeItem('activeClientId');
+    localStorage.removeItem('notifications_sound');
     return <Navigate to="/login" replace />;
   }
-  if (localStorage.getItem('role') === 'client' && location.pathname === '/dashboard') {
+  const role = localStorage.getItem('role');
+  const path = location.pathname;
+
+  // client can only access /client and /account
+  const CLIENT_ALLOWED = ['/client', '/account'];
+  if (role === 'client' && !CLIENT_ALLOWED.some(p => path.startsWith(p))) {
     return <Navigate to="/client" replace />;
   }
+  // owner cannot access /clients (specialist-only)
+  if (role === 'owner' && path.startsWith('/clients')) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  // specialist and owner cannot access /client (client-only)
+  if (role !== 'client' && path === '/client') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return <AppLayout>{children}</AppLayout>;
 }
 
@@ -74,8 +106,8 @@ const router = createBrowserRouter([
     element: <RootLayout />,
     children: [
       { path: '/', element: <Navigate to="/login" replace /> },
-      { path: '/login', element: <Login isLoginMode={true} /> },
-      { path: '/register', element: <Login isLoginMode={false} /> },
+      { path: '/login', element: <PublicRoute><Login isLoginMode={true} /></PublicRoute> },
+      { path: '/register', element: <PublicRoute><Login isLoginMode={false} /></PublicRoute> },
       { path: '/dashboard', element: <ProtectedRoute><Dashboard /></ProtectedRoute> },
       { path: '/client', element: <ProtectedRoute><ClientDashboard /></ProtectedRoute> },
       { path: '/posts', element: <ProtectedRoute><PostsList /></ProtectedRoute> },
@@ -93,7 +125,14 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <ActiveClientProvider>
+      <NotificationsProvider>
+        <RouterProvider router={router} />
+        <NotificationToast />
+      </NotificationsProvider>
+    </ActiveClientProvider>
+  );
 }
 
 export default App;

@@ -35,28 +35,119 @@ def _user_payload(user, expires_at=None):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
-    serializer = UserSerializer(data=request.data)
+    from ..models import ClientInvitation
+    from ..encryption import hash_token
 
-    if serializer.is_valid():
-        from django.db import transaction as _tx
-        with _tx.atomic():
+    invitation_token = (request.data.get('invitation_token') or '').strip()
+    invitation = None
+
+    if invitation_token:
+        token_hash = hash_token(invitation_token)
+        invitation = (
+            ClientInvitation.objects
+            .select_related('specialist')
+            .filter(token_hash=token_hash, status='pending')
+            .first()
+        )
+        if invitation is None or invitation.is_expired:
+            return Response(
+                {'error': 'This invitation link is invalid or has expired.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # Force the email to match the invitation so the client can't
+        # register with a different address than what was invited.
+        expected_email = invitation.decrypted_client_email
+        submitted_email = (request.data.get('email') or '').strip().lower()
+        if submitted_email != expected_email:
+            return Response(
+                {'error': 'The email address must match the invitation.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    # Build mutable copy so we can force role without trusting the client.
+    data = request.data.copy()
+    if invitation:
+        data['role'] = 'client'
+    else:
+        # Only 'owner' and 'specialist' are valid self-registration roles.
+        requested_role = (request.data.get('role') or '').strip().lower()
+        data['role'] = requested_role if requested_role in ('owner', 'specialist') else 'owner'
+
+    from django.db import transaction as _tx
+
+    # If this is an invitation and a deactivated account already exists for this
+    # email, reactivate it instead of creating a duplicate.
+    existing_user = None
+    if invitation:
+        expected_email = invitation.decrypted_client_email
+        existing_user = User.objects.filter(email=expected_email, is_active=False, role='client').first()
+
+    with _tx.atomic():
+        if existing_user:
+            # Reactivate: require all the same fields as fresh registration
+            new_username = (data.get('username') or '').strip()
+            new_password = (data.get('password') or '').strip()
+
+            if not new_username:
+                return Response({'error': 'Username is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            if not new_password:
+                return Response({'error': 'Password is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Username must match the existing account — prevents someone else hijacking via invite
+            if new_username != existing_user.username:
+                return Response(
+                    {'error': 'Username does not match the account associated with this invitation.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            try:
+                validate_password(new_password, existing_user)
+            except DjangoValidationError as e:
+                return Response({'password': list(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+            existing_user.set_password(new_password)
+            existing_user.is_active = True
+            existing_user.specialist = invitation.specialist
+            existing_user.first_name = data.get('first_name', existing_user.first_name)
+            existing_user.last_name = data.get('last_name', existing_user.last_name)
+            existing_user.save(update_fields=[
+                'password', 'is_active', 'specialist_id', 'first_name', 'last_name'
+            ])
+            user = existing_user
+        else:
+            serializer = UserSerializer(data=data)
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             user = serializer.save()
-            role = request.data.get('role')
-            if role in {'specialist', 'client'} and user.role != role:
-                user.role = role
-                user.save(update_fields=['role'])
+            user.role = data['role']
+            if invitation:
+                user.specialist = invitation.specialist
+            user.save(update_fields=['role', 'specialist_id'])
 
-            token, _ = Token.objects.get_or_create(user=user)
-            expires_at = timezone.now() + timedelta(days=settings.TOKEN_EXPIRY_DAYS)
-            TokenExpiry.objects.create(token=token, expires_at=expires_at)
+        token, _ = Token.objects.get_or_create(user=user)
+        expires_at = timezone.now() + timedelta(days=settings.TOKEN_EXPIRY_DAYS)
+        TokenExpiry.objects.update_or_create(
+            token=token,
+            defaults={'expires_at': expires_at, 'is_revoked': False},
+        )
 
-        return Response({
-            'token': token.key,
-            **_user_payload(user, expires_at),
-            'message': 'User registered successfully',
-        }, status=status.HTTP_201_CREATED)
+        if invitation:
+            # Clear any previous invitation's client FK for this user so the
+            # OneToOneField constraint doesn't conflict when we link the new one.
+            from ..models import ClientInvitation as _CI
+            _CI.objects.filter(client=user).exclude(pk=invitation.pk).update(client=None)
 
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            invitation.status = 'accepted'
+            invitation.accepted_at = timezone.now()
+            invitation.accepted_ip = get_client_ip(request)
+            invitation.client = user
+            invitation.save(update_fields=['status', 'accepted_at', 'accepted_ip', 'client'])
+
+    return Response({
+        'token': token.key,
+        **_user_payload(user, expires_at),
+        'message': 'User registered successfully',
+    }, status=status.HTTP_201_CREATED)
 
 
 @api_view(['POST'])
@@ -66,10 +157,16 @@ def login_view(request):
     password = request.data.get('password')
 
     try:
-        User.objects.get(username=username)
+        db_user = User.objects.get(username=username)
     except User.DoesNotExist:
         return Response(
             {'error': 'user_not_found'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    if not db_user.is_active:
+        return Response(
+            {'error': 'account_disabled'},
             status=status.HTTP_401_UNAUTHORIZED
         )
 
@@ -129,8 +226,10 @@ def profile_view(request):
             'last_login': user.last_login,
             'avatar': user.avatar,
             'role': user.role,
+            'auto_approve': user.auto_approve,
+            'notifications_sound': user.notifications_sound,
         })
-    allowed_fields = ['first_name', 'last_name', 'email', 'avatar']
+    allowed_fields = ['first_name', 'last_name', 'email', 'avatar', 'auto_approve', 'notifications_sound']
     data = {k: v for k, v in request.data.items() if k in allowed_fields}
     if 'email' in data and data['email'] != user.email:
         if User.objects.filter(email=data['email']).exclude(pk=user.pk).exists():
@@ -141,7 +240,10 @@ def profile_view(request):
             return Response({'error': 'Invalid image format'}, status=status.HTTP_400_BAD_REQUEST)
         if avatar_val and len(avatar_val) > 2_000_000:
             return Response({'error': 'avatar_too_large'}, status=status.HTTP_400_BAD_REQUEST)
+    bool_fields = {'auto_approve', 'notifications_sound'}
     for key, value in data.items():
+        if key in bool_fields:
+            value = value if isinstance(value, bool) else str(value).lower() not in ('false', '0', '')
         setattr(user, key, value)
     user.save(update_fields=list(data.keys()))
     return Response({
@@ -153,6 +255,8 @@ def profile_view(request):
         'last_login': user.last_login,
         'avatar': user.avatar,
         'role': user.role,
+        'auto_approve': user.auto_approve,
+        'notifications_sound': user.notifications_sound,
     })
 
 

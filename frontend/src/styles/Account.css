@@ -392,6 +392,70 @@
   filter: brightness(1.05);
 }
 
+/* ── Auto-approve toggle ── */
+.auto-approve-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.auto-approve-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auto-approve-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.auto-approve-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.auto-approve-toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--border);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.auto-approve-toggle.on {
+  background: var(--primary);
+}
+
+.auto-approve-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auto-approve-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  display: block;
+}
+
+.auto-approve-toggle.on .auto-approve-thumb {
+  transform: translateX(20px);
+}
+
 @media (max-width: 640px) {
   .account-container { padding: 24px 16px; }
   .account-hero-card { flex-direction: column; align-items: flex-start; }

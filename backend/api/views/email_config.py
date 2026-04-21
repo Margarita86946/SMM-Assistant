@@ -24,18 +24,17 @@ def _serialize_email_config(cfg):
 @permission_classes([IsAuthenticated])
 def email_config_view(request):
     if request.method == 'GET':
-        try:
-            cfg = request.user.email_config
-        except EmailConfiguration.DoesNotExist:
+        cfg = EmailConfiguration.objects.filter(user=request.user, is_active=True).first()
+        if cfg is None:
             return Response({'configured': False})
         return Response({'configured': True, **_serialize_email_config(cfg)})
 
     if request.method == 'DELETE':
-        try:
-            cfg = request.user.email_config
-        except EmailConfiguration.DoesNotExist:
+        cfg = EmailConfiguration.objects.filter(user=request.user, is_active=True).first()
+        if cfg is None:
             return Response({'message': 'No email configuration to remove.'})
-        cfg.delete()
+        cfg.is_active = False
+        cfg.save(update_fields=['is_active'])
         log_action(
             request.user,
             'credentials_updated',
@@ -47,7 +46,7 @@ def email_config_view(request):
     # POST — only requires app_password; everything else is derived from the user's account
     app_password = (request.data.get('app_password') or '').strip()
     if not app_password:
-        existing = EmailConfiguration.objects.filter(user=request.user).first()
+        existing = EmailConfiguration.objects.filter(user=request.user, is_active=True).first()
         if existing is None:
             return Response(
                 {'error': 'App password is required.'},
@@ -82,6 +81,7 @@ def email_config_view(request):
         'from_name': from_name,
         'from_email': user_email,
         'encryption_key': active_key,
+        'is_active': True,
     }
     if encrypted_pw is not None:
         defaults['smtp_password_encrypted'] = encrypted_pw

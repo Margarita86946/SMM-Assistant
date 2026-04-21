@@ -14,10 +14,7 @@ class EmailDeliveryError(Exception):
 
 
 def _connection_and_from(specialist):
-    try:
-        cfg = specialist.email_config
-    except EmailConfiguration.DoesNotExist:
-        cfg = None
+    cfg = EmailConfiguration.objects.filter(user=specialist, is_active=True).first()
     if cfg is not None:
         password = cfg.decrypted_smtp_password
         connection = get_connection(
@@ -95,6 +92,65 @@ def send_invitation_email(specialist, client_email, raw_token):
     except Exception as e:
         logger.error('Invitation email failed: %s', e)
         raise EmailDeliveryError('Failed to send invitation email') from e
+
+
+def send_client_removed_email(specialist, client):
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+    specialist_display = (specialist.get_full_name() or specialist.username).strip()
+    client_display = (client.get_full_name() or client.username).strip()
+    subject = f"Your access to SMM Assistant has been removed"
+    text_body = (
+        f"Hi {client_display},\n\n"
+        f"{specialist_display} has removed you from their workspace on SMM Assistant.\n\n"
+        f"Your data, including any connected Instagram accounts, has been safely removed. "
+        f"If you believe this was a mistake, please contact {specialist_display} directly.\n\n"
+        f"You can still be re-invited to the platform in the future.\n\n"
+        f"— The SMM Assistant Team\n"
+    )
+    safe_specialist = html.escape(specialist_display)
+    safe_client = html.escape(client_display)
+    safe_url = html.escape(frontend_url)
+    html_body = f"""<!doctype html>
+<html>
+<body style="font-family: Inter, Arial, sans-serif; background:#F8FAFC; padding:24px;">
+  <div style="max-width:520px;margin:0 auto;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:32px;">
+    <h2 style="margin:0 0 12px;color:#111827;">Workspace access removed</h2>
+    <p style="color:#374151;line-height:1.5;">
+      Hi {safe_client},
+    </p>
+    <p style="color:#374151;line-height:1.5;">
+      <strong>{safe_specialist}</strong> has removed you from their workspace on SMM Assistant.
+    </p>
+    <p style="color:#374151;line-height:1.5;">
+      Your data, including any connected Instagram accounts, has been safely removed.
+      If you believe this was a mistake, please contact {safe_specialist} directly.
+    </p>
+    <p style="color:#374151;line-height:1.5;">
+      You can still be re-invited to the platform in the future.
+    </p>
+    <p style="color:#9CA3AF;font-size:12px;margin-top:24px;">
+      — The SMM Assistant Team<br/>
+      <a href="{safe_url}" style="color:#6366F1;">{safe_url}</a>
+    </p>
+  </div>
+</body>
+</html>"""
+
+    try:
+        connection, from_email = _connection_and_from(specialist)
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=text_body,
+            from_email=from_email,
+            to=[client.email],
+            connection=connection,
+        )
+        msg.attach_alternative(html_body, 'text/html')
+        msg.send(fail_silently=False)
+        return True
+    except Exception as e:
+        logger.error('Client removal email failed: %s', e)
+        # Non-fatal — we still remove the client even if email fails
 
 
 def send_test_email(email_config):

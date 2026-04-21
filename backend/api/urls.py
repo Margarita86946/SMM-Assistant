@@ -41,15 +41,21 @@ urlpatterns = [
     path('auth/instagram/disconnect/<int:pk>/', views.instagram_disconnect, name='instagram-disconnect'),
     path('auth/instagram/status/', views.instagram_status, name='instagram-status'),
 
-    # Client Invitations
+    # Client Invitations & Clients
     path('invitations/', views.invitations_list, name='invitations-list'),
     path('invitations/<int:pk>/', views.invitation_detail, name='invitation-detail'),
     path('invitations/lookup/<str:token>/', views.invitation_lookup, name='invitation-lookup'),
-    path('invitations/start/<str:token>/', views.invitation_oauth_start, name='invitation-oauth-start'),
+    path('clients/', views.clients_list, name='clients-list'),
+    path('clients/<int:pk>/', views.client_detail, name='client-detail'),
 
     # Email Configuration
     path('email-config/', views.email_config_view, name='email-config'),
 
     # Audit Logs
     path('audit-logs/', views.audit_logs_view, name='audit-logs'),
+
+    # Notifications
+    path('notifications/', views.notifications_list, name='notifications-list'),
+    path('notifications/<int:pk>/read/', views.mark_read, name='notification-read'),
+    path('notifications/read-all/', views.mark_all_read, name='notifications-read-all'),
 ]

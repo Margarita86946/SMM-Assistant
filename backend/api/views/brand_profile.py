@@ -10,6 +10,11 @@ from ..serializers import BrandProfileSerializer
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
 def brand_profile(request):
+    if request.user.role == 'specialist':
+        return Response(
+            {'error': 'Specialists do not have a personal brand profile. Each client manages their own.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
     profile, _ = BrandProfile.objects.get_or_create(user=request.user)
     if request.method == 'GET':
         return Response(BrandProfileSerializer(profile).data)

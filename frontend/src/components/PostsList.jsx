@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { postsAPI, approvalAPI, instagramAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
+import { useActiveClient } from '../context/ActiveClientContext';
 import '../styles/PostsList.css';
 
 const PLATFORM_LABELS = {
@@ -35,6 +36,8 @@ function PostsList() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [submitting, setSubmitting] = useState(null);
+  const [submitError, setSubmitError] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   const [publishingId, setPublishingId] = useState(null);
   const [publishMsg, setPublishMsg] = useState('');
   const [publishError, setPublishError] = useState('');
@@ -42,6 +45,7 @@ function PostsList() {
   const { t } = useTranslation();
   const { language } = useSettings();
   const locale = LOCALE_MAP[language] || 'en-US';
+  const { activeClientId, activeClient } = useActiveClient();
 
   const loadPosts = useCallback(async (pg, srch, platform, st) => {
     try {
@@ -50,6 +54,7 @@ function PostsList() {
       if (srch) params.search = srch;
       if (platform !== 'all') params.platform = platform;
       if (st !== 'all') params.status = st;
+      if (activeClientId) params.client_id = activeClientId;
       const response = await postsAPI.getAll(params);
       const count = response.data.count ?? 0;
       setPosts(response.data.results ?? response.data);
@@ -61,12 +66,15 @@ function PostsList() {
       setLoading(false);
       setInitialLoad(false);
     }
-  }, [t]);
+  }, [t, activeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const timer = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 400);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Reset to page 1 when the active client changes
+  useEffect(() => { setPage(1); }, [activeClientId]);
 
   useEffect(() => {
     loadPosts(page, debouncedSearch, filterPlatform, filterStatus);
@@ -77,6 +85,7 @@ function PostsList() {
   const handleDelete = async (e, id) => {
     e.stopPropagation();
     if (!window.confirm(t('posts.confirmDelete'))) return;
+    setDeleteError('');
     try {
       await postsAPI.delete(id);
       const newTotal = totalCount - 1;
@@ -85,18 +94,21 @@ function PostsList() {
       if (newPage !== page) setPage(newPage);
       else reload();
     } catch {
-      alert(t('posts.failedDelete'));
+      setDeleteError(t('posts.failedDelete'));
+      setTimeout(() => setDeleteError(''), 5000);
     }
   };
 
   const handleSubmitForApproval = async (e, id) => {
     e.stopPropagation();
     setSubmitting(id);
+    setSubmitError('');
     try {
       await approvalAPI.submit(id);
       reload();
     } catch (err) {
-      alert(err.message || 'Failed to submit for approval');
+      setSubmitError(err.message || t('approval.failedSubmit'));
+      setTimeout(() => setSubmitError(''), 5000);
     } finally {
       setSubmitting(null);
     }
@@ -114,9 +126,8 @@ function PostsList() {
       setTimeout(() => setPublishMsg(''), 4000);
     } catch (err) {
       const msg = err.message || '';
-      setPublishError(msg.toLowerCase().includes('no active instagram')
-        ? t('instagram.publishNoAccount')
-        : msg || t('instagram.publishFailed'));
+      const isNoAccount = msg === 'No active Instagram account connected';
+      setPublishError(isNoAccount ? t('instagram.publishNoAccount') : (msg || t('instagram.publishFailed')));
       setTimeout(() => setPublishError(''), 6000);
     } finally {
       setPublishingId(null);
@@ -156,7 +167,20 @@ function PostsList() {
         </div>
       </div>
 
+      {activeClient && (
+        <div className="posts-client-banner">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+          </svg>
+          {t('posts.filteredByClient', { name: [activeClient.first_name, activeClient.last_name].filter(Boolean).join(' ') || activeClient.username })}
+        </div>
+      )}
+
       {error && <div className="error-message">{error}</div>}
+      {deleteError && <div className="error-message">{deleteError}</div>}
+      {submitError && <div className="error-message">{submitError}</div>}
       {publishError && <div className="error-message">{publishError}</div>}
       {publishMsg && <div className="success-message">{publishMsg}</div>}
 
@@ -227,6 +251,19 @@ function PostsList() {
                     <span className={`status-badge ${meta.cls}`}>{meta.text}</span>
                   </div>
 
+                  {!activeClientId && post.client_username && (
+                    <div className="post-client-tag">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                      </svg>
+                      {post.client_first_name || post.client_last_name
+                        ? [post.client_first_name, post.client_last_name].filter(Boolean).join(' ')
+                        : post.client_username}
+                    </div>
+                  )}
+
                   {/* Rejection note callout — shown on draft posts that were previously rejected */}
                   {isRejectedDraft && (
                     <div className="post-rejection-callout">
@@ -237,7 +274,7 @@ function PostsList() {
                         <line x1="12" y1="16" x2="12.01" y2="16"/>
                       </svg>
                       <div>
-                        <strong>Client rejected this post</strong>
+                        <strong>{t('approval.clientRejected')}</strong>
                         {post.approval_note && <p>{post.approval_note}</p>}
                       </div>
                     </div>
@@ -251,7 +288,7 @@ function PostsList() {
                         <circle cx="12" cy="12" r="10"/>
                         <polyline points="12 6 12 12 16 14"/>
                       </svg>
-                      Waiting for client to review
+                      {t('approval.waitingReview')}
                     </div>
                   )}
 
@@ -262,7 +299,7 @@ function PostsList() {
                         stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
-                      Client approved — set a schedule to publish
+                      {t('approval.clientApproved')}
                     </div>
                   )}
 
@@ -281,7 +318,7 @@ function PostsList() {
                     {(isApproved || ['draft', 'scheduled'].includes(post.status)) && (
                       <button className="btn-edit"
                         onClick={e => { e.stopPropagation(); navigate(`/edit/${post.id}`); }}>
-                        {isApproved ? '📅 Schedule' : t('posts.edit')}
+                        {isApproved ? t('approval.scheduleBtn') : t('posts.edit')}
                       </button>
                     )}
 
@@ -290,7 +327,7 @@ function PostsList() {
                       <button className="btn-submit-approval"
                         onClick={e => handleSubmitForApproval(e, post.id)}
                         disabled={submitting === post.id}>
-                        {submitting === post.id ? 'Submitting…' : 'Submit for Approval'}
+                        {submitting === post.id ? t('approval.submitting') : t('approval.submitBtn')}
                       </button>
                     )}
 

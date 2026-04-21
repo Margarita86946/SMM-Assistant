@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
+import { useActiveClient } from '../context/ActiveClientContext';
 import { useTranslation } from '../i18n';
 import SmmLogo from './SmmLogo';
+import { useNotifications } from '../context/NotificationsContext';
 import '../styles/Sidebar.css';
 
 function Sidebar() {
@@ -16,18 +18,13 @@ function Sidebar() {
 
   const role = localStorage.getItem('role');
   const isClient = role === 'client';
+  const isOwner = role === 'owner';
+  const isSpecialist = role === 'specialist';
 
-  const NAV_ITEMS = useMemo(() => [
-    ...(isClient ? [{
-      path: '/client',
-      label: 'Client View',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
-      ),
-    }] : []),
+  const { clients, activeClientId, setActiveClientId } = useActiveClient();
+  const { soundEnabled, updateSoundEnabled } = useNotifications();
+
+  const COMMON_NAV = useMemo(() => [
     {
       path: '/dashboard',
       label: t('nav.dashboard'),
@@ -90,21 +87,55 @@ function Sidebar() {
         </svg>
       ),
     },
-    ...(!isClient ? [{
-      path: '/clients',
-      label: 'Clients',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-          <circle cx="9" cy="7" r="4"/>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-        </svg>
-      ),
-    }] : []),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [language, isClient]);
+  ], [language]);
+
+  const CLIENTS_ITEM = {
+    path: '/clients',
+    label: 'Clients',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    ),
+  };
+
+  const NAV_ITEMS = useMemo(() => {
+    if (isClient) {
+      return [
+        {
+          path: '/client',
+          label: 'Pending Approvals',
+          icon: (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 11 12 14 22 4"/>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+            </svg>
+          ),
+        },
+        {
+          path: '/account',
+          label: t('settings.account'),
+          icon: (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          ),
+        },
+      ];
+    }
+    if (isSpecialist) return [...COMMON_NAV, CLIENTS_ITEM];
+    // owner
+    return COMMON_NAV;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language, isClient, isOwner, isSpecialist]);
 
   const isActive = (path) => {
     if (path === '/dashboard') return location.pathname === '/dashboard';
@@ -117,6 +148,8 @@ function Sidebar() {
     localStorage.removeItem('token_expires_at');
     localStorage.removeItem('avatar');
     localStorage.removeItem('role');
+    localStorage.removeItem('activeClientId');
+    localStorage.removeItem('notifications_sound');
     window.location.href = '/login';
   };
 
@@ -139,6 +172,33 @@ function Sidebar() {
         </div>
         <span className="sidebar-brand-name">SMM Assistant</span>
       </div>
+
+      {isSpecialist && clients.length > 0 && (
+        <div className="sidebar-client-selector">
+          <p className="sidebar-section-label sidebar-section-label--client">{t('sidebar.clientLabel')}</p>
+          <div className="sidebar-client-select-wrap">
+            <svg className="sidebar-client-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <select
+              className="sidebar-client-select"
+              value={activeClientId ?? ''}
+              onChange={e => setActiveClientId(e.target.value ? parseInt(e.target.value, 10) : null)}
+            >
+              <option value="">{t('sidebar.allClients')}</option>
+              {clients.map(c => (
+                <option key={c.id} value={c.id}>
+                  {[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       <nav className="sidebar-nav">
         <p className="sidebar-section-label">{t('nav.menu')}</p>
@@ -164,7 +224,9 @@ function Sidebar() {
           </div>
           <div className="sidebar-user-info">
             <span className="sidebar-username">{username}</span>
-            <span className="sidebar-user-role">{t('settings.contentManager')}</span>
+            <span className="sidebar-user-role">
+              {isClient ? 'Client' : isOwner ? 'Owner' : isSpecialist ? 'Specialist' : t('settings.contentManager')}
+            </span>
           </div>
         </div>
 
@@ -195,6 +257,19 @@ function Sidebar() {
                   <option value="RU">RU</option>
                   <option value="AM">AM</option>
                 </select>
+              </div>
+
+              <div className="settings-row">
+                <span className="settings-row-label">{t('settings.notificationSound')}</span>
+                <div
+                  className="theme-toggle"
+                  onClick={() => updateSoundEnabled(!soundEnabled)}
+                >
+                  <span className="theme-toggle-icon">🔔</span>
+                  <div className={`theme-toggle-track${soundEnabled ? ' on' : ''}`}>
+                    <div className="theme-toggle-thumb" />
+                  </div>
+                </div>
               </div>
 
               <div className="settings-row settings-row--link" onClick={() => { navigate('/account'); setSettingsOpen(false); }}>

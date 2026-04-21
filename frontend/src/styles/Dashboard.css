@@ -27,6 +27,30 @@
   margin: 0;
 }
 
+.dashboard-client-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.dashboard-client-banner svg {
+  width: 16px;
+  height: 16px;
+  color: #6366F1;
+  flex-shrink: 0;
+}
+
+.dashboard-client-banner strong {
+  color: var(--text-primary);
+}
+
 .btn-logout {
   display: none;
 }
@@ -73,10 +97,10 @@
   font-size: 22px;
 }
 
-.stat-card:nth-child(1) .stat-icon { background: #EEF2FF; }
-.stat-card:nth-child(2) .stat-icon { background: #DBEAFE; }
-.stat-card:nth-child(3) .stat-icon { background: #FEF3C7; }
-.stat-card:nth-child(4) .stat-icon { background: #D1FAE5; }
+.stat-card:nth-child(1) .stat-icon { background: var(--primary-light); }
+.stat-card:nth-child(2) .stat-icon { background: var(--info-bg); }
+.stat-card:nth-child(3) .stat-icon { background: var(--warning-bg); }
+.stat-card:nth-child(4) .stat-icon { background: var(--success-bg); }
 
 .stat-info h3 {
   font-size: 28px;

@@ -4,6 +4,7 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
 ROLE_CHOICES = [
+    ('owner', 'Owner'),
     ('specialist', 'Specialist'),
     ('client', 'Client'),
 ]
@@ -13,6 +14,12 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     avatar = models.TextField(blank=True, null=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='specialist')
+    specialist = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='clients', limit_choices_to={'role': 'specialist'},
+    )
+    auto_approve = models.BooleanField(default=False)
+    notifications_sound = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'users'
@@ -85,6 +92,10 @@ class Post(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
+    client = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='assigned_posts', limit_choices_to={'role': 'client'},
+    )
     caption = models.TextField()
     hashtags = models.TextField(blank=True)
     topic = models.CharField(max_length=255, blank=True, default='')
@@ -102,6 +113,7 @@ class Post(models.Model):
     auto_publish = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         db_table = 'posts'
@@ -209,6 +221,10 @@ class ClientInvitation(models.Model):
     revoked_at = models.DateTimeField(null=True, blank=True)
     invited_ip = models.GenericIPAddressField(null=True, blank=True)
     accepted_ip = models.GenericIPAddressField(null=True, blank=True)
+    client = models.OneToOneField(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='accepted_invitation',
+    )
     social_account = models.ForeignKey(
         SocialAccount, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='invitations',
@@ -334,6 +350,7 @@ class EmailConfiguration(models.Model):
     from_name = models.CharField(max_length=100)
     from_email = models.EmailField()
     is_verified = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
     last_test_sent = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -350,3 +367,29 @@ class EmailConfiguration(models.Model):
         if not self.smtp_password_encrypted:
             return ''
         return decrypt(self.smtp_password_encrypted) or ''
+
+
+class Notification(models.Model):
+    TYPE_CHOICES = [
+        ('post_submitted', 'Post Submitted for Review'),
+        ('post_approved', 'Post Approved'),
+        ('post_rejected', 'Post Rejected'),
+        ('post_published', 'Post Published'),
+        ('invitation_accepted', 'Invitation Accepted'),
+    ]
+
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    actor = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='triggered_notifications'
+    )
+    notification_type = models.CharField(max_length=30, choices=TYPE_CHOICES, db_index=True)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, null=True, blank=True, related_name='notifications')
+    is_read = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'notifications'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.notification_type} → {self.recipient.username}"

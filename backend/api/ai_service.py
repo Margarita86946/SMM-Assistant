@@ -22,7 +22,7 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 OLLAMA_MODEL = "gemma4:e2b"
 OLLAMA_TIMEOUT = 120
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-2.0-flash-lite"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 GEMINI_TIMEOUT = 30
 
@@ -51,18 +51,18 @@ Rules:
 
 
 def generate_hashtags(topic, platform):
+    count = "10-15" if platform == "instagram" else "3-5"
     response = client.chat.completions.create(
         model=GROQ_MODEL,
         timeout=30,
         messages=[{
             "role": "user",
-            "content": f"""Generate hashtags for a {platform} post about: {topic}
+            "content": f"""Generate {count} hashtags for a {platform} post about: {topic}
 Rules:
-- Return ONLY hashtags, nothing else
+- Return ONLY the hashtags on a single line, nothing else
+- No labels, no explanations, no section headers
 - Each hashtag starts with #
-- Separate with spaces
-- Instagram: 10-15 hashtags
-- LinkedIn/Twitter: 3-5 hashtags"""
+- Separate with spaces"""
         }]
     )
     return _clean_ai_output(response.choices[0].message.content)
@@ -86,7 +86,8 @@ Rules:
     return _clean_ai_output(response.choices[0].message.content)
 
 
-def _polish_content_groq(caption, hashtags, image_prompt, topic, platform, tone):
+def _polish_content_groq(caption, hashtags, image_prompt, topic, platform, tone, brand_profile=None):
+    brand_ctx = f"\nBrand context: {brand_profile}" if brand_profile else ""
     response = client.chat.completions.create(
         model=GROQ_MODEL,
         timeout=30,
@@ -97,7 +98,7 @@ def _polish_content_groq(caption, hashtags, image_prompt, topic, platform, tone)
 Topic: {topic if topic else 'not specified'}
 Caption: {caption}
 Current hashtags: {hashtags}
-Current image prompt: {image_prompt if image_prompt else 'none'}
+Current image prompt: {image_prompt if image_prompt else 'none'}{brand_ctx}
 
 Rules for caption:
 - Fix grammar and improve quality
@@ -170,10 +171,66 @@ def _clean_ai_output(text):
     return text
 
 
+# ---------- Language detection & translation ----------
+
+# Unicode ranges for non-Latin scripts that models struggle with
+_NON_LATIN_RANGES = [
+    (0x0530, 0x058F),  # Armenian
+    (0x0400, 0x04FF),  # Cyrillic
+    (0x0600, 0x06FF),  # Arabic
+    (0x4E00, 0x9FFF),  # CJK
+    (0x0900, 0x097F),  # Devanagari
+    (0x0370, 0x03FF),  # Greek
+    (0x10A0, 0x10FF),  # Georgian
+]
+
+_LANG_NAMES = {
+    (0x0530, 0x058F): 'Armenian',
+    (0x0400, 0x04FF): 'Russian',
+    (0x0600, 0x06FF): 'Arabic',
+    (0x4E00, 0x9FFF): 'Chinese',
+    (0x0900, 0x097F): 'Hindi',
+    (0x0370, 0x03FF): 'Greek',
+    (0x10A0, 0x10FF): 'Georgian',
+}
+
+
+def _detect_non_latin(text):
+    """Return the language name if the text contains significant non-Latin script, else None."""
+    for start, end in _NON_LATIN_RANGES:
+        count = sum(1 for c in text if start <= ord(c) <= end)
+        if count >= 2:
+            return _LANG_NAMES.get((start, end), 'the original language')
+    return None
+
+
+def _translate(text, target_language, context='social media content'):
+    """Translate text to target_language using Groq. Returns translated text."""
+    response = client.chat.completions.create(
+        model=GROQ_MODEL,
+        timeout=30,
+        messages=[{
+            "role": "user",
+            "content": (
+                f"Translate the following {context} to {target_language}. "
+                f"Return ONLY the translated text, nothing else. "
+                f"Do not explain, do not add quotes.\n\n{text}"
+            ),
+        }],
+    )
+    return _clean_ai_output(response.choices[0].message.content)
+
+
+def _lang_instruction(topic):
+    """Tell the model to respond in the same language as the topic."""
+    return f"IMPORTANT: Detect the language of the topic and write your response in that same language. Topic: {topic}"
+
+
 def generate_caption_ollama(topic, platform, tone, brand_profile=None):
     brand_ctx = f"Brand context: {brand_profile}. " if brand_profile else ""
     prompt = (
-        f"{brand_ctx}Write a {tone} social media caption for {platform} about: {topic}. "
+        f"{_lang_instruction(topic)}. "
+        f"{brand_ctx}Write a {tone} social media caption for {platform}. "
         f"Make it engaging and appropriate for {platform}. Do not include hashtags. "
         f"Output ONLY the caption text. No preamble, no explanation, no sign-off."
     )
@@ -183,18 +240,19 @@ def generate_caption_ollama(topic, platform, tone, brand_profile=None):
 def generate_hashtags_ollama(topic, platform):
     count = "10-15" if platform == 'instagram' else "3-5"
     prompt = (
-        f"Generate {count} hashtags for a {platform} post about: {topic}. "
-        f"Output ONLY hashtags separated by spaces, each starting with #. "
-        f"No preamble, no explanation, no sign-off."
+        f"{_lang_instruction(topic)}. "
+        f"Generate {count} hashtags for a {platform} post. "
+        f"Output ONLY hashtags on one line separated by spaces, each starting with #. "
+        f"No labels, no preamble, no explanation, no sign-off."
     )
     return _strip_ollama_preamble(_ollama_generate(prompt))
 
 
 def generate_image_prompt_ollama(topic, caption):
     prompt = (
-        f"Write a single vivid sentence describing an image for a social media post about '{topic}'. "
+        f"Write a single vivid sentence IN ENGLISH describing an image for a social media post. "
         f"Based on caption: '{caption[:200]}'. Include subject, visual style, lighting, mood. "
-        f"Output ONLY the description sentence. No preamble like 'Here is', no labels like '**Image:**', no sign-off like 'Hope this helps'."
+        f"Output ONLY the English description sentence. No preamble, no labels, no sign-off."
     )
     return _strip_ollama_preamble(_ollama_generate(prompt))
 
@@ -355,35 +413,76 @@ def check_gemini_status():
 
 # ---------- Provider dispatchers ----------
 
-def generate_all_content(topic, platform, tone, brand_profile=None, provider='groq'):
+def _generate_raw(topic_en, platform, tone, brand_profile, provider):
+    """Generate content in English using the requested provider."""
     if provider == 'ollama':
-        return generate_all_content_ollama(topic, platform, tone, brand_profile)
+        return generate_all_content_ollama(topic_en, platform, tone, brand_profile)
     if provider == 'gemini':
-        return generate_all_content_gemini(topic, platform, tone, brand_profile)
+        return generate_all_content_gemini(topic_en, platform, tone, brand_profile)
     try:
-        caption = generate_caption(topic, platform, tone, brand_profile)
-        hashtags = generate_hashtags(topic, platform)
-        image_prompt = generate_image_prompt(topic, caption)
-        return {
-            'caption': caption,
-            'hashtags': hashtags,
-            'image_prompt': image_prompt,
-            'error': None,
-        }
+        caption = generate_caption(topic_en, platform, tone, brand_profile)
+        hashtags = generate_hashtags(topic_en, platform)
+        image_prompt = generate_image_prompt(topic_en, caption)
+        return {'caption': caption, 'hashtags': hashtags, 'image_prompt': image_prompt, 'error': None}
     except Exception as e:
         logger.error('AI content generation failed: %s', e, exc_info=True)
-        return {
-            'caption': '', 'hashtags': '', 'image_prompt': '',
-            'error': 'AI generation failed. Please try again later.',
-        }
+        return {'caption': '', 'hashtags': '', 'image_prompt': '', 'error': 'AI generation failed. Please try again later.'}
 
 
-def polish_content(caption, hashtags, platform, tone='professional', image_prompt='', topic='', provider='groq'):
+def generate_all_content(topic, platform, tone, brand_profile=None, provider='groq'):
+    lang = _detect_non_latin(topic)
+    topic_for_gen = topic
+    if lang:
+        try:
+            topic_for_gen = _translate(topic, 'English', context='social media post topic keyword')
+        except Exception as e:
+            logger.warning('Topic translation failed, using original: %s', e)
+
+    result = _generate_raw(topic_for_gen, platform, tone, brand_profile, provider)
+    if result.get('error'):
+        return result
+
+    if lang:
+        try:
+            result['caption'] = _translate(result['caption'], lang)
+            result['hashtags'] = _translate(result['hashtags'], lang)
+            # image_prompt stays in English — image models need it
+        except Exception as e:
+            logger.warning('Result translation failed, returning English: %s', e)
+
+    return result
+
+
+def polish_content(caption, hashtags, platform, tone='professional', image_prompt='', topic='', provider='groq', brand_profile=None):
+    lang = _detect_non_latin(topic or caption)
+
+    # Translate inputs to English for polishing
+    caption_in, hashtags_in, topic_in = caption, hashtags, topic
+    if lang:
+        try:
+            caption_in = _translate(caption, 'English')
+            hashtags_in = _translate(hashtags, 'English')
+            if topic:
+                topic_in = _translate(topic, 'English')
+        except Exception as e:
+            logger.warning('Polish input translation failed: %s', e)
+
     if provider == 'ollama':
-        return polish_content_ollama(caption, hashtags, image_prompt, topic, platform, tone)
-    if provider == 'gemini':
-        return polish_content_gemini(caption, hashtags, image_prompt, topic, platform, tone)
-    return _polish_content_groq(caption, hashtags, image_prompt, topic, platform, tone)
+        result = polish_content_ollama(caption_in, hashtags_in, image_prompt, topic_in, platform, tone)
+    elif provider == 'gemini':
+        result = polish_content_gemini(caption_in, hashtags_in, image_prompt, topic_in, platform, tone)
+    else:
+        result = _polish_content_groq(caption_in, hashtags_in, image_prompt, topic_in, platform, tone, brand_profile=brand_profile)
+
+    if lang:
+        try:
+            result['caption'] = _translate(result['caption'], lang)
+            result['hashtags'] = _translate(result['hashtags'], lang)
+            # image_prompt stays in English
+        except Exception as e:
+            logger.warning('Polish result translation failed: %s', e)
+
+    return result
 
 
 # ---------- Image (Flux via Pollinations) ----------

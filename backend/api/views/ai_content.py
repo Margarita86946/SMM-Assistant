@@ -36,6 +36,51 @@ def _brand_context_for(user):
         return None
 
 
+def _unsplash_keywords(image_prompt):
+    """Extract 3-5 concrete visual keywords from an image prompt for Unsplash search."""
+    try:
+        from groq import Groq
+        import os as _os
+        groq_client = Groq(api_key=_os.getenv('GROQ_API_KEY'))
+        resp = groq_client.chat.completions.create(
+            model='meta-llama/llama-4-scout-17b-16e-instruct',
+            timeout=10,
+            messages=[{
+                'role': 'user',
+                'content': (
+                    f'Extract 3 to 5 concrete visual nouns or short phrases from this image description '
+                    f'that would work best as a photo search query. '
+                    f'Return ONLY the keywords separated by spaces, nothing else.\n\n{image_prompt}'
+                ),
+            }],
+        )
+        keywords = resp.choices[0].message.content.strip()
+        # Fallback if response is too long or looks wrong
+        if len(keywords) <= 80:
+            return keywords
+    except Exception:
+        pass
+    # Fallback: take first 80 chars up to a word boundary
+    truncated = image_prompt[:80]
+    return truncated[:truncated.rfind(' ')] if ' ' in truncated else truncated
+
+
+def _resolve_brand_context(request):
+    """Use client's brand profile when a specialist generates for a specific client.
+    Owners always use their own brand profile. Specialists have no personal brand profile."""
+    from ..models import User
+    if request.user.role == 'specialist':
+        client_id = request.data.get('client_id')
+        if client_id:
+            try:
+                client = User.objects.get(id=client_id, specialist=request.user, role='client')
+                return _brand_context_for(client)
+            except User.DoesNotExist:
+                pass
+        return None
+    return _brand_context_for(request.user)
+
+
 def _save_generated_image(content_bytes, user_id):
     """Persist AI-generated image bytes to MEDIA_ROOT and return a public URL."""
     from pathlib import Path
@@ -71,7 +116,7 @@ def generate_content(request):
     if tone not in VALID_TONES:
         return Response({'error': f'Tone must be one of: {", ".join(VALID_TONES)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-    brand_ctx = _brand_context_for(request.user)
+    brand_ctx = _resolve_brand_context(request)
     result = generate_all_content(topic, platform, tone, brand_profile=brand_ctx, provider=provider)
 
     if result.get('error'):
@@ -102,8 +147,9 @@ def polish_content_view(request):
     if tone not in VALID_TONES:
         return Response({'error': f'Tone must be one of: {", ".join(VALID_TONES)}'}, status=status.HTTP_400_BAD_REQUEST)
 
+    brand_ctx = _resolve_brand_context(request)
     try:
-        result = polish_content(caption, hashtags, platform, tone, image_prompt, topic, provider=provider)
+        result = polish_content(caption, hashtags, platform, tone, image_prompt, topic, provider=provider, brand_profile=brand_ctx)
         return Response(result, status=status.HTTP_200_OK)
     except Exception as e:
         logger.error('Polish content failed: %s', e, exc_info=True)
@@ -121,8 +167,6 @@ def generate_image(request):
 
     if not prompt:
         return Response({'error': 'Prompt is required'}, status=status.HTTP_400_BAD_REQUEST)
-    if len(prompt) > 500:
-        return Response({'error': 'Prompt must be 500 characters or fewer'}, status=status.HTTP_400_BAD_REQUEST)
 
     if image_provider == 'flux':
         seed = request.data.get('seed')
@@ -130,26 +174,43 @@ def generate_image(request):
             seed = int(seed) if seed is not None else None
         except (TypeError, ValueError):
             seed = None
-        url = generate_image_flux(prompt, platform, seed=seed)
-        try:
-            img_resp = http_requests.get(url, timeout=180)
-            if img_resp.status_code != 200 or len(img_resp.content) < 1000:
-                logger.error('Flux returned status=%s size=%s', img_resp.status_code, len(img_resp.content))
-                return Response({'error': 'Flux image service returned empty response. Try again.'}, status=status.HTTP_502_BAD_GATEWAY)
-            public_url = _save_generated_image(img_resp.content, request.user.id)
-            return Response({'image_url': public_url})
-        except http_requests.Timeout:
-            return Response({'error': 'Flux image generation timed out. Try again.'}, status=status.HTTP_504_GATEWAY_TIMEOUT)
-        except Exception as e:
-            logger.error('Flux fetch failed: %s', e, exc_info=True)
-            return Response({'error': 'Flux image service unavailable. Try again.'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        import random
+        last_error = None
+        for attempt in range(2):
+            current_seed = seed if (attempt == 0 and seed is not None) else random.randint(1, 10_000_000)
+            url = generate_image_flux(prompt, platform, seed=current_seed)
+            try:
+                img_resp = http_requests.get(url, timeout=60)
+                if img_resp.status_code == 200 and len(img_resp.content) >= 1000:
+                    public_url = _save_generated_image(img_resp.content, request.user.id)
+                    return Response({'image_url': public_url})
+                logger.warning('Flux attempt %d: status=%s size=%s seed=%s',
+                               attempt + 1, img_resp.status_code, len(img_resp.content), current_seed)
+                last_error = f'status {img_resp.status_code}, size {len(img_resp.content)}'
+            except http_requests.Timeout:
+                logger.warning('Flux attempt %d timed out (seed=%s)', attempt + 1, current_seed)
+                last_error = 'timeout'
+            except Exception as e:
+                logger.error('Flux attempt %d failed: %s', attempt + 1, e, exc_info=True)
+                last_error = str(e)
+
+        logger.error('Flux failed after 3 attempts: %s', last_error)
+        return Response(
+            {'error': 'Flux image service is currently unavailable. Try again in a moment or switch to Unsplash.'},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
 
     access_key = os.getenv('UNSPLASH_ACCESS_KEY')
     if not access_key:
         return Response({'error': 'Image service is not configured'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
     orientation = 'squarish' if platform == 'instagram' else 'landscape'
-    query = prompt[:100]
+
+    # Extract the 3-5 most visually concrete keywords from the image prompt
+    # so Unsplash (keyword-based search) returns a matching photo
+    query = _unsplash_keywords(prompt)
+
     url = f"https://api.unsplash.com/photos/random?query={http_requests.utils.quote(query)}&orientation={orientation}"
     headers = {'Authorization': f'Client-ID {access_key}'}
 
@@ -181,7 +242,7 @@ def generate_variants(request):
     if tone not in VALID_TONES:
         return Response({'error': f'Tone must be one of: {", ".join(VALID_TONES)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-    brand_ctx = _brand_context_for(request.user)
+    brand_ctx = _resolve_brand_context(request)
     variant_instructions = [
         topic,
         f"{topic} (Make it shorter and punchier)",

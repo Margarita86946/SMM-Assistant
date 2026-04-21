@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { dashboardAPI, postsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
+import { useActiveClient } from '../context/ActiveClientContext';
 import {
   PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid,
@@ -103,15 +104,17 @@ function Dashboard() {
   const { language } = useSettings();
   const locale = LOCALE_MAP[language] || 'en-US';
   const username = localStorage.getItem('username');
+  const { activeClientId, activeClient } = useActiveClient();
 
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
+      const postParams = activeClientId ? { client_id: activeClientId } : {};
       const [statsResponse, postsResponse, activityResponse] = await Promise.all([
-        dashboardAPI.getStats(),
-        postsAPI.getAll(),
-        dashboardAPI.getActivity(),
+        dashboardAPI.getStats(activeClientId),
+        postsAPI.getAll(postParams),
+        dashboardAPI.getActivity(activeClientId),
       ]);
 
       setStats(statsResponse.data);
@@ -124,7 +127,7 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadDashboardData();
@@ -195,6 +198,17 @@ function Dashboard() {
           <p className="subtitle">{t('dashboard.subtitle')}</p>
         </div>
       </div>
+
+      {activeClient && (
+        <div className="dashboard-client-banner">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+          </svg>
+          Showing data for <strong>{[activeClient.first_name, activeClient.last_name].filter(Boolean).join(' ') || activeClient.username}</strong>
+        </div>
+      )}
 
       {error && <div className="error-message">{t(error)}</div>}
 

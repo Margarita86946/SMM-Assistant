@@ -66,6 +66,31 @@
   margin-bottom: 7px;
 }
 
+.gen-form-group .label-optional {
+  font-weight: 400;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.gen-form-group .label-context-set {
+  font-weight: 500;
+  color: #6366F1;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.gen-client-locked {
+  width: 100%;
+  padding: 10px 13px;
+  background: var(--input-bg, var(--surface));
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: default;
+}
+
 .gen-form-group input,
 .gen-form-group select {
   width: 100%;
@@ -377,6 +402,36 @@
   color: #EF4444;
 }
 
+.gen-image-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+.gen-image-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: #6366F1;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.gen-image-loading-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-tertiary, #9CA3AF);
+}
+
 /* --- Brand context banner --- */
 .brand-banner {
   padding: 12px 16px;
@@ -430,8 +485,8 @@
   font-size: 12px;
   font-weight: 600;
 }
-.gen-model-status--ok { color: #059669; }
-.gen-model-status--err { color: #DC2626; }
+.gen-model-status--ok { color: var(--success); }
+.gen-model-status--err { color: var(--error); }
 .gen-model-note {
   margin: 6px 0 0;
   font-size: 12px;
@@ -439,54 +494,3 @@
   font-weight: 500;
 }
 
-/* --- Variants --- */
-.gen-variants-row {
-  margin-top: 10px;
-}
-.btn-variants {
-  background: var(--primary-light);
-  color: var(--primary);
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.btn-variants:hover:not(:disabled) { background: var(--primary-muted); }
-.btn-variants:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.gen-variants-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  margin-top: 12px;
-}
-.gen-variant-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.gen-variant-text {
-  font-size: 13px;
-  color: var(--text-primary, #111827);
-  margin: 0;
-  line-height: 1.5;
-}
-.btn-use-variant {
-  background: #6366F1;
-  color: #FFF;
-  border: none;
-  padding: 7px 12px;
-  border-radius: 7px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  align-self: flex-start;
-}
-.btn-use-variant:hover { background: #4F46E5; }

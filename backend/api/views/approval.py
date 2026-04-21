@@ -5,8 +5,18 @@ from rest_framework import status
 
 from django.db import transaction
 
-from ..models import Post
+from ..models import Post, Notification
 from ..audit import log_action
+
+
+def _notify(recipient, actor, notification_type, post):
+    if recipient and recipient != actor:
+        Notification.objects.create(
+            recipient=recipient,
+            actor=actor,
+            notification_type=notification_type,
+            post=post,
+        )
 
 
 @api_view(['POST'])
@@ -14,7 +24,7 @@ from ..audit import log_action
 def submit_post(request, pk):
     with transaction.atomic():
         try:
-            post = Post.objects.select_for_update().get(pk=pk, user=request.user)
+            post = Post.objects.select_for_update(of=('self',)).select_related('client').get(pk=pk, user=request.user)
         except Post.DoesNotExist:
             return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
         if post.status != 'draft':
@@ -22,11 +32,26 @@ def submit_post(request, pk):
                 {'error': 'Only draft posts can be submitted for approval.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # If the client has granted full permission, auto-approve immediately
+        if post.client and post.client.auto_approve:
+            post.status = 'approved'
+            post.approved_by = post.client
+            post.approval_note = ''
+            post.save(update_fields=['status', 'approved_by', 'approval_note', 'updated_at'])
+            log_action(request.user, 'post_submitted', request=request, target=post)
+            log_action(post.client, 'post_approved', request=request, target=post,
+                       metadata={'auto_approved': True})
+            # Notify specialist that it was auto-approved
+            _notify(request.user, post.client, 'post_approved', post)
+            return Response({'status': post.status, 'auto_approved': True})
+
         post.status = 'pending_approval'
         post.approval_note = ''
         post.save(update_fields=['status', 'approval_note', 'updated_at'])
     log_action(request.user, 'post_submitted', request=request, target=post)
-    return Response({'status': post.status})
+    # Notify client that a post needs review
+    _notify(post.client, request.user, 'post_submitted', post)
+    return Response({'status': post.status, 'auto_approved': False})
 
 
 @api_view(['POST'])
@@ -53,6 +78,8 @@ def approve_post(request, pk):
         post.approval_note = ''
         post.save(update_fields=['status', 'approved_by', 'approval_note', 'updated_at'])
     log_action(request.user, 'post_approved', request=request, target=post)
+    # Notify specialist that client approved
+    _notify(post.user, request.user, 'post_approved', post)
     return Response({'status': post.status})
 
 
@@ -84,4 +111,6 @@ def reject_post(request, pk):
         request.user, 'post_rejected', request=request, target=post,
         metadata={'note_length': len(note)},
     )
+    # Notify specialist that client rejected
+    _notify(post.user, request.user, 'post_rejected', post)
     return Response({'status': post.status})
