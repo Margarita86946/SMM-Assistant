@@ -27,6 +27,30 @@
   margin: 0;
 }
 
+.dashboard-client-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.dashboard-client-banner svg {
+  width: 16px;
+  height: 16px;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.dashboard-client-banner strong {
+  color: var(--text-primary);
+}
+
 .btn-logout {
   display: none;
 }
@@ -73,10 +97,10 @@
   font-size: 22px;
 }
 
-.stat-card:nth-child(1) .stat-icon { background: #EEF2FF; }
-.stat-card:nth-child(2) .stat-icon { background: #DBEAFE; }
-.stat-card:nth-child(3) .stat-icon { background: #FEF3C7; }
-.stat-card:nth-child(4) .stat-icon { background: #D1FAE5; }
+.stat-card:nth-child(1) .stat-icon { background: var(--primary-light); }
+.stat-card:nth-child(2) .stat-icon { background: var(--info-bg); }
+.stat-card:nth-child(3) .stat-icon { background: var(--warning-bg); }
+.stat-card:nth-child(4) .stat-icon { background: var(--success-bg); }
 
 .stat-info h3 {
   font-size: 28px;
@@ -272,15 +296,16 @@
   font-weight: 600;
   color: var(--primary);
   background: var(--primary-light);
-  border: 1px solid transparent;
+  border: 1px solid rgba(99, 102, 241, 0.3);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
 .btn-view-details:hover {
-  background: #e0e7ff;
+  background: var(--primary-muted);
   border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
 /* ---- Post Detail Modal ---- */
@@ -401,4 +426,30 @@
 @media (max-width: 768px) {
   .dashboard-container { padding: 24px 16px; }
   .dashboard-header { flex-direction: column; }
+}
+
+.dashboard-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 36px;
+}
+@media (max-width: 900px) {
+  .dashboard-charts-grid { grid-template-columns: 1fr; }
+}
+
+.dashboard-chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.04));
+}
+
+.dashboard-chart-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 14px;
+  letter-spacing: -0.2px;
 }

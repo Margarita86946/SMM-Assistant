@@ -8,53 +8,110 @@
 :root {
   --primary: #6366F1;
   --primary-dark: #4F46E5;
-  --primary-light: #EEF2FF;
-  --primary-muted: rgba(99, 102, 241, 0.12);
+  --primary-light: #E0E7FF;
+  --primary-muted: rgba(99, 102, 241, 0.18);
 
-  --sidebar-bg: #111827;
-  --sidebar-border: rgba(255, 255, 255, 0.06);
-  --sidebar-hover: rgba(255, 255, 255, 0.06);
-  --sidebar-active: rgba(99, 102, 241, 0.15);
-  --sidebar-text: #9CA3AF;
-  --sidebar-text-active: #A5B4FC;
+  /* sidebar — light mode: white card with subtle indigo accent */
+  --sidebar-bg: #FFFFFF;
+  --sidebar-border: #C7D2E8;
+  --sidebar-hover: #EDE9FE;
+  --sidebar-hover-text: #4338CA;
+  --sidebar-active: #EEF2FF;
+  --sidebar-text: #6B7280;
+  --sidebar-text-active: #4338CA;
+  --sidebar-brand-text: #111827;
+  --sidebar-username: #111827;
+  --sidebar-role: #9CA3AF;
+  --sidebar-section-label: #9CA3AF;
+  --sidebar-select-bg: #F0F4FF;
+  --sidebar-select-border: #C7D2E8;
+  --sidebar-select-text: #374151;
+  --sidebar-select-hover-bg: #E8EEFF;
+  --sidebar-option-bg: #FFFFFF;
+
+  /* settings panel — light */
+  --settings-panel-bg: #FFFFFF;
+  --settings-panel-border: #C7D2E8;
+  --settings-panel-shadow: 0 8px 28px rgba(99,102,241,0.13), 0 2px 8px rgba(0,0,0,0.08);
+  --settings-row-hover: #EDE9FE;
+  --settings-label-text: #374151;
+  --settings-select-bg: #EEF2FF;
+  --settings-select-border: #C7D2E8;
+  --toggle-track-off: #D1D5DB;
+
   --sidebar-width: 240px;
 
-  --bg: #F8FAFC;
+  --bg: #F0F4FF;
   --surface: #FFFFFF;
-  --surface-2: #F1F5F9;
+  --surface-2: #F5F7FF;
 
   --text-primary: #111827;
   --text-secondary: #6B7280;
   --text-tertiary: #9CA3AF;
 
-  --border: #E5E7EB;
-  --border-light: #F3F4F6;
+  --border: #C7D2E8;
+  --border-light: #DDE3F0;
+  --input-bg: #F8FAFF;
+  --input-border: #C7D2E8;
 
   --success: #10B981;
+  --success-dark: #059669;
   --success-bg: #D1FAE5;
   --success-text: #065F46;
 
   --warning: #F59E0B;
+  --warning-dark: #D97706;
   --warning-bg: #FEF3C7;
   --warning-text: #92400E;
 
   --error: #EF4444;
+  --error-dark: #DC2626;
   --error-bg: #FEE2E2;
   --error-text: #991B1B;
+  --error-border: rgba(239,68,68,0.3);
 
   --info: #3B82F6;
   --info-bg: #DBEAFE;
   --info-text: #1D4ED8;
 
-  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
-  --shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+  /* Platform chip colors — light mode */
+  --chip-instagram-bg: #FDE8F5;
+  --chip-instagram-text: #9D174D;
+  --chip-linkedin-bg: #DBEAFE;
+  --chip-linkedin-text: #1D4ED8;
+  --chip-twitter-bg: #E0F2FE;
+  --chip-twitter-text: #0369A1;
+
+  /* Toggle track off-state */
+  --toggle-off: #D1D5DB;
+
+  /* AI assist card gradient */
+  --ai-assist-bg: linear-gradient(135deg, #FAFBFF 0%, #F5F3FF 100%);
+
+  --shadow-sm: 0 1px 3px rgba(99,102,241,0.07), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow: 0 2px 8px rgba(99,102,241,0.08), 0 1px 3px rgba(0,0,0,0.07);
+  --shadow-md: 0 4px 16px rgba(99,102,241,0.10), 0 2px 6px rgba(0,0,0,0.07);
+  --shadow-lg: 0 10px 32px rgba(99,102,241,0.12), 0 4px 10px rgba(0,0,0,0.08);
 
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 14px;
   --radius-xl: 20px;
+
+  /* auth page — light mode */
+  --auth-page-bg: #EEF2FF;
+  --auth-right-bg: #FAFBFF;
+  /* left panel: soft indigo-to-violet, lighter than dark mode */
+  --auth-left-bg: linear-gradient(145deg, #312E81 0%, #4338CA 50%, #6366F1 100%);
+  --auth-left-heading: #FFFFFF;
+  --auth-left-subtext: #C7D2FE;
+  --auth-glow-1: rgba(165, 180, 252, 0.25);
+  --auth-glow-2: rgba(196, 181, 253, 0.18);
+  --auth-feature-icon-bg: rgba(255, 255, 255, 0.15);
+  --auth-feature-icon-border: rgba(255, 255, 255, 0.25);
+  --auth-feature-icon-color: #E0E7FF;
+  --auth-feature-title: #F5F3FF;
+  --auth-feature-desc: #A5B4FC;
 }
 
 /* ── Dark mode — comes AFTER :root so it wins ────── */
@@ -63,24 +120,85 @@
   --surface: #111827;
   --surface-2: #1A2336;
 
+  /* sidebar — dark mode: deep navy */
+  --sidebar-bg: #111827;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-hover-text: #E5E7EB;
+  --sidebar-active: rgba(99, 102, 241, 0.15);
+  --sidebar-text: #9CA3AF;
+  --sidebar-text-active: #A5B4FC;
+  --sidebar-brand-text: #FFFFFF;
+  --sidebar-username: #E5E7EB;
+  --sidebar-role: #4B5563;
+  --sidebar-section-label: #4B5563;
+  --sidebar-select-bg: rgba(255, 255, 255, 0.05);
+  --sidebar-select-border: rgba(255, 255, 255, 0.1);
+  --sidebar-select-text: #E5E7EB;
+  --sidebar-select-hover-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-option-bg: #1F2937;
+
+  /* settings panel — dark */
+  --settings-panel-bg: #1F2937;
+  --settings-panel-border: rgba(255, 255, 255, 0.08);
+  --settings-panel-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  --settings-row-hover: rgba(255, 255, 255, 0.05);
+  --settings-label-text: #D1D5DB;
+  --settings-select-bg: #374151;
+  --settings-select-border: rgba(255, 255, 255, 0.1);
+  --toggle-track-off: #374151;
+
+  /* auth page — dark mode */
+  --auth-page-bg: #070D19;
+  --auth-right-bg: #111827;
+  --auth-left-bg: linear-gradient(145deg, #0F172A 0%, #1E1B4B 50%, #312E81 100%);
+  --auth-left-heading: #FFFFFF;
+  --auth-left-subtext: #A5B4FC;
+  --auth-glow-1: rgba(99, 102, 241, 0.3);
+  --auth-glow-2: rgba(139, 92, 246, 0.2);
+  --auth-feature-icon-bg: rgba(99, 102, 241, 0.15);
+  --auth-feature-icon-border: rgba(99, 102, 241, 0.3);
+  --auth-feature-icon-color: #A5B4FC;
+  --auth-feature-title: #E5E7EB;
+  --auth-feature-desc: #6B7280;
+
   --text-primary: #E2EAF4;
   --text-secondary: #6B7E99;
   --text-tertiary: #3D5068;
 
   --border: #1E2D45;
   --border-light: #131E30;
+  --input-bg: #0D1828;
+  --input-border: #1E2D45;
 
   --primary-light: rgba(99, 102, 241, 0.15);
   --primary-muted: rgba(99, 102, 241, 0.10);
 
   --success-bg: rgba(16, 185, 129, 0.13);
   --success-text: #34D399;
+  --success-dark: #34D399;
   --warning-bg: rgba(245, 158, 11, 0.13);
   --warning-text: #FCD34D;
+  --warning-dark: #FBBF24;
   --error-bg: rgba(239, 68, 68, 0.13);
   --error-text: #F87171;
+  --error-dark: #F87171;
+  --error-border: rgba(239,68,68,0.25);
   --info-bg: rgba(59, 130, 246, 0.13);
   --info-text: #60A5FA;
+
+  /* Platform chip colors — dark mode */
+  --chip-instagram-bg: rgba(236, 72, 153, 0.2);
+  --chip-instagram-text: #F9A8D4;
+  --chip-linkedin-bg: rgba(59, 130, 246, 0.2);
+  --chip-linkedin-text: #93C5FD;
+  --chip-twitter-bg: rgba(14, 165, 233, 0.2);
+  --chip-twitter-text: #7DD3FC;
+
+  --toggle-off: #374151;
+
+  /* AI assist card gradient — dark */
+  --ai-assist-bg: linear-gradient(135deg, #0F1835 0%, #0D1430 100%);
 
   --shadow-sm: 0 1px 4px rgba(0,0,0,0.5);
   --shadow: 0 2px 12px rgba(0,0,0,0.55);
@@ -88,15 +206,57 @@
   --shadow-lg: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03);
 }
 
+/* ── Unsaved changes modal (shared across pages) ── */
+.edit-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 20px;
+  animation: edit-fade-in 0.15s ease;
+}
+@keyframes edit-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.edit-modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  width: 100%;
+  max-width: 400px;
+  padding: 28px;
+  animation: edit-slide-up 0.2s ease;
+}
+@keyframes edit-slide-up { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.edit-modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.edit-modal-icon { font-size: 20px; line-height: 1; }
+.edit-modal-header h3 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.edit-modal-msg { font-size: 13.5px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 24px; }
+.edit-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.edit-modal-leave-btn {
+  padding: 9px 18px; background: transparent; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+  color: var(--text-secondary); cursor: pointer; transition: border-color 0.15s, color 0.15s;
+}
+.edit-modal-leave-btn:hover { border-color: var(--error); color: var(--error); }
+.edit-modal-stay-btn {
+  padding: 9px 18px; background: var(--primary); border: none;
+  border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+  color: white; cursor: pointer; transition: background 0.2s, box-shadow 0.2s;
+}
+.edit-modal-stay-btn:hover { background: var(--primary-dark); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+
 /* ── Dark mode component overrides ──────────────── */
 
 /* Inputs */
 [data-theme="dark"] input,
 [data-theme="dark"] select,
 [data-theme="dark"] textarea {
-  background: #0D1828 !important;
+  background: var(--input-bg) !important;
   color: #E2EAF4 !important;
-  border-color: #1E2D45 !important;
+  border-color: var(--input-border) !important;
   color-scheme: dark;
 }
 
@@ -121,23 +281,12 @@
   background: #284264;
 }
 
-/* Sidebar */
+/* Sidebar — dark mode gets a subtle gradient */
 [data-theme="dark"] .sidebar {
   background: linear-gradient(180deg, #090F1C 0%, #070D19 100%);
   border-right-color: #131E30;
 }
 
-[data-theme="dark"] .settings-panel {
-  background: #111827 !important;
-  border-color: rgba(255,255,255,0.07) !important;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
-}
-
-[data-theme="dark"] .settings-lang-select {
-  background: #1A2336 !important;
-  color: #E2EAF4 !important;
-  border-color: #1E2D45 !important;
-}
 
 /* Stat cards — gradient background + colored top border */
 [data-theme="dark"] .stat-card {
@@ -218,12 +367,6 @@
   border-color: rgba(16,185,129,0.4) !important;
 }
 
-/* AI assist card */
-[data-theme="dark"] .ai-assist-card {
-  background: linear-gradient(135deg, #0F1835 0%, #0D1430 100%) !important;
-  border-color: rgba(99, 102, 241, 0.28) !important;
-}
-
 /* Image loading overlay */
 [data-theme="dark"] .image-preview-loading {
   background: rgba(11, 17, 32, 0.92) !important;
@@ -242,20 +385,139 @@
 [data-theme="dark"] .cal-cell--empty {
   background: #0B1120 !important;
 }
-[data-theme="dark"] .cal-chip--instagram {
-  background: rgba(236, 72, 153, 0.2) !important;
-  color: #F9A8D4 !important;
+[data-theme="dark"] .cal-cell--drag-over {
+  background: rgba(99, 102, 241, 0.18) !important;
+  outline-color: #6366F1 !important;
 }
-[data-theme="dark"] .cal-chip--linkedin {
-  background: rgba(59, 130, 246, 0.2) !important;
-  color: #93C5FD !important;
+[data-theme="dark"] .cal-cell--past-drop {
+  background: rgba(239, 68, 68, 0.12) !important;
+  cursor: not-allowed !important;
 }
-[data-theme="dark"] .cal-chip--twitter {
-  background: rgba(14, 165, 233, 0.2) !important;
-  color: #7DD3FC !important;
+[data-theme="dark"] .cal-chip--past {
+  opacity: 0.35 !important;
 }
 [data-theme="dark"] .cal-modal {
   box-shadow: 0 24px 80px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.05) !important;
+}
+
+/* ── Light mode enhancements ─────────────────────── */
+
+/* Every card-like surface gets a shadow so it lifts off the page bg */
+:root:not([data-theme="dark"]) .stat-card,
+:root:not([data-theme="dark"]) .recent-posts-section,
+:root:not([data-theme="dark"]) .dashboard-chart-card,
+:root:not([data-theme="dark"]) .post-item,
+:root:not([data-theme="dark"]) .account-hero-card,
+:root:not([data-theme="dark"]) .cal-card,
+:root:not([data-theme="dark"]) .notif-dropdown,
+:root:not([data-theme="dark"]) .post-modal {
+  box-shadow: var(--shadow);
+}
+
+:root:not([data-theme="dark"]) .stat-card:hover,
+:root:not([data-theme="dark"]) .post-item:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Stat card accent top borders */
+:root:not([data-theme="dark"]) .stat-card:nth-child(1) { border-top: 2px solid rgba(99,102,241,0.55); }
+:root:not([data-theme="dark"]) .stat-card:nth-child(2) { border-top: 2px solid rgba(59,130,246,0.55); }
+:root:not([data-theme="dark"]) .stat-card:nth-child(3) { border-top: 2px solid rgba(245,158,11,0.55); }
+:root:not([data-theme="dark"]) .stat-card:nth-child(4) { border-top: 2px solid rgba(16,185,129,0.55); }
+
+/* Post card hover: more obvious indigo border */
+:root:not([data-theme="dark"]) .post-item:hover {
+  border-color: #A5B4FC;
+}
+
+/* Inputs: slightly stronger bg so they read as "field" vs page */
+:root:not([data-theme="dark"]) input:not([type="checkbox"]):not([type="radio"]),
+:root:not([data-theme="dark"]) select,
+:root:not([data-theme="dark"]) textarea {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+}
+
+:root:not([data-theme="dark"]) input:focus,
+:root:not([data-theme="dark"]) select:focus,
+:root:not([data-theme="dark"]) textarea:focus {
+  background: #FFFFFF;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.13);
+}
+
+/* Badge colours */
+:root:not([data-theme="dark"]) .badge-pending {
+  background: #EDE9FE;
+  color: #5B21B6;
+}
+:root:not([data-theme="dark"]) .badge-approved {
+  background: #D1FAE5;
+  color: #065F46;
+}
+:root:not([data-theme="dark"]) .badge-rejected {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+/* Section/card dividers: make border-light visible */
+:root:not([data-theme="dark"]) .posts-list {
+  background: var(--border);
+}
+
+/* Sidebar light mode right-border shadow */
+:root:not([data-theme="dark"]) .sidebar {
+  box-shadow: 1px 0 0 var(--border), 3px 0 12px rgba(99,102,241,0.06);
+}
+
+/* ── Light mode hover equivalents (mirror dark-mode overrides) ── */
+
+/* Dashboard post-card hover */
+:root:not([data-theme="dark"]) .post-card:hover {
+  background: #E0E7FF !important;
+}
+
+/* Calendar cell hover */
+:root:not([data-theme="dark"]) .cal-cell:hover {
+  background: #E0E7FF !important;
+}
+
+/* Edit button hover */
+:root:not([data-theme="dark"]) .btn-edit:hover {
+  background: var(--primary-light) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+}
+
+/* Delete button hover */
+:root:not([data-theme="dark"]) .btn-delete:hover {
+  background: var(--error-bg) !important;
+  border-color: rgba(239,68,68,0.4) !important;
+  color: var(--error) !important;
+}
+
+/* Save draft button hover */
+:root:not([data-theme="dark"]) .btn-save-draft:hover:not(:disabled) {
+  background: rgba(16,185,129,0.12) !important;
+  border-color: rgba(16,185,129,0.5) !important;
+}
+
+/* Notification item hover */
+:root:not([data-theme="dark"]) .notif-item:hover {
+  background: #E0E7FF !important;
+}
+:root:not([data-theme="dark"]) .notif-item--unread:hover {
+  background: #C7D2FE !important;
+}
+
+/* Table row hover (Clients page) */
+:root:not([data-theme="dark"]) .inv-table tr:hover td {
+  background: #E0E7FF !important;
+}
+
+/* ClientDashboard cancel button hover */
+:root:not([data-theme="dark"]) .client-btn-cancel:hover {
+  background: #E0E7FF !important;
 }
 
 /* ── Global styles ───────────────────────────────── */
@@ -302,11 +564,11 @@ button:focus, input:focus, select:focus, textarea:focus {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
+  background: var(--border);
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: var(--text-tertiary);
 }
 
 .status-badge {
@@ -339,6 +601,21 @@ button:focus, input:focus, select:focus, textarea:focus {
 .badge-posted {
   background: var(--success-bg);
   color: var(--success-text);
+}
+
+.badge-pending {
+  background: #F3E8FF;
+  color: #6B21A8;
+}
+
+.badge-approved {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.badge-rejected {
+  background: #FEE2E2;
+  color: #991B1B;
 }
 
 .error-message {

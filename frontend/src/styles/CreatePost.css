@@ -1,5 +1,5 @@
 .create-container {
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 36px 32px 60px;
 }
@@ -7,6 +7,7 @@
 .create-header {
   margin-bottom: 28px;
 }
+
 
 .create-header h1 {
   font-size: 26px;
@@ -22,19 +23,6 @@
   margin: 0;
 }
 
-.create-workspace {
-  display: grid;
-  grid-template-columns: 1fr 420px;
-  gap: 20px;
-  align-items: start;
-}
-
-@media (max-width: 960px) {
-  .create-workspace {
-    grid-template-columns: 1fr;
-  }
-}
-
 .create-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -47,33 +35,6 @@
   margin-bottom: 0;
 }
 
-.card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 16px;
-  letter-spacing: -0.2px;
-}
-
-.card-title-icon {
-  font-size: 16px;
-  line-height: 1;
-}
-
-.ai-assist-card {
-  border-color: #C7D2FE;
-  background: linear-gradient(135deg, #FAFBFF 0%, #F5F3FF 100%);
-}
-
-.ai-assist-hint {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: -8px 0 16px;
-  line-height: 1.55;
-}
 
 .create-form-group {
   margin-bottom: 14px;
@@ -85,10 +46,10 @@
 
 .create-form-group label {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
 
 .create-field-label-row {
@@ -102,11 +63,63 @@
   margin-bottom: 0;
 }
 
+.create-field-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.btn-copy svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.btn-copy:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-copy:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.btn-copy--done {
+  border-color: var(--success);
+  color: var(--success-text);
+  background: var(--success-bg);
+}
+
+.btn-copy--done:hover {
+  border-color: var(--success);
+  color: var(--success-text);
+  background: var(--success-bg);
+}
+
 .btn-regen {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 9px;
+  padding: 4px 10px;
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
@@ -125,22 +138,24 @@
 }
 
 .btn-regen:hover:not(:disabled) {
-  border-color: #F59E0B;
-  color: #D97706;
-  background: #FFFBEB;
+  border-color: var(--warning);
+  color: var(--warning-text);
+  background: var(--warning-bg);
 }
 
 .btn-regen--loading,
 .btn-regen--loading:hover {
-  border-color: #F59E0B;
-  color: #D97706;
-  background: #FFFBEB;
+  border-color: var(--warning);
+  color: var(--warning-text);
+  background: var(--warning-bg);
   cursor: not-allowed;
 }
 
 .label-required {
   color: var(--error);
   margin-left: 2px;
+  vertical-align: middle;
+  line-height: 1;
 }
 
 .label-optional {
@@ -149,14 +164,404 @@
   font-size: 11px;
 }
 
+.label-context-set {
+  font-weight: 500;
+  color: var(--primary);
+  font-size: 11px;
+}
+
+.create-client-locked {
+  width: 100%;
+  padding: 10px 13px;
+  background: var(--input-bg, var(--surface));
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.brand-banner {
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid;
+}
+
+.brand-banner--ok {
+  background: var(--success-bg);
+  border-color: var(--success);
+  color: var(--success-text);
+}
+
+/* ── Image upload ─────────────────────────────────── */
+.create-upload-zone-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  border: 1.5px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.create-upload-cam-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  border-radius: 50%;
+  transition: color 0.15s, background 0.15s;
+}
+
+.create-upload-cam-btn svg {
+  width: 32px;
+  height: 32px;
+}
+
+.create-upload-cam-btn:hover {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.create-upload-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  overflow: hidden;
+  z-index: 50;
+  min-width: 180px;
+}
+
+.create-upload-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-align: left;
+}
+
+.create-upload-menu button:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.create-upload-menu button:hover svg {
+  color: var(--primary);
+}
+
+.create-upload-menu button svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+/* ── Camera overlay ─────────────────────────────────── */
+.create-camera-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-camera-modal {
+  position: relative;
+  background: #000;
+  border-radius: 16px;
+  overflow: hidden;
+  width: min(420px, 94vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.create-camera-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.15s;
+}
+
+.create-camera-close:hover {
+  background: rgba(239,68,68,0.8);
+}
+
+.create-camera-video {
+  width: 100%;
+  display: block;
+  max-height: 60vh;
+  object-fit: cover;
+}
+
+.create-camera-capture {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  border: 3px solid #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.create-camera-capture:hover {
+  background: rgba(255,255,255,0.25);
+  transform: translateX(-50%) scale(1.05);
+}
+
+.create-camera-shutter {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #fff;
+  display: block;
+}
+
+.create-camera-stop {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: #fff;
+  display: block;
+}
+
+.create-camera-capture--recording {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: #ef4444;
+  animation: pulse-record 1s ease-in-out infinite;
+}
+
+@keyframes pulse-record {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+}
+
+.create-camera-mode-tabs {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 20px;
+  padding: 4px;
+  z-index: 2;
+}
+
+.create-camera-mode-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.create-camera-mode-tabs button.active {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+
+.create-camera-flip {
+  position: absolute;
+  bottom: 28px;
+  right: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  border: 2px solid rgba(255,255,255,0.6);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: background 0.15s;
+}
+
+.create-camera-flip:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+.create-camera-retake-row {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 20px;
+}
+
+.create-camera-retake-btn,
+.create-camera-use-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.create-camera-retake-btn {
+  background: rgba(255,255,255,0.15);
+  border: 2px solid rgba(255,255,255,0.6);
+  color: #fff;
+}
+
+.create-camera-retake-btn:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+.create-camera-use-btn {
+  background: #fff;
+  border: none;
+  color: #111;
+}
+
+.create-camera-use-btn:hover {
+  transform: scale(1.03);
+}
+
+.create-camera-error {
+  color: #f87171;
+  font-size: 13px;
+  padding: 24px 20px;
+  text-align: center;
+}
+
+.create-upload-preview {
+  display: flex;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--input-border);
+  overflow: hidden;
+  background: var(--input-bg);
+}
+
+.create-upload-img-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.create-upload-img {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+}
+
+.create-upload-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  background: rgba(0,0,0,0.55);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.create-upload-remove:hover {
+  background: rgba(239,68,68,0.85);
+}
+
+.create-upload-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.create-upload-error {
+  font-size: 12px;
+  color: var(--error);
+  margin-bottom: 6px;
+}
+
+.create-schedule-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--primary);
+  font-weight: 500;
+}
+
 .create-form-group input,
 .create-form-group select,
 .create-form-group textarea {
   width: 100%;
-  padding: 9px 12px;
+  padding: 10px 13px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--text-primary);
   background: var(--surface-2);
   box-sizing: border-box;
@@ -253,170 +658,7 @@
   cursor: not-allowed;
 }
 
-.btn-save-post {
-  width: 100%;
-  padding: 11px;
-  background: var(--success);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
-  margin-top: 6px;
-}
 
-.btn-save-post:hover:not(:disabled) {
-  background: #059669;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-  transform: translateY(-1px);
-}
-
-.btn-save-post:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.image-gen-card {
-  position: sticky;
-  top: 24px;
-}
-
-.btn-generate-image {
-  width: 100%;
-  padding: 11px;
-  background: linear-gradient(135deg, #7C3AED 0%, #6366F1 100%);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s, box-shadow 0.2s, transform 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  margin-bottom: 16px;
-}
-
-.btn-generate-image:hover:not(:disabled) {
-  opacity: 0.9;
-  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
-  transform: translateY(-1px);
-}
-
-.btn-generate-image:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.image-preview-area {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: var(--radius);
-  border: 2px dashed var(--border);
-  background: var(--bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  position: relative;
-  transition: border-color 0.2s;
-  margin-bottom: 12px;
-}
-
-.image-preview-area--has-image {
-  border-style: solid;
-  border-color: var(--border);
-}
-
-.image-preview-empty {
-  text-align: center;
-  color: var(--text-tertiary);
-}
-
-.image-preview-empty-icon {
-  font-size: 36px;
-  display: block;
-  margin-bottom: 10px;
-  opacity: 0.4;
-}
-
-.image-preview-empty p {
-  font-size: 13px;
-  margin: 0;
-}
-
-.image-preview-loading {
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.85);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  z-index: 2;
-}
-
-.image-preview-loading p {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-  text-align: center;
-  padding: 0 20px;
-}
-
-.image-spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--border);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.generated-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.generated-image--visible {
-  opacity: 1;
-}
-
-.btn-download {
-  width: 100%;
-  padding: 10px;
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: border-color 0.2s, color 0.2s, background 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.btn-download:hover:not(:disabled) {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--primary-light);
-}
-
-.btn-download:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 
 .btn-spinner {
   width: 14px;

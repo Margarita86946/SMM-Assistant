@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, useBlocker } from 'react-router-dom';
 import { postsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
+import { useBack } from '../hooks/useBack';
+import { PostPreview, CaptionCounter, HashtagsCounter, LIMITS } from './PostPreview';
 import '../styles/EditPost.css';
 
 function UnsavedModal({ onLeave, onStay, t }) {
@@ -30,6 +32,7 @@ function UnsavedModal({ onLeave, onStay, t }) {
 
 function EditPost() {
   const navigate = useNavigate();
+  const goBack = useBack('/posts');
   const { id } = useParams();
   const { t } = useTranslation();
   const [formData, setFormData] = useState({
@@ -159,13 +162,15 @@ function EditPost() {
       )}
 
       <div className="edit-post-header">
-        <button className="edit-back-btn" onClick={() => navigate('/posts')}>
+        <button className="edit-back-btn" onClick={goBack}>
           {t('edit.back')}
         </button>
         <h2>{t('edit.title')}{id}</h2>
         {isDirty && <span className="edit-dirty-badge">{t('edit.unsavedTitle')}</span>}
       </div>
 
+      <div className="create-layout">
+      <div className="create-layout-form">
       <div className="edit-post-card">
         {error && <div className="error-message">{t(error)}</div>}
         {successMsg && <div className="success-message">{successMsg}</div>}
@@ -177,22 +182,48 @@ function EditPost() {
         )}
 
         <div className="edit-form-group">
-          <label>{t('edit.caption')}</label>
+          <div className="edit-field-label-row">
+            <label>{t('edit.caption')}</label>
+            <CaptionCounter caption={formData.caption} hashtags={formData.hashtags} platform={formData.platform} />
+          </div>
           <textarea
             name="caption"
             value={formData.caption}
-            onChange={handleChange}
+            onChange={(e) => {
+              const platform = formData.platform;
+              const limit = LIMITS[platform]?.caption;
+              if (platform === 'twitter') {
+                const combined = [e.target.value, formData.hashtags].filter(Boolean).join(' ');
+                if (limit && combined.length > limit) return;
+              } else if (limit && e.target.value.length > limit) {
+                return;
+              }
+              handleChange(e);
+            }}
             rows={5}
           />
         </div>
 
         <div className="edit-form-group">
-          <label>{t('edit.hashtags')}</label>
+          <div className="edit-field-label-row">
+            <label>{t('edit.hashtags')}</label>
+            <HashtagsCounter hashtags={formData.hashtags} platform={formData.platform} />
+          </div>
           <input
             type="text"
             name="hashtags"
             value={formData.hashtags}
-            onChange={handleChange}
+            onChange={(e) => {
+              const platform = formData.platform;
+              if (platform === 'twitter') {
+                const combined = [formData.caption, e.target.value].filter(Boolean).join(' ');
+                if (combined.length > LIMITS.twitter.caption) return;
+              } else if (platform === 'instagram') {
+                const tags = e.target.value.trim().split(/\s+/).filter(t => t.startsWith('#')).length;
+                if (tags > LIMITS.instagram.hashtagCount) return;
+              }
+              handleChange(e);
+            }}
             placeholder={t('edit.hashtagsPlaceholder')}
           />
         </div>
@@ -277,6 +308,19 @@ function EditPost() {
             {saving ? t('edit.saving') : t('edit.saveChanges')}
           </button>
         </div>
+      </div>
+      </div>
+
+      <div className="create-layout-preview">
+        <div className="preview-label">{t('create.previewTitle')}</div>
+        <PostPreview
+          platform={formData.platform}
+          caption={formData.caption}
+          hashtags={formData.hashtags}
+          imageUrl={formData.image_url || undefined}
+          username={localStorage.getItem('username') || ''}
+        />
+      </div>
       </div>
     </div>
   );
