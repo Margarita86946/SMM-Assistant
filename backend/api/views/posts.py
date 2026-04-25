@@ -6,25 +6,31 @@ from rest_framework.pagination import PageNumberPagination
 
 from django.db.models import Q
 from django.utils import timezone
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.conf import settings
 
-from ..models import Post
+import os
+import uuid
+import mimetypes
+
+from ..models import Post, Notification
 from ..serializers import PostSerializer, PostCreateSerializer
 
 
 class StablePageNumberPagination(PageNumberPagination):
-    """PageNumberPagination with a stable (created_at, id) sort enforced so
-    that concurrent inserts during pagination never push a row to a different
-    page offset.  The queryset must already be ordered by -created_at; this
-    class appends -id as a tie-breaker before handing off to the DB."""
-
     page_size = 3
     page_size_query_param = 'page_size'
     max_page_size = 100
+    min_page_size = 1
+
+    def get_page_size(self, request):
+        size = super().get_page_size(request)
+        if size is not None:
+            return max(self.min_page_size, size)
+        return size
 
     def paginate_queryset(self, queryset, request, view=None):
-        # Append -id as a deterministic tie-breaker on top of whatever
-        # ordering the caller set.  Two posts created in the same second get
-        # a fixed, repeatable order so the offset never shifts between pages.
         queryset = queryset.order_by('-created_at', '-id')
         return super().paginate_queryset(queryset, request, view)
 
@@ -34,11 +40,19 @@ class StablePageNumberPagination(PageNumberPagination):
 def posts_list(request):
     if request.method == 'GET':
         if request.user.role == 'client':
-            # Clients see only posts explicitly assigned to them
-            posts = Post.objects.filter(client=request.user, deleted_at__isnull=True).order_by('-created_at')
+            posts = (
+                Post.objects
+                .filter(client=request.user, deleted_at__isnull=True)
+                .select_related('user', 'client')
+                .order_by('-created_at')
+            )
         else:
-            # Specialists see their own posts plus posts assigned to any of their clients
-            posts = Post.objects.filter(user=request.user, deleted_at__isnull=True).order_by('-created_at')
+            posts = (
+                Post.objects
+                .filter(user=request.user, deleted_at__isnull=True)
+                .select_related('user', 'client')
+                .order_by('-created_at')
+            )
 
         search = request.query_params.get('search', '').strip()
         platform = request.query_params.get('platform', '').strip()
@@ -61,8 +75,7 @@ def posts_list(request):
             )
         if platform:
             posts = posts.filter(platform=platform)
-        if post_status and request.user.role != 'client':
-            # treat 'approved' and legacy 'ready_to_post' as the same bucket
+        if post_status:
             if post_status == 'approved':
                 posts = posts.filter(status__in=['approved', 'ready_to_post'])
             else:
@@ -84,14 +97,22 @@ def posts_list(request):
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def post_detail(request, pk):
+    if request.user.role == 'client':
+        if request.method != 'GET':
+            return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            post = Post.objects.select_related('user', 'client').get(pk=pk, client=request.user, deleted_at__isnull=True)
+        except Post.DoesNotExist:
+            return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(PostSerializer(post).data)
+
     try:
-        post = Post.objects.get(pk=pk, user=request.user, deleted_at__isnull=True)
+        post = Post.objects.select_related('user', 'client').get(pk=pk, user=request.user, deleted_at__isnull=True)
     except Post.DoesNotExist:
         return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
-        serializer = PostSerializer(post)
-        return Response(serializer.data)
+        return Response(PostSerializer(post).data)
 
     elif request.method == 'PUT':
         _CONTENT_FIELDS = ('caption', 'hashtags', 'image_prompt', 'topic', 'platform')
@@ -101,8 +122,6 @@ def post_detail(request, pk):
         serializer = PostCreateSerializer(post, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated = serializer.save()
-            # If a scheduled/approved post has content edits (not just time change),
-            # require re-approval so the client sees the changes before it goes live.
             if old_status in ('scheduled', 'approved', 'ready_to_post'):
                 new_content = {f: getattr(updated, f, '') or '' for f in _CONTENT_FIELDS}
                 content_changed = any(old_content[f] != new_content[f] for f in _CONTENT_FIELDS)
@@ -111,6 +130,13 @@ def post_detail(request, pk):
                     updated.status = 'pending_approval'
                     updated.approval_note = ''
                     updated.save(update_fields=['status', 'approval_note', 'updated_at'])
+                    if updated.client_id:
+                        Notification.objects.create(
+                            recipient=updated.client,
+                            actor=request.user,
+                            notification_type='post_submitted',
+                            post=updated,
+                        )
             return Response(PostSerializer(updated).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -123,11 +149,13 @@ def post_detail(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def calendar_view(request):
+    if request.user.role == 'client':
+        return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
     from django.utils import timezone
     import zoneinfo
 
     month = request.GET.get('month')
-    year  = request.GET.get('year')
+    year = request.GET.get('year')
     tz_name = request.GET.get('tz', 'UTC')
 
     if not month or not year:
@@ -135,23 +163,22 @@ def calendar_view(request):
 
     try:
         month = int(month)
-        year  = int(year)
+        year = int(year)
         user_tz = zoneinfo.ZoneInfo(tz_name)
     except (ValueError, zoneinfo.ZoneInfoNotFoundError):
         return Response({'error': 'Invalid month, year, or timezone'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Build UTC range covering the full calendar month in the user's local timezone
     import calendar as _cal
     last_day = _cal.monthrange(year, month)[1]
     month_start = timezone.datetime(year, month, 1, 0, 0, 0, tzinfo=user_tz)
-    month_end   = timezone.datetime(year, month, last_day, 23, 59, 59, tzinfo=user_tz)
+    month_end = timezone.datetime(year, month, last_day, 23, 59, 59, tzinfo=user_tz)
 
     qs = Post.objects.filter(
         user=request.user,
         scheduled_time__gte=month_start,
         scheduled_time__lte=month_end,
         deleted_at__isnull=True,
-    )
+    ).select_related('user', 'client')
 
     client_id = request.GET.get('client_id', '').strip()
     if client_id:
@@ -169,6 +196,8 @@ def calendar_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def today_posts(request):
+    if request.user.role == 'client':
+        return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
     from django.utils import timezone
 
     today = timezone.now().date()
@@ -177,7 +206,52 @@ def today_posts(request):
         user=request.user,
         scheduled_time__date=today,
         deleted_at__isnull=True,
-    ).order_by('scheduled_time')
+    ).select_related('user', 'client').order_by('scheduled_time')
 
-    serializer = PostSerializer(posts, many=True)
-    return Response(serializer.data)
+    return Response(PostSerializer(posts, many=True).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_post_image(request):
+    file = request.FILES.get('image')
+    if not file:
+        return Response({'error': 'No image file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    allowed = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
+    mime = file.content_type or mimetypes.guess_type(file.name)[0] or ''
+    if mime not in allowed:
+        return Response({'error': 'Unsupported file type. Use JPEG, PNG, WEBP, or GIF.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if file.size > 10 * 1024 * 1024:
+        return Response({'error': 'File too large. Maximum size is 10 MB.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    ext = os.path.splitext(file.name)[1].lower() or '.jpg'
+    filename = f"post_images/{uuid.uuid4().hex}{ext}"
+    saved_path = default_storage.save(filename, ContentFile(file.read()))
+
+    url = request.build_absolute_uri(settings.MEDIA_URL + saved_path)
+    return Response({'image_url': url}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_post_video(request):
+    file = request.FILES.get('video')
+    if not file:
+        return Response({'error': 'No video file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    allowed = {'video/mp4', 'video/quicktime', 'video/x-m4v'}
+    mime = file.content_type or mimetypes.guess_type(file.name)[0] or ''
+    if mime not in allowed:
+        return Response({'error': 'Unsupported file type. Use MP4 or MOV.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if file.size > 500 * 1024 * 1024:
+        return Response({'error': 'File too large. Maximum size is 500 MB.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    ext = os.path.splitext(file.name)[1].lower() or '.mp4'
+    filename = f"post_videos/{uuid.uuid4().hex}{ext}"
+    saved_path = default_storage.save(filename, ContentFile(file.read()))
+
+    url = request.build_absolute_uri(settings.MEDIA_URL + saved_path)
+    return Response({'video_url': url}, status=status.HTTP_201_CREATED)

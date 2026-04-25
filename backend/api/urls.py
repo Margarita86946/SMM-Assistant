@@ -12,6 +12,8 @@ urlpatterns = [
     # Posts
     path('posts/', views.posts_list, name='posts-list'),
     path('posts/<int:pk>/', views.post_detail, name='post-detail'),
+    path('posts/upload-image/', views.upload_post_image, name='upload-post-image'),
+    path('posts/upload-video/', views.upload_post_video, name='upload-post-video'),
     path('posts/<int:pk>/submit/', views.submit_post, name='submit-post'),
     path('posts/<int:pk>/approve/', views.approve_post, name='approve-post'),
     path('posts/<int:pk>/reject/', views.reject_post, name='reject-post'),
@@ -58,4 +60,13 @@ urlpatterns = [
     path('notifications/', views.notifications_list, name='notifications-list'),
     path('notifications/<int:pk>/read/', views.mark_read, name='notification-read'),
     path('notifications/read-all/', views.mark_all_read, name='notifications-read-all'),
+
+    # Analyzer
+    path('analyzer/accounts/', views.analyzer_accounts, name='analyzer-accounts'),
+    path('analyzer/<int:account_id>/overview/', views.analyzer_overview, name='analyzer-overview'),
+    path('analyzer/<int:account_id>/posts/', views.analyzer_posts, name='analyzer-posts'),
+    path('analyzer/<int:account_id>/audience/', views.analyzer_audience, name='analyzer-audience'),
+    path('analyzer/<int:account_id>/ai/', views.analyzer_ai, name='analyzer-ai'),
+    path('analyzer/<int:account_id>/refresh/', views.analyzer_refresh, name='analyzer-refresh'),
+    path('analyzer/demo-toggle/', views.analyzer_demo_toggle, name='analyzer-demo-toggle'),
 ]

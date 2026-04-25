@@ -23,6 +23,11 @@ VALID_TONES = {'professional', 'casual', 'funny', 'inspirational'}
 VALID_PROVIDERS = {'groq', 'ollama', 'gemini'}
 VALID_IMAGE_PROVIDERS = {'unsplash', 'flux'}
 
+_CLIENT_FORBIDDEN = Response(
+    {'error': 'AI generation is not available for client accounts.'},
+    status=status.HTTP_403_FORBIDDEN,
+)
+
 
 def _resolve_provider(value):
     value = (value or 'groq').lower()
@@ -73,7 +78,11 @@ def _resolve_brand_context(request):
         client_id = request.data.get('client_id')
         if client_id:
             try:
-                client = User.objects.get(id=client_id, specialist=request.user, role='client')
+                client = (
+                    User.objects
+                    .only('id')
+                    .get(id=client_id, specialist=request.user, role='client')
+                )
                 return _brand_context_for(client)
             except User.DoesNotExist:
                 pass
@@ -102,6 +111,8 @@ def ai_status(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def generate_content(request):
+    if request.user.role == 'client':
+        return _CLIENT_FORBIDDEN
     topic = request.data.get('topic', '').strip()
     platform = request.data.get('platform', 'instagram').lower()
     tone = request.data.get('tone', 'professional').lower()
@@ -132,6 +143,8 @@ def generate_content(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def polish_content_view(request):
+    if request.user.role == 'client':
+        return _CLIENT_FORBIDDEN
     caption = request.data.get('caption', '')
     hashtags = request.data.get('hashtags', '')
     image_prompt = request.data.get('image_prompt', '')
@@ -159,6 +172,8 @@ def polish_content_view(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def generate_image(request):
+    if request.user.role == 'client':
+        return _CLIENT_FORBIDDEN
     prompt = request.data.get('prompt', '').strip()
     platform = request.data.get('platform', 'instagram').lower()
     image_provider = (request.data.get('image_provider') or 'unsplash').lower()
@@ -228,6 +243,8 @@ def generate_image(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def generate_variants(request):
+    if request.user.role == 'client':
+        return _CLIENT_FORBIDDEN
     topic = request.data.get('topic', '').strip()
     platform = request.data.get('platform', 'instagram').lower()
     tone = request.data.get('tone', 'professional').lower()

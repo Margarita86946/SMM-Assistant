@@ -44,13 +44,23 @@ def _serialize_invitation(inv, include_email=True):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def invitations_list(request):
+    if request.user.role != 'specialist':
+        return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
     if request.method == 'GET':
         invitations = (
             ClientInvitation.objects
             .filter(specialist=request.user)
+            .only(
+                'id', 'status', 'client_email', 'created_at', 'expires_at',
+                'accepted_at', 'revoked_at', 'social_account_id',
+            )
             .order_by('-created_at')[:200]
         )
         return Response([_serialize_invitation(inv) for inv in invitations])
+
+    if request.user.role != 'specialist':
+        return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
 
     client_email = (request.data.get('client_email') or '').strip().lower()
     if not client_email or '@' not in client_email or len(client_email) > 254:
@@ -171,12 +181,21 @@ def invitation_lookup(request, token):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def clients_list(request):
-    if request.user.role not in ('specialist',):
-        return Response({'error': 'Only specialists can view their clients.'}, status=status.HTTP_403_FORBIDDEN)
+    if request.user.role != 'specialist':
+        return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+    from ..models import SocialAccount
+    from django.db.models import Prefetch
+
+    accounts_qs = SocialAccount.objects.filter(
+        platform='instagram', is_active=True
+    ).only('id', 'account_username', 'account_type', 'connected_at', 'token_expires_at', 'user_id')
 
     clients = (
         User.objects
         .filter(specialist=request.user, role='client')
+        .only('id', 'username', 'email', 'first_name', 'last_name', 'date_joined')
+        .prefetch_related(Prefetch('social_accounts', queryset=accounts_qs, to_attr='ig_accounts'))
         .order_by('date_joined')
     )
     data = [
@@ -187,6 +206,16 @@ def clients_list(request):
             'first_name': c.first_name,
             'last_name': c.last_name,
             'date_joined': c.date_joined.isoformat(),
+            'instagram_accounts': [
+                {
+                    'id': a.id,
+                    'username': a.account_username,
+                    'account_type': a.account_type,
+                    'connected_at': a.connected_at.isoformat() if a.connected_at else None,
+                    'token_expires_at': a.token_expires_at.isoformat() if a.token_expires_at else None,
+                }
+                for a in c.ig_accounts
+            ],
         }
         for c in clients
     ]
@@ -203,10 +232,13 @@ def client_detail(request, pk):
     - Sends them a notification email
     """
     if request.user.role != 'specialist':
-        return Response({'error': 'Only specialists can remove clients.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
-        client = User.objects.get(pk=pk, specialist=request.user, role='client')
+        client = User.objects.only(
+            'id', 'username', 'email', 'specialist_id', 'is_active', 'role',
+            'first_name', 'last_name',
+        ).get(pk=pk, specialist=request.user, role='client')
     except User.DoesNotExist:
         return Response({'error': 'Client not found.'}, status=status.HTTP_404_NOT_FOUND)
 

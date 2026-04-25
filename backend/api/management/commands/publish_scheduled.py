@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from api import instagram_service
 from api.models import Post, SocialAccount
+from api.notify import notify_post_published, notify_post_publish_failed
 
 
 logger = logging.getLogger('api')
@@ -30,7 +31,8 @@ class Command(BaseCommand):
             status='scheduled',
             platform='instagram',
             scheduled_time__lte=now,
-        ).select_related('user')
+            deleted_at__isnull=True,
+        ).select_related('user', 'client')
 
         total = due_posts.count()
         if total == 0:
@@ -44,23 +46,32 @@ class Command(BaseCommand):
         failed = 0
 
         for post in due_posts:
+            ig_owner = post.client if post.client_id else post.user
+
             if dry_run:
-                self.stdout.write(f'  [dry-run] would publish post {post.pk} for {post.user.username}')
+                self.stdout.write(f'  [dry-run] would publish post {post.pk} for {ig_owner.username}')
                 continue
 
             try:
                 account = SocialAccount.objects.get(
-                    user=post.user, platform='instagram', is_active=True
+                    user=ig_owner, platform='instagram', is_active=True
                 )
             except SocialAccount.DoesNotExist:
-                logger.warning('publish_scheduled: skipping post %s — no active Instagram account', post.pk)
+                logger.warning('publish_scheduled: skipping post %s — no active Instagram account for %s', post.pk, ig_owner.username)
                 skipped += 1
                 continue
 
-            if not account.access_token or (
+            try:
+                decrypted_token = account.decrypted_token
+            except Exception as e:
+                logger.error('publish_scheduled: skipping post %s — token decryption failed: %s', post.pk, e)
+                skipped += 1
+                continue
+
+            if not decrypted_token or (
                 account.token_expires_at and account.token_expires_at <= now
             ):
-                logger.warning('publish_scheduled: skipping post %s — token expired', post.pk)
+                logger.warning('publish_scheduled: skipping post %s — token missing or expired', post.pk)
                 skipped += 1
                 continue
 
@@ -75,13 +86,14 @@ class Command(BaseCommand):
 
             try:
                 ig_post_id = instagram_service.publish_image_post(
-                    account.access_token,
+                    decrypted_token,
                     account.instagram_user_id,
                     post.image_url,
                     caption_text,
                 )
             except instagram_service.InstagramAPIError as e:
                 logger.error('publish_scheduled: post %s failed: %s', post.pk, e)
+                notify_post_publish_failed(post)
                 failed += 1
                 continue
 
@@ -95,6 +107,7 @@ class Command(BaseCommand):
                 locked.auto_publish = False
                 locked.save(update_fields=['status', 'instagram_post_id', 'auto_publish', 'updated_at'])
 
+            notify_post_published(post)
             published += 1
             self.stdout.write(f'  published post {post.pk} → {ig_post_id}')
 

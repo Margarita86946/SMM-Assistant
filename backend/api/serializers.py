@@ -46,7 +46,7 @@ class PostSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'client', 'client_username', 'client_first_name', 'client_last_name',
             'caption', 'hashtags', 'topic', 'tone',
-            'image_prompt', 'image_url', 'platform', 'scheduled_time', 'status',
+            'image_prompt', 'image_url', 'video_url', 'media_type', 'platform', 'scheduled_time', 'status',
             'approval_note', 'approved_by',
             'auto_publish', 'instagram_post_id',
             'created_at', 'updated_at'
@@ -91,6 +91,8 @@ class PostCreateSerializer(serializers.ModelSerializer):
             'tone',
             'image_prompt',
             'image_url',
+            'video_url',
+            'media_type',
             'platform',
             'scheduled_time',
             'status',
@@ -105,8 +107,9 @@ class PostCreateSerializer(serializers.ModelSerializer):
         if not request:
             return value
         user = request.user
-        # Client field can only point to one of the specialist's own clients
-        if value.specialist_id != user.id or value.role != 'client':
+        if user.role != 'specialist':
+            raise serializers.ValidationError('Only specialists can assign posts to clients.')
+        if not (value.specialist_id == user.id and value.role == 'client'):
             raise serializers.ValidationError('This client does not belong to you.')
         return value
 
@@ -122,10 +125,8 @@ class PostCreateSerializer(serializers.ModelSerializer):
                 {'auto_publish': 'Auto-publish is only supported for Instagram posts.'}
             )
 
-        # Client posts must be approved before they can be scheduled
         if new_status == 'scheduled' and client is not None:
             approved = current_approval in ('approved', 'ready_to_post')
-            # also allow if the incoming data itself carries approved status (edge case)
             if not approved and data.get('status') == 'scheduled':
                 raise serializers.ValidationError(
                     {'status': 'This post must be approved by the client before it can be scheduled.'}

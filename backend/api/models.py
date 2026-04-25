@@ -20,6 +20,7 @@ class User(AbstractUser):
     )
     auto_approve = models.BooleanField(default=False)
     notifications_sound = models.BooleanField(default=True)
+    analyzer_demo_mode = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'users'
@@ -59,9 +60,6 @@ class EncryptionKey(models.Model):
         key = cls.objects.filter(is_active=True).order_by('-created_at').first()
         if key is not None:
             return key
-        # No active key exists — create one. Use get_or_create with a fixed
-        # sentinel identifier so concurrent calls converge on the same row
-        # instead of each creating their own key.
         with transaction.atomic():
             key, _ = cls.objects.get_or_create(
                 key_identifier='key_v1_default',
@@ -110,6 +108,8 @@ class Post(models.Model):
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name='approved_posts'
     )
     instagram_post_id = models.CharField(max_length=100, blank=True)
+    video_url = models.URLField(max_length=1000, blank=True, default='')
+    media_type = models.CharField(max_length=10, default='image', choices=[('image', 'Image'), ('video', 'Video')])
     auto_publish = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -291,8 +291,12 @@ class AuditLog(models.Model):
         ('invitation_sent', 'Client Invitation Sent'),
         ('invitation_accepted', 'Client Invitation Accepted'),
         ('invitation_revoked', 'Client Invitation Revoked'),
+        ('post_submitted', 'Post Submitted for Approval'),
+        ('post_approved', 'Post Approved'),
+        ('post_rejected', 'Post Rejected'),
         ('post_published', 'Post Published to Instagram'),
         ('post_publish_failed', 'Post Publish Failed'),
+        ('client_removed', 'Client Removed from Workspace'),
         ('token_refreshed', 'Access Token Refreshed'),
         ('token_expired', 'Access Token Expired'),
         ('login', 'User Login'),
@@ -369,12 +373,34 @@ class EmailConfiguration(models.Model):
         return decrypt(self.smtp_password_encrypted) or ''
 
 
+class InstagramSnapshot(models.Model):
+    social_account = models.ForeignKey(
+        SocialAccount, on_delete=models.CASCADE, related_name='snapshots'
+    )
+    fetched_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    overview = models.JSONField(default=dict)
+    insights = models.JSONField(default=list)
+    media = models.JSONField(default=list)
+    audience = models.JSONField(default=dict)
+    online_followers = models.JSONField(default=dict)
+
+    class Meta:
+        db_table = 'instagram_snapshots'
+        ordering = ['-fetched_at']
+        get_latest_by = 'fetched_at'
+
+    def __str__(self):
+        return f"Snapshot({self.social_account.account_username}, {self.fetched_at})"
+
+
 class Notification(models.Model):
     TYPE_CHOICES = [
         ('post_submitted', 'Post Submitted for Review'),
         ('post_approved', 'Post Approved'),
         ('post_rejected', 'Post Rejected'),
         ('post_published', 'Post Published'),
+        ('post_publish_failed', 'Post Publish Failed'),
+        ('post_scheduled_reminder', 'Post Scheduled Reminder'),
         ('invitation_accepted', 'Invitation Accepted'),
     ]
 

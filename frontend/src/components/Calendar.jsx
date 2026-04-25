@@ -4,6 +4,10 @@ import { calendarAPI, postsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import { useActiveClient } from '../context/ActiveClientContext';
+import {
+  FiX, FiLock, FiRefreshCw, FiEdit2, FiSearch, FiCheck,
+  FiClock, FiUser, FiChevronLeft, FiChevronRight, FiMove,
+} from 'react-icons/fi';
 import '../styles/Calendar.css';
 
 const PLATFORM_META = {
@@ -106,7 +110,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
     setRescheduleLoading(true);
     try {
       // Also set status to 'scheduled' so a draft/approved post is properly marked
-      await onReschedule(post.id, scheduled.toISOString(), 'scheduled');
+      await onReschedule(post.id, scheduled.toISOString());
       close();
     } catch {
       setRescheduleErr(t('calendar.rescheduleFailed'));
@@ -124,11 +128,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
             <span className={`status-badge ${statusCls}`}>{statusText}</span>
           </div>
           <button className="cal-modal-close" onClick={close} aria-label="Close">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+            <FiX />
           </button>
         </div>
 
@@ -142,11 +142,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
               {!isPosted && (
                 isPast ? (
                   <span className="cal-modal-locked-badge" title="Past posts cannot be rescheduled">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                    </svg>
+                    <FiLock />
                     {t('calendar.past')}
                   </span>
                 ) : (
@@ -154,11 +150,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
                     className={`cal-modal-reschedule-btn${rescheduling ? ' cal-modal-reschedule-btn--active' : ''}`}
                     onClick={() => setRescheduling(r => !r)}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="23 4 23 10 17 10"/>
-                      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                    </svg>
+                    <FiRefreshCw />
                     {t('calendar.reschedule')}
                   </button>
                 )
@@ -227,22 +219,11 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
               disabled={isPast}
               title={isPast ? 'Past posts cannot be edited' : undefined}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
               {isPast ? (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                    width="13" height="13">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                  Past post
-                </>
-              ) : t('calendar.editPost')}
+                <><FiLock size={13} /> Past post</>
+              ) : (
+                <><FiEdit2 /> {t('calendar.editPost')}</>
+              )}
             </button>
           )}
           <button className="cal-modal-cancel-btn" onClick={close}>{t('calendar.close')}</button>
@@ -330,19 +311,12 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
             <h3 className="cal-drawer-title">{displayDate}</h3>
           </div>
           <button className="cal-modal-close" onClick={close} aria-label="Close">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+            <FiX />
           </button>
         </div>
 
         <div className="cal-drawer-search-wrap">
-          <svg className="cal-drawer-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
+          <FiSearch className="cal-drawer-search-icon" />
           <input
             ref={searchRef}
             type="text"
@@ -385,12 +359,7 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
                         {post.caption.length > 90 ? post.caption.slice(0, 90) + '…' : post.caption}
                       </p>
                     </div>
-                    {isSelected && (
-                      <svg className="cal-drawer-post-check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                        fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                    )}
+                    {isSelected && <FiCheck className="cal-drawer-post-check" />}
                   </button>
                 );
               })}
@@ -405,10 +374,7 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
           {err && <p className="cal-drawer-err">{err}</p>}
           <div className="cal-drawer-time-row">
             <label className="cal-drawer-time-label">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
+              <FiClock />
               {t('calendar.publishTime')}
             </label>
             <input
@@ -426,13 +392,7 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
             {confirming ? (
               <><span className="cal-drawer-confirm-spinner" /> {t('calendar.scheduling')}</>
             ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                {t('calendar.confirmSchedule')}
-              </>
+              <><FiCheck /> {t('calendar.confirmSchedule')}</>
             )}
           </button>
         </div>
@@ -453,23 +413,23 @@ function Calendar() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [dropError, setDropError] = useState('');
   const [selectedPost, setSelectedPost] = useState(null);
   const [scheduleDrawer, setScheduleDrawer] = useState(null);
-  const [dragging, setDragging] = useState(null);
-  const [dragOverKey, setDragOverKey] = useState(null);
-  const [dragOverNav, setDragOverNav] = useState(null); // 'prev' | 'next' | null
-  const [navPortalKey, setNavPortalKey] = useState(0); // bumped each time portal countdown restarts
-  const [rejectPostId, setRejectPostId] = useState(null);
-  const [rejectCellKey, setRejectCellKey] = useState(null);
   const [flashKey, setFlashKey] = useState(0);
+  const [calView, setCalView] = useState('month'); // 'month' | 'week' | 'day'
   const pendingFlash = useRef(false);
-  const navHoverTimer = useRef(null);
-  const dragMonthRef = useRef({ month: 0, year: 0 });
-  const originMonthRef = useRef(null);    // month/year when drag started
-  const dropSucceededRef = useRef(false); // true only when drop was accepted
-  const docDragEndRef = useRef(null);     // document-level dragend listener (source may unmount)
-  const draggingRef = useRef(null);       // always-current ref — avoids stale closure in handlers
+
+  // ── Drag state ──────────────────────────────────────────────────────────────
+  const [dragging, setDragging]       = useState(null);   // post object being dragged
+  const [dragOver, setDragOver]       = useState(null);   // dateKey hovered
+  const [dragOverNav, setDragOverNav] = useState(null);   // 'prev' | 'next' | null
+  const [navPortalKey, setNavPortalKey] = useState(0);
+  const draggingRef    = useRef(null);   // mirror of dragging — readable in async handlers
+  const snapshotRef    = useRef([]);     // posts snapshot at drag-start
+  const succeededRef   = useRef(false);  // true when a valid drop happened
+  const handledRef     = useRef(false);  // prevents double-fire of dragend
+  const navTimerRef    = useRef(null);
+  const currentDateRef = useRef(currentDate); // always-current currentDate for closures
 
   const month = currentDate.getMonth() + 1;
   const year  = currentDate.getFullYear();
@@ -492,9 +452,7 @@ function Calendar() {
   }, [month, year, activeClientId]);
 
   useEffect(() => { loadPosts(); }, [loadPosts]);
-
-  // Keep a ref so the nav-portal timer can read current month/year without stale closure
-  useEffect(() => { dragMonthRef.current = { month, year }; }, [month, year]);
+  useEffect(() => { currentDateRef.current = currentDate; }, [currentDate]);
 
   useEffect(() => {
     if (flashKey === 0) return;
@@ -535,219 +493,197 @@ function Calendar() {
   for (let i = 0; i < firstDayOfWeek; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
-  const monthLabel = currentDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
   const DAYS_OF_WEEK = ['daySun', 'dayMon', 'dayTue', 'dayWed', 'dayThu', 'dayFri', 'daySat'].map(k => t(`calendar.${k}`));
 
-  const prevMonth = () => { setPosts([]); setCurrentDate(new Date(year, month - 2, 1)); };
-  const nextMonth = () => { setPosts([]); setCurrentDate(new Date(year, month, 1)); };
-  const goToday   = () => {
-    if (year !== today.getFullYear() || month !== today.getMonth() + 1) {
+  const prevPeriod = () => {
+    setPosts([]);
+    if (calView === 'month') setCurrentDate(new Date(year, month - 2, 1));
+    else if (calView === 'week') setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 7); return d; });
+    else setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d; });
+  };
+  const nextPeriod = () => {
+    setPosts([]);
+    if (calView === 'month') setCurrentDate(new Date(year, month, 1));
+    else if (calView === 'week') setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 7); return d; });
+    else setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d; });
+  };
+  const goToday = () => {
+    const sameMonth = year === today.getFullYear() && month === today.getMonth() + 1;
+    if (!sameMonth) {
       pendingFlash.current = true;
       setPosts([]);
-      setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
     } else {
       setFlashKey(k => k + 1);
     }
+    setCurrentDate(calView === 'month'
+      ? new Date(today.getFullYear(), today.getMonth(), 1)
+      : new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    );
   };
+
+  // Week view: get the Monday of the week containing currentDate
+  const getWeekStart = (d) => {
+    const day = new Date(d);
+    const dow = day.getDay(); // 0=Sun
+    const diff = dow === 0 ? -6 : 1 - dow;
+    day.setDate(day.getDate() + diff);
+    day.setHours(0, 0, 0, 0);
+    return day;
+  };
+
+  const weekStart = getWeekStart(currentDate);
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+
+  const periodLabel = calView === 'month'
+    ? currentDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' })
+    : calView === 'week'
+      ? `${weekDays[0].toLocaleDateString(locale, { month: 'short', day: 'numeric' })} – ${weekDays[6].toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}`
+      : currentDate.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
+  // A cell is forbidden if its entire day is strictly in the past (before today's date)
+  const isCellPast = (dateKey) => dateKey < todayKey;
+
   // ── Drag handlers ──────────────────────────────────────────────────────────
 
-  const handleDragStart = useCallback((e, post) => {
+  const endDrag = useCallback(() => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+
+    setDragging(null);
+    setDragOver(null);
+    setDragOverNav(null);
+    draggingRef.current = null;
+    if (navTimerRef.current) { clearTimeout(navTimerRef.current); navTimerRef.current = null; }
+
+    if (!succeededRef.current && snapshotRef.current.length > 0) {
+      // Restore snapshot instantly
+      setPosts(snapshotRef.current);
+      // Navigate back to origin month only if we drifted away
+      setCurrentDate(prev => {
+        const od = snapshotRef.current._originDate;
+        if (!od) return prev;
+        if (prev.getFullYear() === od.getFullYear() && prev.getMonth() === od.getMonth()) return prev;
+        return od;
+      });
+    }
+
+    snapshotRef.current = [];
+    succeededRef.current = false;
+    setTimeout(() => { handledRef.current = false; }, 0);
+  }, []);
+
+  const onDragStart = useCallback((e, post) => {
     draggingRef.current = post;
     setDragging(post);
-    originMonthRef.current = { ...dragMonthRef.current };
-    dropSucceededRef.current = false;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('postId', String(post.id));
+    succeededRef.current = false;
+    handledRef.current = false;
 
-    // Build a clean ghost image — no hover scale, full opacity
+    // Snapshot current posts + origin month date
+    const snap = [...posts];
+    snap._originDate = currentDateRef.current;
+    snapshotRef.current = snap;
+
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(post.id));
+
+    // Clean ghost image
     const el = e.currentTarget;
     const rect = el.getBoundingClientRect();
     const clone = el.cloneNode(true);
-    clone.style.cssText = [
-      'position:fixed', 'top:-9999px', 'left:-9999px',
-      `width:${rect.width}px`, 'transform:none', 'opacity:1',
-      'pointer-events:none', 'margin:0',
-    ].join(';');
+    clone.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${rect.width}px;margin:0;pointer-events:none;opacity:1;`;
     document.body.appendChild(clone);
     e.dataTransfer.setDragImage(clone, e.clientX - rect.left, e.clientY - rect.top);
     setTimeout(() => document.body.removeChild(clone), 0);
-  }, []);
 
-  const handleDragEnd = useCallback((e) => {
-    // Don't null the ref here — handleDrop reads it and may not have fired yet
-    // (some browsers fire dragend before drop in edge cases)
-    setTimeout(() => {
-      draggingRef.current = null;
-      setDragging(null);
-    }, 0);
-    setDragOverKey(null);
-    setDragOverNav(null);
-    if (navHoverTimer.current) {
-      clearTimeout(navHoverTimer.current.id);
-      navHoverTimer.current = null;
-    }
-    if (docDragEndRef.current) {
-      document.removeEventListener('dragend', docDragEndRef.current);
-      docDragEndRef.current = null;
-    }
-    if (!dropSucceededRef.current && originMonthRef.current) {
-      const { month: om, year: oy } = originMonthRef.current;
-      const { month: cm, year: cy } = dragMonthRef.current;
-      if (om !== cm || oy !== cy) {
-        setPosts([]);
-        setCurrentDate(new Date(oy, om - 1, 1));
-      }
-    }
-    originMonthRef.current = null;
-    dropSucceededRef.current = false;
-  }, []);
+    // Document-level dragend fires even when chip unmounts (cross-month portal)
+    const docHandler = () => { document.removeEventListener('dragend', docHandler); endDrag(); };
+    document.addEventListener('dragend', docHandler);
+  }, [posts, endDrag]);
 
-  const handleDragOver = useCallback((e, dateKey) => {
+  const onDragEnd = useCallback(() => { endDrag(); }, [endDrag]);
+
+  const onDragOver = useCallback((e, dateKey) => {
     e.preventDefault();
-    // Block drops on past dates
-    if (dateKey < todayKey) {
+    if (isCellPast(dateKey)) {
       e.dataTransfer.dropEffect = 'none';
-      setDragOverKey(null);
-      return;
+      setDragOver(null);
+    } else {
+      e.dataTransfer.dropEffect = 'move';
+      setDragOver(dateKey);
     }
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverKey(dateKey);
-  }, [todayKey]);
+  }, [todayKey]); // eslint-disable-line
 
-  const handleDragLeave = useCallback((e) => {
-    if (!e.currentTarget.contains(e.relatedTarget)) {
-      setDragOverKey(null);
-    }
+  const onDragLeave = useCallback((e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(null);
   }, []);
 
-  const handleDrop = useCallback(async (e, targetDateKey) => {
+  const onDrop = useCallback(async (e, targetKey) => {
     e.preventDefault();
-    setDragOverKey(null);
+    setDragOver(null);
 
     const post = draggingRef.current;
-    console.log('[drop] targetDateKey=', targetDateKey, 'post=', post?.id, post?.scheduled_time);
-    if (!post) { console.warn('[drop] draggingRef is null — drop ignored'); return; }
+    if (!post || isCellPast(targetKey)) return;
 
-    // Compute source key using local date (same as cell keys)
     const srcDate = post.scheduled_time ? new Date(post.scheduled_time) : null;
-    const sourceKey = srcDate
+    const srcKey  = srcDate
       ? `${srcDate.getFullYear()}-${String(srcDate.getMonth()+1).padStart(2,'0')}-${String(srcDate.getDate()).padStart(2,'0')}`
       : null;
+    if (srcKey === targetKey) return;
 
-    if (sourceKey === targetDateKey) {
-      draggingRef.current = null;
-      setDragging(null);
-      return;
-    }
+    // Keep original time-of-day
+    const h  = srcDate ? srcDate.getHours()   : 9;
+    const m  = srcDate ? srcDate.getMinutes() : 0;
+    const [ty, tm, td] = targetKey.split('-').map(Number);
+    const newTime = new Date(ty, tm - 1, td, h, m, 0).toISOString();
 
-    // Preserve local hours:minutes so time-of-day is kept after rescheduling
-    const th   = srcDate ? srcDate.getHours()   : 9;
-    const tmin = srcDate ? srcDate.getMinutes() : 0;
+    succeededRef.current = true;
 
-    const [ty, tm, td] = targetDateKey.split('-').map(Number);
-    const prospective = new Date(ty, tm - 1, td, th, tmin, 0);
-
-    if (prospective <= new Date()) {
-      // Snap-back: flash the forbidden cell and shake the chip back to its origin
-      setRejectCellKey(targetDateKey);
-      setRejectPostId(post.id);
-      setDropError("Can't reschedule to a past date or time.");
-      draggingRef.current = null;
-      setDragging(null);
-      setTimeout(() => {
-        setRejectCellKey(null);
-        setRejectPostId(null);
-        setDropError('');
-      }, 600);
-      return;
-    }
-
-    const newScheduledTime = prospective.toISOString();
-
-    // Mark success before the await — dragend fires while we're still awaiting
-    dropSucceededRef.current = true;
-
-    // Optimistic update: move the chip immediately, no refresh needed
-    console.log('[drop] optimistic update → moving post', post.id, 'to', newScheduledTime);
-    setPosts(prev => prev.map(p =>
-      p.id === post.id ? { ...p, scheduled_time: newScheduledTime } : p
-    ));
-    draggingRef.current = null;
-    setDragging(null);
+    // Optimistic: update or inject
+    setPosts(prev => {
+      const exists = prev.some(p => p.id === post.id);
+      if (exists) return prev.map(p => p.id === post.id ? { ...p, scheduled_time: newTime } : p);
+      return [...prev, { ...post, scheduled_time: newTime }];
+    });
 
     try {
-      await postsAPI.update(post.id, { scheduled_time: newScheduledTime });
-      console.log('[drop] API success');
-    } catch (err) {
-      console.error('[drop] API error — reverting', err);
-      dropSucceededRef.current = false;
-      setDropError('Failed to move post. Reverting…');
-      setTimeout(() => setDropError(''), 4000);
+      await postsAPI.update(post.id, { scheduled_time: newTime });
+    } catch {
+      succeededRef.current = false;
       loadPosts();
     }
-  }, [loadPosts]);
+  }, [loadPosts, todayKey]); // eslint-disable-line
 
-  // ── Nav-arrow portal: hover for 500ms while dragging → flip month ─────────
-
-  const handleNavDragOver = useCallback((e, direction) => {
-    if (!dragging) return;
+  // Nav portal: hover arrow for 600ms while dragging → flip month
+  const onNavDragOver = useCallback((e, dir) => {
+    if (!draggingRef.current) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'none'; // don't allow drop ON the arrow itself
-
-    // If already counting down for this direction, do nothing
-    if (navHoverTimer.current?.direction === direction) return;
-
-    // Direction changed: cancel the old timer
-    if (navHoverTimer.current) {
-      clearTimeout(navHoverTimer.current.id);
-    }
-
-    setDragOverNav(direction);
-    setNavPortalKey(k => k + 1); // force CSS animation to restart from 0%
-
-    const timerId = setTimeout(() => {
-      navHoverTimer.current = null;
+    e.dataTransfer.dropEffect = 'none';
+    if (navTimerRef.current?.dir === dir) return;
+    if (navTimerRef.current) { clearTimeout(navTimerRef.current); }
+    setDragOverNav(dir);
+    setNavPortalKey(k => k + 1);
+    const timer = setTimeout(() => {
+      navTimerRef.current = null;
       setDragOverNav(null);
-      const { month: m, year: y } = dragMonthRef.current;
-
-      // Capture snap-back target before navigating away
-      const snapTo = { month: m, year: y };
-
-      // Document-level dragend fires even if the source chip unmounts
-      if (docDragEndRef.current) {
-        document.removeEventListener('dragend', docDragEndRef.current);
-      }
-      const docListener = () => {
-        document.removeEventListener('dragend', docListener);
-        docDragEndRef.current = null;
-        if (!dropSucceededRef.current) {
-          setPosts([]);
-          setCurrentDate(new Date(snapTo.year, snapTo.month - 1, 1));
-        }
-        dropSucceededRef.current = false;
-        originMonthRef.current = null;
-      };
-      docDragEndRef.current = docListener;
-      document.addEventListener('dragend', docListener);
-
+      setCurrentDate(prev => {
+        const m = prev.getMonth();
+        const y = prev.getFullYear();
+        return dir === 'prev' ? new Date(y, m - 1, 1) : new Date(y, m + 1, 1);
+      });
       setPosts([]);
-      setCurrentDate(direction === 'prev'
-        ? new Date(y, m - 2, 1)
-        : new Date(y, m,     1));
-    }, 500);
+    }, 600);
+    navTimerRef.current = { id: timer, dir };
+  }, []);
 
-    navHoverTimer.current = { id: timerId, direction };
-  }, [dragging]);
-
-  const handleNavDragLeave = useCallback(() => {
+  const onNavDragLeave = useCallback(() => {
     setDragOverNav(null);
-    if (navHoverTimer.current) {
-      clearTimeout(navHoverTimer.current.id);
-      navHoverTimer.current = null;
-    }
+    if (navTimerRef.current) { clearTimeout(navTimerRef.current.id); navTimerRef.current = null; }
   }, []);
 
   return (
@@ -758,166 +694,219 @@ function Calendar() {
           <h1>{t('calendar.title')}</h1>
           <p className="cal-subtitle">{t('calendar.subtitle')}</p>
         </div>
-        <button className="cal-new-btn" onClick={() => navigate('/generate')}>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          {t('calendar.newPost')}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="cal-new-btn cal-new-btn--outline" onClick={() => navigate('/create')}>
+            {t('posts.createManual')}
+          </button>
+          <button className="cal-new-btn" onClick={() => navigate('/generate')}>
+            {t('posts.createNew')}
+          </button>
+        </div>
       </div>
 
       {activeClient && (
         <div className="cal-client-banner">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-          </svg>
+          <FiUser />
           {t('calendar.filteredBy', { name: [activeClient.first_name, activeClient.last_name].filter(Boolean).join(' ') || activeClient.username })}
         </div>
       )}
 
-      {error    && <div className="error-message">{t(error)}</div>}
-      {dropError && <div className="error-message">{dropError}</div>}
+      {error && <div className="error-message">{t(error)}</div>}
 
       <div className="cal-card">
         <div className="cal-nav">
           <div className="cal-nav-left">
             <button
-              className={`cal-nav-btn${dragOverNav === 'prev' ? ' cal-nav-btn--drag-portal' : ''}`}
+              className={`cal-nav-btn${dragOverNav === 'prev' ? ' cal-nav-btn--portal' : ''}`}
               data-portal-key={dragOverNav === 'prev' ? navPortalKey : undefined}
-              onClick={prevMonth}
-              aria-label="Previous month"
-              onDragOver={e => handleNavDragOver(e, 'prev')}
-              onDragLeave={handleNavDragLeave}
+              onClick={prevPeriod}
+              aria-label="Previous"
+              onDragOver={e => onNavDragOver(e, 'prev')}
+              onDragLeave={onNavDragLeave}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6"/>
-              </svg>
+              <FiChevronLeft />
             </button>
-            <h2 className="cal-month-label">{monthLabel}</h2>
+            <h2 className="cal-month-label">{periodLabel}</h2>
             <button
-              className={`cal-nav-btn${dragOverNav === 'next' ? ' cal-nav-btn--drag-portal' : ''}`}
+              className={`cal-nav-btn${dragOverNav === 'next' ? ' cal-nav-btn--portal' : ''}`}
               data-portal-key={dragOverNav === 'next' ? navPortalKey : undefined}
-              onClick={nextMonth}
-              aria-label="Next month"
-              onDragOver={e => handleNavDragOver(e, 'next')}
-              onDragLeave={handleNavDragLeave}
+              onClick={nextPeriod}
+              aria-label="Next"
+              onDragOver={e => onNavDragOver(e, 'next')}
+              onDragLeave={onNavDragLeave}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 18 15 12 9 6"/>
-              </svg>
+              <FiChevronRight />
             </button>
           </div>
           <div className="cal-nav-right">
             <span className="cal-post-count">{t('calendar.postsThisMonth', { count: posts.length })}</span>
+            <div className="cal-view-toggle">
+              {['month','week','day'].map(v => (
+                <button key={v} className={`cal-view-btn${calView === v ? ' cal-view-btn--active' : ''}`}
+                  onClick={() => setCalView(v)}>
+                  {v.charAt(0).toUpperCase() + v.slice(1)}
+                </button>
+              ))}
+            </div>
             <button className="cal-today-btn" onClick={goToday}>{t('calendar.today')}</button>
           </div>
         </div>
 
-        <div className="cal-grid-header">
-          {DAYS_OF_WEEK.map((d) => (
-            <div key={d} className="cal-dow">{d}</div>
-          ))}
-        </div>
+        {calView === 'month' && (
+          <>
+            <div className="cal-grid-header">
+              {DAYS_OF_WEEK.map((d) => (
+                <div key={d} className="cal-dow">{d}</div>
+              ))}
+            </div>
+            <div className={`cal-grid-wrap${loading ? ' cal-grid-wrap--loading' : ''}`}>
+              <div className={`cal-grid${dragging ? ' cal-grid--dragging' : ''}`}>
+                {cells.map((day, idx) => {
+                  const col = idx % 7;
+                  if (day === null) return <div key={`blank-${idx}`} className="cal-cell cal-cell--empty" data-col={col} />;
+                  const key = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                  const dayPosts = postsByDay[key] || [];
+                  const isToday   = key === todayKey;
+                  const isPast    = key < todayKey;
+                  const isOver    = dragOver === key;
+                  const isBlocked = dragging && isPast;
+                  return (
+                    <div key={key} id={isToday ? 'cal-today-cell' : undefined} data-col={col}
+                      className={['cal-cell', isToday ? 'cal-cell--today' : '', isOver ? 'cal-cell--drag-over' : '', isBlocked ? 'cal-cell--blocked' : ''].filter(Boolean).join(' ')}
+                      onClick={() => !dragging && setScheduleDrawer(key)}
+                      onDragOver={e => onDragOver(e, key)} onDragLeave={onDragLeave} onDrop={e => onDrop(e, key)}
+                    >
+                      {isToday && flashKey > 0 && <div key={flashKey} className="cal-today-flash-overlay" />}
+                      <div className={`cal-day-num${isToday ? ' cal-day-num--today' : ''}`}>{day}</div>
+                      <div className="cal-posts">
+                        {dayPosts.map((post) => {
+                          const p = PLATFORM_META[post.platform] || { icon: '📄' };
+                          const isDraggingThis = dragging?.id === post.id;
+                          return (
+                            <button key={post.id} draggable={!isPast}
+                              className={['cal-post-chip', `cal-chip--${post.platform}`, isPast ? 'cal-chip--past' : '', isDraggingThis ? 'cal-chip--dragging' : ''].filter(Boolean).join(' ')}
+                              onDragStart={isPast ? undefined : e => { e.stopPropagation(); onDragStart(e, post); }}
+                              onDragEnd={isPast ? undefined : onDragEnd}
+                              onClick={e => { e.stopPropagation(); setSelectedPost(post); }}
+                              title={post.caption}
+                            >
+                              <span className="cal-chip-icon">{p.icon}</span>
+                              <span className="cal-chip-time">{formatTime(post.scheduled_time, locale)}</span>
+                              {!activeClientId && post.client_username && (
+                                <span className="cal-chip-client" title={[post.client_first_name, post.client_last_name].filter(Boolean).join(' ') || post.client_username}>
+                                  {(post.client_first_name || post.client_username || '').charAt(0).toUpperCase()}
+                                </span>
+                              )}
+                              {!isPast && <FiMove className="cal-chip-grip" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <span className="cal-cell-add-hint">+</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {loading && <div className="cal-loading-overlay" />}
+            </div>
+          </>
+        )}
 
-        <div className={`cal-grid-wrap${loading ? ' cal-grid-wrap--loading' : ''}`}>
-          <div className={`cal-grid${dragging ? ' cal-grid--dragging' : ''}`}>
-            {cells.map((day, idx) => {
-              const col = idx % 7;
-              if (day === null) {
-                return <div key={`blank-${idx}`} className="cal-cell cal-cell--empty" data-col={col} />;
-              }
-              const key = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const dayPosts = postsByDay[key] || [];
-              const isToday = key === todayKey;
-              const isDragOver = dragOverKey === key;
-              const isRejectCell = rejectCellKey === key;
-              // Mark cell as forbidden if dropping the dragged chip there would land in the past
-              const isPast = dragging && (() => {
-                if (key < todayKey) return true;
-                if (key === todayKey) {
-                  const orig = dragging.scheduled_time ? new Date(dragging.scheduled_time) : null;
-                  const h = orig ? orig.getHours() : 9;
-                  const m = orig ? orig.getMinutes() : 0;
-                  const now2 = new Date();
-                  return new Date(now2.getFullYear(), now2.getMonth(), now2.getDate(), h, m, 0) <= now2;
-                }
-                return false;
-              })();
+        {calView === 'week' && (
+          <div className={`cal-week-wrap${loading ? ' cal-grid-wrap--loading' : ''}`}>
+            <div className="cal-week-header">
+              {weekDays.map((d) => {
+                const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                const isToday = key === todayKey;
+                return (
+                  <div key={key} className={`cal-week-col-head${isToday ? ' cal-week-col-head--today' : ''}`}>
+                    <span className="cal-week-dow">{d.toLocaleDateString(locale, { weekday: 'short' })}</span>
+                    <span className={`cal-week-date-num${isToday ? ' cal-day-num--today' : ''}`}>{d.getDate()}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="cal-week-body">
+              {weekDays.map((d) => {
+                const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                const dayPosts = postsByDay[key] || [];
+                const isPast = key < todayKey;
+                const isToday = key === todayKey;
+                return (
+                  <div key={key} className={`cal-week-col${isToday ? ' cal-week-col--today' : ''}${dragging && isPast ? ' cal-cell--blocked' : ''}${dragOver === key ? ' cal-cell--drag-over' : ''}`}
+                    onClick={() => !dragging && setScheduleDrawer(key)}
+                    onDragOver={e => onDragOver(e, key)} onDragLeave={onDragLeave} onDrop={e => onDrop(e, key)}
+                  >
+                    {dayPosts.length === 0
+                      ? <span className="cal-week-empty">—</span>
+                      : dayPosts.map(post => {
+                          const p = PLATFORM_META[post.platform] || { icon: '📄' };
+                          const isDraggingThis = dragging?.id === post.id;
+                          return (
+                            <button key={post.id} draggable={!isPast}
+                              className={['cal-post-chip cal-week-chip', `cal-chip--${post.platform}`, isPast ? 'cal-chip--past' : '', isDraggingThis ? 'cal-chip--dragging' : ''].filter(Boolean).join(' ')}
+                              onDragStart={isPast ? undefined : e => { e.stopPropagation(); onDragStart(e, post); }}
+                              onDragEnd={isPast ? undefined : onDragEnd}
+                              onClick={e => { e.stopPropagation(); setSelectedPost(post); }}
+                              title={post.caption}
+                            >
+                              <span className="cal-chip-icon">{p.icon}</span>
+                              <span className="cal-chip-time">{formatTime(post.scheduled_time, locale)}</span>
+                              {!isPast && <FiMove className="cal-chip-grip" />}
+                            </button>
+                          );
+                        })
+                    }
+                  </div>
+                );
+              })}
+            </div>
+            {loading && <div className="cal-loading-overlay" />}
+          </div>
+        )}
 
-              return (
-                <div
-                  key={key}
-                  id={isToday ? 'cal-today-cell' : undefined}
-                  data-col={col}
-                  className={[
-                    'cal-cell',
-                    isToday      ? 'cal-cell--today'     : '',
-                    isDragOver   ? 'cal-cell--drag-over' : '',
-                    isPast       ? 'cal-cell--past-drop' : '',
-                    isRejectCell ? 'cal-cell--reject'    : '',
-                  ].filter(Boolean).join(' ')}
-                  onClick={() => setScheduleDrawer(key)}
-                  onDragOver={e => handleDragOver(e, key)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={e => handleDrop(e, key)}
-                >
-                  {isToday && flashKey > 0 && (
-                    <div key={flashKey} className="cal-today-flash-overlay" />
-                  )}
-                  <div className={`cal-day-num${isToday ? ' cal-day-num--today' : ''}`}>{day}</div>
-
-                  <div className="cal-posts">
-                    {dayPosts.map((post) => {
+        {calView === 'day' && (() => {
+          const key = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}-${String(currentDate.getDate()).padStart(2,'0')}`;
+          const dayPosts = postsByDay[key] || [];
+          const isPast = key < todayKey;
+          const isToday = key === todayKey;
+          return (
+            <div className={`cal-day-wrap${loading ? ' cal-grid-wrap--loading' : ''}`}>
+              <div className={`cal-day-header${isToday ? ' cal-day-header--today' : ''}`}>
+                {currentDate.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' })}
+              </div>
+              <div className={`cal-day-body${dragging && isPast ? ' cal-cell--blocked' : ''}${dragOver === key ? ' cal-cell--drag-over' : ''}`}
+                onClick={() => !dragging && setScheduleDrawer(key)}
+                onDragOver={e => onDragOver(e, key)} onDragLeave={onDragLeave} onDrop={e => onDrop(e, key)}
+              >
+                {dayPosts.length === 0
+                  ? <div className="cal-day-empty">No posts scheduled. Click to add one.</div>
+                  : dayPosts.map(post => {
                       const p = PLATFORM_META[post.platform] || { icon: '📄' };
                       const isDraggingThis = dragging?.id === post.id;
-                      const isRejectChip = rejectPostId === post.id;
-                      const chipPast = post.scheduled_time
-                        ? new Date(post.scheduled_time) <= new Date()
-                        : false;
                       return (
-                        <button
-                          key={post.id}
-                          draggable={!chipPast}
-                          className={[
-                            'cal-post-chip',
-                            `cal-chip--${post.platform}`,
-                            isDraggingThis ? 'cal-chip--dragging' : '',
-                            chipPast       ? 'cal-chip--past'     : '',
-                            isRejectChip   ? 'cal-chip--reject'   : '',
-                          ].filter(Boolean).join(' ')}
-                          onDragStart={chipPast ? undefined : e => { e.stopPropagation(); handleDragStart(e, post); }}
-                          onDragEnd={chipPast ? undefined : handleDragEnd}
+                        <button key={post.id} draggable={!isPast}
+                          className={['cal-day-post-row', `cal-chip--${post.platform}`, isPast ? 'cal-chip--past' : '', isDraggingThis ? 'cal-chip--dragging' : ''].filter(Boolean).join(' ')}
+                          onDragStart={isPast ? undefined : e => { e.stopPropagation(); onDragStart(e, post); }}
+                          onDragEnd={isPast ? undefined : onDragEnd}
                           onClick={e => { e.stopPropagation(); setSelectedPost(post); }}
-                          title={post.caption}
                         >
+                          <span className="cal-day-post-time">{formatTime(post.scheduled_time, locale)}</span>
                           <span className="cal-chip-icon">{p.icon}</span>
-                          <span className="cal-chip-time">{formatTime(post.scheduled_time, locale)}</span>
-                          {!activeClientId && post.client_username && (
-                            <span className="cal-chip-client" title={post.client_first_name || post.client_last_name
-                              ? [post.client_first_name, post.client_last_name].filter(Boolean).join(' ')
-                              : post.client_username}>
-                              {(post.client_first_name || post.client_username || '').charAt(0).toUpperCase()}
-                            </span>
-                          )}
+                          <span className="cal-day-post-caption">{post.topic || post.caption.slice(0, 60)}</span>
+                          <span className={`status-badge ${STATUS_CLS[post.status] || 'badge-draft'}`} style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                            {post.status.replace(/_/g, ' ')}
+                          </span>
+                          {!isPast && <FiMove className="cal-chip-grip" style={{ marginLeft: 8 }} />}
                         </button>
                       );
-                    })}
-                  </div>
-
-                  {/* subtle + hint on hover */}
-                  <span className="cal-cell-add-hint">+</span>
-                </div>
-              );
-            })}
-          </div>
-          {loading && <div className="cal-loading-overlay" />}
-        </div>
+                    })
+                }
+              </div>
+              {loading && <div className="cal-loading-overlay" />}
+            </div>
+          );
+        })()}
       </div>
 
       {clientsInMonth.length > 0 && (
@@ -940,16 +929,7 @@ function Calendar() {
           </div>
         ))}
         <div className="cal-legend-item cal-legend-drag-hint">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            width="14" height="14">
-            <polyline points="5 9 2 12 5 15"/>
-            <polyline points="9 5 12 2 15 5"/>
-            <polyline points="15 19 12 22 9 19"/>
-            <polyline points="19 9 22 12 19 15"/>
-            <line x1="2" y1="12" x2="22" y2="12"/>
-            <line x1="12" y1="2" x2="12" y2="22"/>
-          </svg>
+          <FiMove size={13} />
           <span>{t('calendar.dragHint')}</span>
         </div>
       </div>
@@ -959,10 +939,8 @@ function Calendar() {
           post={selectedPost}
           onClose={() => setSelectedPost(null)}
           onEdit={(id) => { setSelectedPost(null); navigate(`/edit/${id}`); }}
-          onReschedule={async (postId, isoTime, newStatus) => {
-            const payload = { scheduled_time: isoTime };
-            if (newStatus) payload.status = newStatus;
-            await postsAPI.update(postId, payload);
+          onReschedule={async (postId, isoTime) => {
+            await postsAPI.update(postId, { scheduled_time: isoTime });
             const target = new Date(isoTime);
             const targetYear = target.getFullYear();
             const targetMonth = target.getMonth(); // 0-indexed

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { invitationsAPI } from '../services/api';
 import SmmLogo from './SmmLogo';
+import { FiX, FiUser } from 'react-icons/fi';
 import '../styles/AcceptInvitation.css';
 
 function AcceptInvitation() {
@@ -48,10 +49,7 @@ function AcceptInvitation() {
         {!loading && error && (
           <div className="accept-result accept-result--error">
             <div className="accept-result-icon accept-result-icon--error">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
+              <FiX />
             </div>
             <h2 className="accept-result-title">Invalid Invitation</h2>
             <p className="accept-result-msg">{error}</p>
@@ -61,11 +59,7 @@ function AcceptInvitation() {
         {!loading && !error && invitation && (
           <>
             <div className="accept-ig-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-              </svg>
+              <FiUser />
             </div>
 
             <h2 className="accept-title">You've been invited</h2>

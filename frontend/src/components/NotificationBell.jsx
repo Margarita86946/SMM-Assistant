@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationsContext';
 import { useTranslation } from '../i18n';
+import { FiBell } from 'react-icons/fi';
 import '../styles/NotificationBell.css';
 
 function timeAgo(isoString, t) {
@@ -19,6 +20,8 @@ function notifLabel(n, t) {
     case 'post_approved': return t('notifications.postApproved').replace('{name}', name);
     case 'post_rejected': return t('notifications.postRejected').replace('{name}', name);
     case 'post_published': return t('notifications.postPublished');
+    case 'post_publish_failed': return t('notifications.postPublishFailed');
+    case 'post_scheduled_reminder': return t('notifications.postScheduledReminder');
     case 'invitation_accepted': return t('notifications.invitationAccepted').replace('{name}', name);
     default: return n.type;
   }
@@ -66,11 +69,7 @@ export function NotificationBell() {
         title={t('notifications.title')}
         aria-label={t('notifications.title')}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-        </svg>
+        <FiBell />
         {unreadCount > 0 && (
           <span className="notif-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
         )}
@@ -147,14 +146,14 @@ export function NotificationToast() {
 
   return (
     <div className="notif-toast-container">
-      {toasts.map(n => (
-        <div key={n.toastId} className="notif-toast">
+      {toasts.map(n => {
+        const isError = n.type === 'post_publish_failed';
+        const isWarning = n.type === 'post_scheduled_reminder';
+        const cls = `notif-toast${isError ? ' notif-toast--error' : isWarning ? ' notif-toast--warning' : ''}`;
+        return (
+        <div key={n.toastId} className={cls}>
           <div className="notif-toast-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
+            <FiBell />
           </div>
           <div className="notif-toast-body">
             <p className="notif-toast-title">{t('notifications.newNotification')}</p>
@@ -165,7 +164,8 @@ export function NotificationToast() {
             onClick={() => setToasts(prev => prev.filter(x => x.toastId !== n.toastId))}
           >×</button>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

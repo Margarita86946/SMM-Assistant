@@ -201,6 +201,75 @@
   flex-shrink: 0;
 }
 
+/* Edit button in card title */
+.account-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 5px 12px;
+  background: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid rgba(99,102,241,0.25);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.account-edit-btn:hover {
+  background: var(--primary-muted);
+  border-color: var(--primary);
+}
+
+.account-edit-btn svg {
+  width: 13px;
+  height: 13px;
+  color: var(--primary);
+}
+
+/* Read-only field display */
+.account-field-readonly {
+  padding: 10px 13px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--text-primary);
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+}
+
+.account-field-empty {
+  color: var(--text-tertiary);
+}
+
+/* Save/cancel row in edit mode */
+.account-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.account-btn-cancel {
+  padding: 10px 20px;
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.account-btn-cancel:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
 .account-form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -264,11 +333,11 @@
 }
 
 .account-btn-danger {
-  background: #EF4444;
+  background: var(--error);
 }
 
 .account-btn-danger:hover:not(:disabled) {
-  background: #DC2626;
+  background: var(--error-dark);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
@@ -371,7 +440,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #10B981;
+  background: var(--success);
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
 }
 

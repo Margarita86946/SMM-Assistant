@@ -10,6 +10,8 @@ from .posts import (
     post_detail,
     calendar_view,
     today_posts,
+    upload_post_image,
+    upload_post_video,
 )
 from .approval import (
     submit_post,
@@ -45,3 +47,12 @@ from .invitations import (
 from .email_config import email_config_view
 from .audit_logs import audit_logs_view
 from .notifications import notifications_list, mark_read, mark_all_read
+from .analyzer import (
+    analyzer_accounts,
+    analyzer_overview,
+    analyzer_posts,
+    analyzer_audience,
+    analyzer_ai,
+    analyzer_refresh,
+    analyzer_demo_toggle,
+)

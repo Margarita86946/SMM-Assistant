@@ -1,9 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { aiAPI, postsAPI, brandAPI } from '../services/api';
+import { useNavigate, useBlocker } from 'react-router-dom';
+import { aiAPI, postsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useActiveClient } from '../context/ActiveClientContext';
+import { FiCheck, FiCopy, FiRefreshCw } from 'react-icons/fi';
+import { PostPreview, CaptionCounter, HashtagsCounter } from './PostPreview';
 import '../styles/ContentGenerator.css';
+
+function UnsavedModal({ onLeave, onStay, t }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onStay(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onStay]);
+  return (
+    <div className="edit-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onStay(); }}>
+      <div className="edit-modal">
+        <div className="edit-modal-header">
+          <span className="edit-modal-icon">⚠️</span>
+          <h3>{t('edit.unsavedTitle')}</h3>
+        </div>
+        <p className="edit-modal-msg">{t('edit.unsavedMsg')}</p>
+        <div className="edit-modal-actions">
+          <button className="edit-modal-leave-btn" onClick={onLeave}>{t('edit.leave')}</button>
+          <button className="edit-modal-stay-btn" onClick={onStay}>{t('edit.stay')}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function CopyButton({ text, disabled }) {
     const [copied, setCopied] = useState(false);
@@ -19,18 +44,7 @@ function CopyButton({ text, disabled }) {
 
     return (
         <button className={`btn-copy${copied ? ' btn-copy--done' : ''}`} onClick={handleCopy} title={t('generate.copy')} disabled={disabled}>
-            {copied ? (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12"/>
-                </svg>
-            ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                </svg>
-            )}
+            {copied ? <FiCheck /> : <FiCopy />}
             {copied ? t('generate.copied') : t('generate.copy')}
         </button>
     );
@@ -44,12 +58,7 @@ function RegenButton({ onClick, loading, t }) {
             disabled={loading}
             title={t('generate.regen')}
         >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                style={loading ? { animation: 'spin 0.7s linear infinite' } : {}}>
-                <polyline points="23 4 23 10 17 10"/>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-            </svg>
+            <FiRefreshCw style={loading ? { animation: 'spin 0.7s linear infinite' } : {}} />
             {loading ? t('generate.regenLoading') : t('generate.regen')}
         </button>
     );
@@ -57,7 +66,7 @@ function RegenButton({ onClick, loading, t }) {
 
 function ContentGenerator() {
     const navigate = useNavigate();
-    const { t } = useTranslation();
+const { t } = useTranslation();
     const { activeClientId, clients } = useActiveClient();
     const role = localStorage.getItem('role');
     const isSpecialist = role === 'specialist';
@@ -76,7 +85,6 @@ function ContentGenerator() {
     const [textProvider, setTextProvider] = useState('groq');
     const [imageProvider, setImageProvider] = useState('flux');
     const [ollamaStatus, setOllamaStatus] = useState({ ollama: false, models: [] });
-    const [brandProfile, setBrandProfile] = useState(null);
     const [generatedContent, setGeneratedContent] = useState(null);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -90,15 +98,7 @@ function ContentGenerator() {
 
     useEffect(() => {
         aiAPI.getStatus().then(res => setOllamaStatus(res.data)).catch(() => {});
-        if (!isSpecialist) {
-            brandAPI.get().then(res => setBrandProfile(res.data)).catch(() => setBrandProfile(null));
-        }
     }, [isSpecialist]);
-
-    const hasBrandContext = !isSpecialist && brandProfile && (
-        brandProfile.brand_name || brandProfile.voice_tone ||
-        brandProfile.target_audience || brandProfile.keywords || brandProfile.banned_words
-    );
 
     const selectedClient = isSpecialist ? clients.find(c => String(c.id) === selectedClientId) || null : null;
 
@@ -117,9 +117,26 @@ function ContentGenerator() {
         return imgRes.data.image_url;
     };
 
+    const isDirty = !!(formData.topic || generatedContent);
+
+    const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+        isDirty && currentLocation.pathname !== nextLocation.pathname
+    );
+
+    useEffect(() => {
+        const handler = (e) => { if (isDirty) { e.preventDefault(); e.returnValue = ''; } };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [isDirty]);
+
     const handleGenerate = async () => {
         if (!formData.topic.trim()) {
             setError(t('generate.topicRequired'));
+            return;
+        }
+        const resolvedClient = activeClientId ?? (selectedClientId ? parseInt(selectedClientId, 10) : null);
+        if (isSpecialist && clients.length > 0 && !resolvedClient) {
+            setError(t('generate.clientRequired'));
             return;
         }
         setLoading(true);
@@ -158,7 +175,17 @@ function ContentGenerator() {
                 setImageUrl(url);
             } else {
                 const cp = selectedClientId ? { client_id: parseInt(selectedClientId, 10) } : {};
-                const response = await aiAPI.generateContent({ ...formData, provider: textProvider, ...cp });
+                // Use polishContent so regen is aware of the other existing fields
+                const response = await aiAPI.polishContent({
+                    topic: formData.topic,
+                    caption: generatedContent?.caption || '',
+                    hashtags: generatedContent?.hashtags || '',
+                    image_prompt: generatedContent?.image_prompt || '',
+                    platform: formData.platform,
+                    tone: formData.tone,
+                    provider: textProvider,
+                    ...cp,
+                });
                 setGeneratedContent(prev => ({ ...prev, [section]: response.data[section] }));
             }
         } catch (err) {
@@ -188,6 +215,7 @@ function ContentGenerator() {
                 client: resolvedClientId || null,
             });
             setSuccessMsg(t('generate.savedDraft'));
+            setGeneratedContent(null); setFormData({ topic: '', platform: 'instagram', tone: 'professional' });
             setTimeout(() => navigate('/posts'), 1500);
         } catch {
             setError(t('generate.failedSave'));
@@ -217,12 +245,14 @@ function ContentGenerator() {
         }
     };
 
+    const username = localStorage.getItem('username') || '';
+
     return (
-        <div className="generator-container">
+        <div className={`generator-container${generatedContent ? ' generator-container--wide' : ''}`}>
+            {blocker.state === 'blocked' && (
+                <UnsavedModal t={t} onLeave={() => blocker.proceed()} onStay={() => blocker.reset()} />
+            )}
             <div className="generator-header">
-                <button className="generator-back-btn" onClick={() => navigate('/dashboard')}>
-                    {t('generate.back')}
-                </button>
                 <div className="generator-header-text">
                     <h2>{t('generate.title')}</h2>
                     <p>{t('generate.subtitle')}</p>
@@ -232,19 +262,8 @@ function ContentGenerator() {
             {error && <div className="error-message">{error}</div>}
             {successMsg && <div className="success-message">{successMsg}</div>}
 
-            {isSpecialist ? (
-                selectedClient ? (
-                    <div className="brand-banner brand-banner--ok">
-                        <span>✓ Using brand context for <strong>{[selectedClient.first_name, selectedClient.last_name].filter(Boolean).join(' ') || selectedClient.username}</strong></span>
-                    </div>
-                ) : null
-            ) : (
-                hasBrandContext && (
-                    <div className="brand-banner brand-banner--ok">
-                        <span>✓ Using brand context: <strong>{brandProfile.brand_name || 'your brand'}</strong></span>
-                    </div>
-                )
-            )}
+            <div className={generatedContent ? 'generator-two-col' : undefined}>
+            <div className={generatedContent ? 'generator-main-col' : undefined}>
 
             <div className="generator-form-card">
                 <div className="gen-form-group">
@@ -282,10 +301,10 @@ function ContentGenerator() {
                 {isSpecialist && clients.length > 0 && (
                     <div className="gen-form-group">
                         <label>
-                            Client{' '}
+                            Assign to Client{' '}
                             {activeClientId
                                 ? <span className="label-context-set">pre-filled from filter</span>
-                                : <span className="label-optional">optional — uses brand profile</span>
+                                : <span className="label-required">*</span>
                             }
                         </label>
                         {activeClientId ? (
@@ -302,7 +321,7 @@ function ContentGenerator() {
                                 value={selectedClientId}
                                 onChange={e => setSelectedClientId(e.target.value)}
                             >
-                                <option value="">— No client (generic content) —</option>
+                                <option value="">— Select a client —</option>
                                 {clients.map(c => (
                                     <option key={c.id} value={c.id}>
                                         {[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username}
@@ -310,6 +329,12 @@ function ContentGenerator() {
                                 ))}
                             </select>
                         )}
+                    </div>
+                )}
+
+                {isSpecialist && selectedClient && (
+                    <div className="brand-banner brand-banner--ok">
+                        <span>✓ Using brand context for <strong>{[selectedClient.first_name, selectedClient.last_name].filter(Boolean).join(' ') || selectedClient.username}</strong></span>
                     </div>
                 )}
 
@@ -349,10 +374,12 @@ function ContentGenerator() {
                 <div className="generator-results-card">
                     <h3>{t('generate.results')}</h3>
 
+
                     <div className={`gen-result-block${regenLoading.caption ? ' gen-result-block--loading' : ''}`}>
                         <div className="gen-result-label-row">
                             <strong>{t('generate.caption')}</strong>
                             <div className="gen-result-actions">
+                                <CaptionCounter caption={generatedContent.caption} hashtags={generatedContent.hashtags} platform={formData.platform} />
                                 <RegenButton onClick={() => handleRegenSection('caption')} loading={regenLoading.caption} t={t} />
                                 <CopyButton text={generatedContent.caption} disabled={regenLoading.caption} />
                             </div>
@@ -364,6 +391,7 @@ function ContentGenerator() {
                         <div className="gen-result-label-row">
                             <strong>{t('generate.hashtags')}</strong>
                             <div className="gen-result-actions">
+                                <HashtagsCounter hashtags={generatedContent.hashtags} platform={formData.platform} />
                                 <RegenButton onClick={() => handleRegenSection('hashtags')} loading={regenLoading.hashtags} t={t} />
                                 <CopyButton text={generatedContent.hashtags} disabled={regenLoading.hashtags} />
                             </div>
@@ -431,6 +459,22 @@ function ContentGenerator() {
                     </div>
                 </div>
             )}
+
+            </div>
+
+            {generatedContent && (
+                <div className="generator-preview-col">
+                    <div className="preview-label">{t('create.previewTitle')}</div>
+                    <PostPreview
+                        platform={formData.platform}
+                        caption={generatedContent.caption}
+                        hashtags={generatedContent.hashtags}
+                        imageUrl={imageUrl || undefined}
+                        username={username}
+                    />
+                </div>
+            )}
+            </div>
         </div>
     );
 }

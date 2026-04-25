@@ -24,7 +24,6 @@ from ..audit import log_action, get_client_ip
 
 logger = logging.getLogger('api')
 
-
 OAUTH_STATE_TTL_MINUTES = 10
 
 
@@ -46,7 +45,7 @@ def instagram_oauth_start(request):
             )
         url = instagram_service.get_oauth_url(state=nonce)
         return Response({'oauth_url': url})
-    except instagram_service.InstagramAPIError as e:
+    except instagram_service.InstagramAPIError:
         return Response(
             {'error': 'Instagram integration is not configured'},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -79,13 +78,14 @@ def instagram_oauth_callback(request):
                 .select_related('user', 'invitation', 'invitation__specialist')
                 .get(nonce=state, platform='instagram')
             )
-            if oauth_state.expires_at < timezone.now():
-                oauth_state.delete()
-                flow = 'invitation' if oauth_state.invitation_id else 'own'
-                return fail_redirect(flow, 'error')
             invitation = oauth_state.invitation
             owning_user = oauth_state.user
+            had_invitation = oauth_state.invitation_id is not None
+            is_expired = oauth_state.expires_at < timezone.now()
             oauth_state.delete()
+            if is_expired:
+                flow = 'invitation' if had_invitation else 'own'
+                return fail_redirect(flow, 'error')
     except OAuthState.DoesNotExist:
         return fail_redirect('own', 'error')
 
@@ -104,7 +104,7 @@ def instagram_oauth_callback(request):
         short = instagram_service.exchange_code_for_token(code)
         long_lived = instagram_service.get_long_lived_token(short['access_token'])
         info = instagram_service.get_instagram_user_info(long_lived['access_token'])
-    except instagram_service.InstagramAPIError as e:
+    except instagram_service.InstagramAPIError:
         return fail_redirect(flow, 'error')
 
     account_type = (info.get('account_type') or '').upper()
@@ -146,7 +146,7 @@ def instagram_oauth_callback(request):
                 invitation.save(update_fields=[
                     'status', 'accepted_at', 'accepted_ip', 'social_account'
                 ])
-        except Exception as e:
+        except Exception:
             return fail_redirect(flow, 'error')
 
         decrypted_email = invitation.decrypted_client_email
@@ -193,7 +193,7 @@ def instagram_oauth_callback(request):
                 'client_email': '',
             },
         )
-    except Exception as e:
+    except Exception:
         return fail_redirect(flow, 'error')
 
     log_action(
@@ -242,16 +242,21 @@ def instagram_disconnect(request, pk):
 def instagram_status(request):
     from django.db.models import Q as DQ
     if request.user.role == 'specialist':
-        # Own accounts + accounts belonging to any of this specialist's clients
         accounts = SocialAccount.objects.filter(
             DQ(user=request.user) |
             DQ(user__specialist=request.user, user__role='client'),
             platform='instagram',
             is_active=True,
-        ).select_related('user').order_by('connected_at')
+        ).select_related('user').only(
+            'id', 'account_username', 'account_type', 'user_id', 'token_expires_at',
+            'connected_at', 'is_client_account', 'user__id', 'user__username',
+        ).order_by('connected_at')
     else:
         accounts = SocialAccount.objects.filter(
             user=request.user, platform='instagram', is_active=True,
+        ).only(
+            'id', 'account_username', 'account_type', 'user_id', 'token_expires_at',
+            'connected_at', 'is_client_account',
         ).order_by('connected_at')
 
     return Response({
@@ -272,10 +277,9 @@ def instagram_status(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def publish_post_now(request, pk):
-    # Phase 1: validate and lock the post row — short transaction, no external I/O
     with transaction.atomic():
         try:
-            post = Post.objects.select_for_update().get(pk=pk, user=request.user)
+            post = Post.objects.select_related('client').select_for_update().get(pk=pk, user=request.user)
         except Post.DoesNotExist:
             return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -289,34 +293,42 @@ def publish_post_now(request, pk):
                 {'error': 'Only Instagram posts can be published right now'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if not post.image_url:
-            return Response({'error': 'Post has no image to publish'}, status=status.HTTP_400_BAD_REQUEST)
-        if post.image_url.startswith('data:'):
+        is_video = post.media_type == 'video'
+        media_url = post.video_url if is_video else post.image_url
+
+        if not media_url:
+            return Response({'error': 'Post has no media to publish'}, status=status.HTTP_400_BAD_REQUEST)
+        if media_url.startswith('data:'):
             return Response(
-                {'error': 'Embedded image data is not reachable by Instagram. Regenerate the image and try again.'},
+                {'error': 'Embedded media data is not reachable by Instagram. Re-upload the file and try again.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if post.image_url.startswith(('http://localhost', 'http://127.0.0.1', 'https://localhost', 'https://127.0.0.1')):
+        if media_url.startswith(('http://localhost', 'http://127.0.0.1', 'https://localhost', 'https://127.0.0.1')):
             return Response(
                 {'error': (
-                    'Image URL points to localhost, which Instagram cannot reach. '
+                    'Media URL points to localhost, which Instagram cannot reach. '
                     'Set BACKEND_PUBLIC_URL in backend/.env to a public HTTPS URL '
-                    '(e.g. an ngrok tunnel), restart the server, regenerate the image, and try again.'
+                    '(e.g. an ngrok tunnel), restart the server, re-upload the file, and try again.'
                 )},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if not post.image_url.startswith(('http://', 'https://')):
+        if not media_url.startswith(('http://', 'https://')):
             return Response(
-                {'error': 'Image URL must be a public http(s) URL reachable by Instagram.'},
+                {'error': 'Media URL must be a public http(s) URL reachable by Instagram.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        ig_owner = post.client if post.client_id else request.user
         try:
             account = SocialAccount.objects.get(
-                user=request.user, platform='instagram',
-                is_client_account=False, is_active=True,
+                user=ig_owner, platform='instagram', is_active=True,
             )
         except SocialAccount.DoesNotExist:
+            if ig_owner != request.user:
+                return Response(
+                    {'error': 'No active Instagram account connected for this client'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             return Response(
                 {'error': 'No active Instagram account connected'},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -326,32 +338,37 @@ def publish_post_now(request, pk):
             account.token_expires_at and account.token_expires_at <= timezone.now()
         ):
             return Response(
-                {'error': 'Your Instagram token has expired. Please reconnect in Account settings.'},
+                {'error': 'Instagram token has expired. Please reconnect the account in Account settings.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Snapshot values needed outside the transaction before releasing the lock
         caption_text = post.caption or ''
         if post.hashtags:
             caption_text = f'{caption_text}\n\n{post.hashtags}'.strip()
 
         try:
             plaintext_token = account.decrypted_token
-        except DecryptionError as e:
+        except DecryptionError:
             return Response({'error': 'Publishing to Instagram failed. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
 
         if not plaintext_token:
             return Response({'error': 'Publishing to Instagram failed. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
 
-    # Phase 2: call Instagram API outside any transaction — avoids holding a DB lock
-    # during slow external I/O (typically 1-30 seconds).
     try:
-        instagram_post_id = instagram_service.publish_image_post(
-            plaintext_token,
-            account.instagram_user_id,
-            post.image_url,
-            caption_text,
-        )
+        if is_video:
+            instagram_post_id = instagram_service.publish_reel(
+                plaintext_token,
+                account.instagram_user_id,
+                post.video_url,
+                caption_text,
+            )
+        else:
+            instagram_post_id = instagram_service.publish_image_post(
+                plaintext_token,
+                account.instagram_user_id,
+                post.image_url,
+                caption_text,
+            )
     except (instagram_service.InstagramAPIError, DecryptionError) as e:
         logger.exception('publish_post_now failed for post=%s: %s', post.pk, e)
         log_action(
@@ -368,15 +385,12 @@ def publish_post_now(request, pk):
     finally:
         plaintext_token = None
 
-    # Phase 3: mark the post as published — short transaction again
     with transaction.atomic():
-        # Re-fetch with lock: another concurrent request may have published between phases
         try:
             post = Post.objects.select_for_update().get(pk=pk, user=request.user)
         except Post.DoesNotExist:
             return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
         if post.status == 'posted':
-            # Already marked by a concurrent request — idempotent, treat as success
             return Response({
                 'message': 'Post published to Instagram',
                 'instagram_post_id': post.instagram_post_id,

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { invitationsAPI, emailConfigAPI, profileAPI, clientsAPI } from '../services/api';
+import { invitationsAPI, clientsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useActiveClient } from '../context/ActiveClientContext';
+import { FiUsers, FiUser, FiSend, FiMail, FiInstagram, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import '../styles/Clients.css';
 
 function StatusBadge({ status, t }) {
@@ -12,6 +13,64 @@ function StatusBadge({ status, t }) {
     expired: t('clients.statusExpired'),
   };
   return <span className={`inv-badge inv-badge--${status}`}>{labels[status] || status}</span>;
+}
+
+function ClientRow({ client, removing, onRemove, fmt, t }) {
+  const [expanded, setExpanded] = useState(false);
+  const accounts = client.instagram_accounts || [];
+  const name = [client.first_name, client.last_name].filter(Boolean).join(' ') || client.username;
+
+  return (
+    <div className="client-row">
+      <div className="client-row-main">
+        <div className="client-row-avatar">{name.charAt(0).toUpperCase()}</div>
+        <div className="client-row-info">
+          <span className="client-row-name">{name}</span>
+          <span className="client-row-meta">@{client.username} · {client.email}</span>
+        </div>
+        <span className="client-row-joined">{fmt(client.date_joined)}</span>
+        <div className="client-row-actions">
+          {accounts.length > 0 && (
+            <button
+              className="client-ig-toggle"
+              onClick={() => setExpanded(e => !e)}
+              title="Instagram accounts"
+            >
+              <FiInstagram />
+              <span>{accounts.length}</span>
+              {expanded ? <FiChevronUp size={13} /> : <FiChevronDown size={13} />}
+            </button>
+          )}
+          {accounts.length === 0 && (
+            <span className="client-no-ig">No Instagram connected</span>
+          )}
+          <button
+            className="inv-revoke-btn"
+            onClick={() => onRemove(client.id, client.username)}
+            disabled={removing === client.id}
+          >
+            {removing === client.id ? t('clients.removing') : t('clients.remove')}
+          </button>
+        </div>
+      </div>
+
+      {expanded && accounts.length > 0 && (
+        <div className="client-ig-accounts">
+          {accounts.map(a => (
+            <div key={a.id} className="client-ig-account">
+              <FiInstagram className="client-ig-icon" />
+              <span className="client-ig-username">@{a.username}</span>
+              <span className="client-ig-type">{a.account_type}</span>
+              <span className="client-ig-connected">Connected {fmt(a.connected_at)}</span>
+              {a.token_expires_at && new Date(a.token_expires_at) < new Date() && (
+                <span className="client-ig-expired">Token expired</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Clients() {
@@ -32,16 +91,6 @@ function Clients() {
   const [revoking, setRevoking] = useState(null);
   const [removing, setRemoving] = useState(null);
 
-  const [emailCfg, setEmailCfg] = useState(null);
-  const [cfgLoading, setCfgLoading] = useState(true);
-  const [cfgOpen, setCfgOpen] = useState(false);
-  const [appPassword, setAppPassword] = useState('');
-  const [cfgSaving, setCfgSaving] = useState(false);
-  const [cfgMsg, setCfgMsg] = useState('');
-  const [cfgError, setCfgError] = useState('');
-  const [cfgRemoving, setCfgRemoving] = useState(false);
-
-  const [specialistEmail, setSpecialistEmail] = useState('');
 
   const loadClients = async () => {
     try {
@@ -65,64 +114,10 @@ function Clients() {
     }
   };
 
-  const loadEmailCfg = async () => {
-    try {
-      const res = await emailConfigAPI.get();
-      setEmailCfg(res.data.configured ? res.data : null);
-    } catch {
-      setEmailCfg(null);
-    } finally {
-      setCfgLoading(false);
-    }
-  };
-
   useEffect(() => {
     loadClients();
     loadInvitations();
-    loadEmailCfg();
-    profileAPI.get().then(res => setSpecialistEmail(res.data.email || '')).catch(() => {});
-  }, []);
-
-  const handleSaveEmailCfg = async () => {
-    if (!emailCfg && !appPassword.trim()) {
-      setCfgError(t('clients.emailSaveError'));
-      return;
-    }
-    setCfgSaving(true);
-    setCfgMsg('');
-    setCfgError('');
-    try {
-      const payload = appPassword.trim() ? { app_password: appPassword.trim() } : {};
-      const res = await emailConfigAPI.save(payload);
-      setEmailCfg(res.data);
-      if (res.data.warning) {
-        setCfgMsg(res.data.warning);
-      } else {
-        setCfgMsg(t('clients.emailSaved'));
-      }
-      setAppPassword('');
-      setCfgOpen(false);
-    } catch (err) {
-      setCfgError(err.message || t('clients.emailSaveError'));
-    } finally {
-      setCfgSaving(false);
-    }
-  };
-
-  const handleRemoveEmailCfg = async () => {
-    if (!window.confirm(t('clients.revoke') + '?')) return;
-    setCfgRemoving(true);
-    setCfgMsg('');
-    setCfgError('');
-    try {
-      await emailConfigAPI.remove();
-      setEmailCfg(null);
-    } catch (err) {
-      setCfgError(err.message || t('clients.emailRemoveError'));
-    } finally {
-      setCfgRemoving(false);
-    }
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSendInvitation = async () => {
     if (!emailInput.trim() || !emailInput.includes('@')) {
@@ -190,13 +185,7 @@ function Clients() {
       {/* Connected Clients */}
       <div className="clients-card">
         <div className="clients-card-title">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
+          <FiUsers />
           {t('clients.connectedTitle')}
           {clients.length > 0 && (
             <span className="inv-chip-accepted">{clients.length}</span>
@@ -207,160 +196,21 @@ function Clients() {
           <p className="clients-muted">{t('clients.loading')}</p>
         ) : clients.length === 0 ? (
           <div className="inv-empty">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-            </svg>
+            <FiUser />
             <p>{t('clients.noClients')}</p>
           </div>
         ) : (
-          <div className="inv-table-wrap">
-            <table className="inv-table">
-              <thead>
-                <tr>
-                  <th>{t('clients.colName')}</th>
-                  <th>{t('clients.colUsername')}</th>
-                  <th>{t('clients.colEmail')}</th>
-                  <th>{t('clients.colJoined')}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {clients.map(c => (
-                  <tr key={c.id}>
-                    <td>{[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}</td>
-                    <td className="inv-td-email">@{c.username}</td>
-                    <td className="inv-td-email">{c.email}</td>
-                    <td className="inv-td-date">{fmt(c.date_joined)}</td>
-                    <td className="inv-td-action">
-                      <button
-                        className="inv-revoke-btn"
-                        onClick={() => handleRemoveClient(c.id, c.username)}
-                        disabled={removing === c.id}
-                      >
-                        {removing === c.id ? t('clients.removing') : t('clients.remove')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Email Configuration */}
-      <div className="clients-card">
-        <div className="clients-card-title">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-            <polyline points="22,6 12,13 2,6"/>
-          </svg>
-          {t('clients.emailSetup')}
-        </div>
-
-        {cfgLoading ? (
-          <p className="clients-muted">{t('clients.loading')}</p>
-        ) : emailCfg ? (
-          <div className="cfg-status-row">
-            <div className="cfg-status-ok">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              {t('clients.sentFrom')} <strong>{emailCfg.from_email}</strong>
-              {emailCfg.is_verified
-                ? <span className="cfg-verified-badge">{t('clients.verified')}</span>
-                : <span className="cfg-unverified-badge">{t('clients.unverified')}</span>}
-            </div>
-            <div className="cfg-status-actions">
-              <button className="cfg-btn-edit" onClick={() => {
-                setAppPassword('');
-                setCfgMsg('');
-                setCfgError('');
-                setCfgOpen(true);
-              }}>{t('clients.updatePassword')}</button>
-              <button className="cfg-btn-remove" onClick={handleRemoveEmailCfg} disabled={cfgRemoving}>
-                {cfgRemoving ? t('clients.revoking') : t('clients.remove')}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="cfg-warn-banner">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            {t('clients.emailBanner')}
-            <button className="cfg-btn-setup" onClick={() => {
-              setAppPassword('');
-              setCfgMsg('');
-              setCfgError('');
-              setCfgOpen(true);
-            }}>
-              {t('clients.setupNow')}
-            </button>
-          </div>
-        )}
-
-        {cfgMsg && (
-          <div className={cfgMsg.toLowerCase().includes('not') || cfgMsg.toLowerCase().includes('warn') || cfgMsg.toLowerCase().includes('fail')
-            ? 'clients-msg-warn' : 'clients-msg-ok'} style={{ marginTop: 12 }}>
-            {cfgMsg}
-          </div>
-        )}
-        {cfgError && <div className="clients-msg-err" style={{ marginTop: 12 }}>{cfgError}</div>}
-
-        {cfgOpen && (
-          <div className="cfg-form">
-            <div className="cfg-sender-row">
-              <span className="cfg-sender-label">Sending from</span>
-              <span className="cfg-sender-email">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                  <polyline points="22,6 12,13 2,6"/>
-                </svg>
-                {emailCfg?.from_email || specialistEmail || 'your registered email'}
-              </span>
-            </div>
-
-            <div className="cfg-form-group">
-              <label>
-                Gmail App Password
-                {emailCfg && <span className="cfg-pw-hint"> — leave blank to keep existing</span>}
-              </label>
-              <input
-                type="password"
-                value={appPassword}
-                onChange={e => { setAppPassword(e.target.value); setCfgError(''); }}
-                placeholder={emailCfg ? '••••••••••••' : 'xxxx xxxx xxxx xxxx'}
-                autoComplete="new-password"
+          <div className="client-rows">
+            {clients.map(c => (
+              <ClientRow
+                key={c.id}
+                client={c}
+                removing={removing}
+                onRemove={handleRemoveClient}
+                fmt={fmt}
+                t={t}
               />
-            </div>
-
-            <div className="cfg-hint-box">
-              <div className="cfg-hint-title">How to get a Gmail App Password</div>
-              <ol className="cfg-hint-steps">
-                <li>Go to your <strong>Google Account</strong> → <strong>Security</strong></li>
-                <li>Under "How you sign in to Google", enable <strong>2-Step Verification</strong> (required)</li>
-                <li>Search for <strong>"App passwords"</strong> in your Google Account settings</li>
-                <li>Select app: <strong>Mail</strong> → click <strong>Generate</strong></li>
-                <li>Copy the 16-character password and paste it above</li>
-              </ol>
-              <p className="cfg-hint-note">This is different from your regular Gmail password and only gives access to sending email.</p>
-            </div>
-
-            <div className="cfg-form-actions">
-              <button className="cfg-btn-save" onClick={handleSaveEmailCfg} disabled={cfgSaving}>
-                {cfgSaving ? t('clients.sending') : t('common.save')}
-              </button>
-              <button className="cfg-btn-cancel" onClick={() => setCfgOpen(false)}>{t('common.cancel')}</button>
-            </div>
+            ))}
           </div>
         )}
       </div>
@@ -368,11 +218,7 @@ function Clients() {
       {/* Send Invitation */}
       <div className="clients-card">
         <div className="clients-card-title">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
+          <FiSend />
           {t('clients.inviteTitle')}
         </div>
 
@@ -398,11 +244,7 @@ function Clients() {
       {(invitations.filter(i => i.status === 'pending').length > 0 || invLoading) && (
         <div className="clients-card">
           <div className="clients-card-title">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-              <polyline points="22,6 12,13 2,6"/>
-            </svg>
+            <FiMail />
             {t('clients.pendingTitle')}
             {pendingCount > 0 && <span className="inv-chip-pending">{pendingCount}</span>}
           </div>

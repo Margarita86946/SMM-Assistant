@@ -54,8 +54,6 @@ def register(request):
                 {'error': 'This invitation link is invalid or has expired.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        # Force the email to match the invitation so the client can't
-        # register with a different address than what was invited.
         expected_email = invitation.decrypted_client_email
         submitted_email = (request.data.get('email') or '').strip().lower()
         if submitted_email != expected_email:
@@ -64,19 +62,15 @@ def register(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-    # Build mutable copy so we can force role without trusting the client.
     data = request.data.copy()
     if invitation:
         data['role'] = 'client'
     else:
-        # Only 'owner' and 'specialist' are valid self-registration roles.
         requested_role = (request.data.get('role') or '').strip().lower()
         data['role'] = requested_role if requested_role in ('owner', 'specialist') else 'owner'
 
     from django.db import transaction as _tx
 
-    # If this is an invitation and a deactivated account already exists for this
-    # email, reactivate it instead of creating a duplicate.
     existing_user = None
     if invitation:
         expected_email = invitation.decrypted_client_email
@@ -84,7 +78,6 @@ def register(request):
 
     with _tx.atomic():
         if existing_user:
-            # Reactivate: require all the same fields as fresh registration
             new_username = (data.get('username') or '').strip()
             new_password = (data.get('password') or '').strip()
 
@@ -93,7 +86,6 @@ def register(request):
             if not new_password:
                 return Response({'error': 'Password is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Username must match the existing account — prevents someone else hijacking via invite
             if new_username != existing_user.username:
                 return Response(
                     {'error': 'Username does not match the account associated with this invitation.'},
@@ -124,6 +116,9 @@ def register(request):
                 user.specialist = invitation.specialist
             user.save(update_fields=['role', 'specialist_id'])
 
+        user.last_login = timezone.now()
+        user.save(update_fields=['last_login'])
+
         token, _ = Token.objects.get_or_create(user=user)
         expires_at = timezone.now() + timedelta(days=settings.TOKEN_EXPIRY_DAYS)
         TokenExpiry.objects.update_or_create(
@@ -132,8 +127,6 @@ def register(request):
         )
 
         if invitation:
-            # Clear any previous invitation's client FK for this user so the
-            # OneToOneField constraint doesn't conflict when we link the new one.
             from ..models import ClientInvitation as _CI
             _CI.objects.filter(client=user).exclude(pk=invitation.pk).update(client=None)
 

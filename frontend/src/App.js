@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, Navigate, useLocation } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -11,6 +11,7 @@ import ContentGenerator from './components/ContentGenerator';
 import Account from './components/Account';
 import ClientDashboard from './components/ClientDashboard';
 import Clients from './components/Clients';
+import Analyzer from './components/Analyzer';
 import AcceptInvitation from './components/AcceptInvitation';
 import Sidebar from './components/Sidebar';
 import { NotificationBell, NotificationToast } from './components/NotificationBell';
@@ -44,6 +45,8 @@ function AppLayout({ children }) {
   );
 }
 
+const VALID_ROLES = new Set(['owner', 'specialist', 'client']);
+
 function homeForRole(role) {
   if (role === 'client') return '/client';
   return '/dashboard';
@@ -56,10 +59,29 @@ function PublicRoute({ children }) {
   return children;
 }
 
+// Routes each role is allowed to access (prefix match)
+const ROLE_ALLOWED_PATHS = {
+  owner:      ['/dashboard', '/posts', '/create', '/edit', '/calendar', '/generate', '/account'],
+  specialist: ['/dashboard', '/posts', '/create', '/edit', '/calendar', '/generate', '/account', '/clients', '/analyzer'],
+  client:     ['/client', '/account'],
+};
+
 function ProtectedRoute({ children }) {
   const location = useLocation();
+  const [role, setRole] = useState(() => localStorage.getItem('role'));
+
+  // Re-read role whenever localStorage is updated (e.g. after server sync in NotificationsContext)
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === 'role') setRole(localStorage.getItem('role'));
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/login" replace />;
+
   const expiresAt = localStorage.getItem('token_expires_at');
   if (expiresAt && new Date(expiresAt) < new Date()) {
     localStorage.removeItem('token');
@@ -70,21 +92,18 @@ function ProtectedRoute({ children }) {
     localStorage.removeItem('notifications_sound');
     return <Navigate to="/login" replace />;
   }
-  const role = localStorage.getItem('role');
-  const path = location.pathname;
 
-  // client can only access /client and /account
-  const CLIENT_ALLOWED = ['/client', '/account'];
-  if (role === 'client' && !CLIENT_ALLOWED.some(p => path.startsWith(p))) {
-    return <Navigate to="/client" replace />;
+  // Reject any unknown/tampered role value
+  if (!role || !VALID_ROLES.has(role)) {
+    return <Navigate to="/login" replace />;
   }
-  // owner cannot access /clients (specialist-only)
-  if (role === 'owner' && path.startsWith('/clients')) {
-    return <Navigate to="/dashboard" replace />;
-  }
-  // specialist and owner cannot access /client (client-only)
-  if (role !== 'client' && path === '/client') {
-    return <Navigate to="/dashboard" replace />;
+
+  const path = location.pathname;
+  const allowed = ROLE_ALLOWED_PATHS[role] ?? [];
+  const isAllowed = allowed.some(p => path === p || path.startsWith(p + '/'));
+
+  if (!isAllowed) {
+    return <Navigate to={homeForRole(role)} replace />;
   }
 
   return <AppLayout>{children}</AppLayout>;
@@ -117,6 +136,7 @@ const router = createBrowserRouter([
       { path: '/generate', element: <ProtectedRoute><ContentGenerator /></ProtectedRoute> },
       { path: '/account', element: <ProtectedRoute><Account /></ProtectedRoute> },
       { path: '/clients', element: <ProtectedRoute><Clients /></ProtectedRoute> },
+      { path: '/analyzer', element: <ProtectedRoute><Analyzer /></ProtectedRoute> },
       { path: '/accept-invitation/:token', element: <AcceptInvitation /> },
       { path: '/accept-invitation', element: <AcceptInvitation /> },
       { path: '*', element: <NotFound /> },

@@ -4,12 +4,14 @@ import { postsAPI, approvalAPI, instagramAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import { useActiveClient } from '../context/ActiveClientContext';
+import { FiUser, FiSearch, FiAlertCircle, FiClock, FiCheck, FiTrash2, FiCalendar, FiX } from 'react-icons/fi';
+import { FaInstagram, FaLinkedin, FaTwitter } from 'react-icons/fa';
 import '../styles/PostsList.css';
 
 const PLATFORM_LABELS = {
-  instagram: '📷 Instagram',
-  linkedin:  '💼 LinkedIn',
-  twitter:   '🐦 Twitter',
+  instagram: { icon: <FaInstagram />, text: 'Instagram' },
+  linkedin:  { icon: <FaLinkedin />,  text: 'LinkedIn' },
+  twitter:   { icon: <FaTwitter />,   text: 'Twitter' },
 };
 
 const STATUS_META = {
@@ -41,6 +43,11 @@ function PostsList() {
   const [publishingId, setPublishingId] = useState(null);
   const [publishMsg, setPublishMsg] = useState('');
   const [publishError, setPublishError] = useState('');
+  const [selected, setSelected] = useState(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkScheduleDate, setBulkScheduleDate] = useState('');
+  const [bulkScheduleTime, setBulkScheduleTime] = useState('09:00');
+  const [showBulkSchedule, setShowBulkSchedule] = useState(false);
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { language } = useSettings();
@@ -134,6 +141,56 @@ function PostsList() {
     }
   };
 
+  const toggleSelect = (id) => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const toggleSelectAll = () => {
+    const selectableIds = posts
+      .filter(p => !['pending_approval', 'posted'].includes(p.status))
+      .map(p => p.id);
+    const allSelected = selectableIds.every(id => selected.has(id));
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(selectableIds));
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Delete ${selected.size} post(s)?`)) return;
+    setBulkLoading(true);
+    try {
+      await Promise.all([...selected].map(id => postsAPI.delete(id)));
+      setSelected(new Set());
+      reload();
+    } catch {
+      setDeleteError('Failed to delete some posts.');
+      setTimeout(() => setDeleteError(''), 4000);
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkSchedule = async () => {
+    if (!bulkScheduleDate || !bulkScheduleTime) return;
+    const [yr, mo, dy] = bulkScheduleDate.split('-').map(Number);
+    const [hr, mn] = bulkScheduleTime.split(':').map(Number);
+    const iso = new Date(yr, mo - 1, dy, hr, mn, 0).toISOString();
+    setBulkLoading(true);
+    try {
+      await Promise.all([...selected].map(id => postsAPI.update(id, { scheduled_time: iso, status: 'scheduled' })));
+      setSelected(new Set());
+      setShowBulkSchedule(false);
+      setBulkScheduleDate('');
+      reload();
+    } catch {
+      setDeleteError('Failed to schedule some posts.');
+      setTimeout(() => setDeleteError(''), 4000);
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   const formatDate = (ds) => {
     if (!ds) return t('posts.notScheduled');
     return new Date(ds).toLocaleDateString(locale, {
@@ -163,17 +220,14 @@ function PostsList() {
           {totalAllCount > 0 && <span className="posts-count-badge">{totalAllCount}</span>}
         </h1>
         <div className="header-actions">
+          <button onClick={() => navigate('/create')} className="btn-create btn-create--outline">{t('posts.createManual')}</button>
           <button onClick={() => navigate('/generate')} className="btn-create">{t('posts.createNew')}</button>
         </div>
       </div>
 
       {activeClient && (
         <div className="posts-client-banner">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-          </svg>
+          <FiUser />
           {t('posts.filteredByClient', { name: [activeClient.first_name, activeClient.last_name].filter(Boolean).join(' ') || activeClient.username })}
         </div>
       )}
@@ -185,11 +239,17 @@ function PostsList() {
       {publishMsg && <div className="success-message">{publishMsg}</div>}
 
       <div className="posts-filter-bar">
+        <label className="posts-select-all">
+          <input
+            type="checkbox"
+            checked={posts.filter(p => !['pending_approval','posted'].includes(p.status)).length > 0 &&
+              posts.filter(p => !['pending_approval','posted'].includes(p.status)).every(p => selected.has(p.id))}
+            onChange={toggleSelectAll}
+          />
+          <span>Select all</span>
+        </label>
         <div className="posts-search-wrap">
-          <svg className="posts-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
+          <FiSearch className="posts-search-icon" />
           <input type="text" className="posts-search-input"
             placeholder={t('posts.searchPlaceholder')} value={search}
             onChange={e => setSearch(e.target.value)} />
@@ -219,6 +279,42 @@ function PostsList() {
         )}
       </div>
 
+      {selected.size > 0 && (
+        <div className="bulk-bar">
+          <span className="bulk-bar-count">{selected.size} selected</span>
+          <div className="bulk-bar-actions">
+            {showBulkSchedule ? (
+              <>
+                <input type="date" className="bulk-date-input" value={bulkScheduleDate}
+                  min={new Date().toISOString().slice(0,10)}
+                  onChange={e => setBulkScheduleDate(e.target.value)} />
+                <input type="time" className="bulk-date-input" value={bulkScheduleTime}
+                  onChange={e => setBulkScheduleTime(e.target.value)} />
+                <button className="bulk-btn bulk-btn--primary" onClick={handleBulkSchedule}
+                  disabled={bulkLoading || !bulkScheduleDate}>
+                  <FiCheck /> Confirm
+                </button>
+                <button className="bulk-btn" onClick={() => setShowBulkSchedule(false)}>
+                  <FiX /> Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="bulk-btn" onClick={() => setShowBulkSchedule(true)} disabled={bulkLoading}>
+                  <FiCalendar /> Schedule
+                </button>
+                <button className="bulk-btn bulk-btn--danger" onClick={handleBulkDelete} disabled={bulkLoading}>
+                  <FiTrash2 /> Delete
+                </button>
+              </>
+            )}
+          </div>
+          <button className="bulk-bar-close" onClick={() => { setSelected(new Set()); setShowBulkSchedule(false); }}>
+            <FiX />
+          </button>
+        </div>
+      )}
+
       {hasActiveFilter && totalCount > 0 && (
         <p className="posts-result-count">
           {t('posts.resultCount', { filtered: totalCount, total: totalAllCount })}
@@ -242,22 +338,31 @@ function PostsList() {
               const meta = STATUS_META[post.status] || { text: post.status, cls: 'badge-draft' };
               const isApproved = post.status === 'approved' || post.status === 'ready_to_post';
               const isRejectedDraft = post.status === 'draft' && post.approval_note;
+              const isSelectable = !['pending_approval', 'posted'].includes(post.status);
+              const isSelected = selected.has(post.id);
 
               return (
-                <div key={post.id} className={`post-item${isRejectedDraft ? ' post-item--rejected' : ''}`}>
+                <div key={post.id} className={`post-item${isRejectedDraft ? ' post-item--rejected' : ''}${isSelected ? ' post-item--selected' : ''}`}>
 
                   <div className="post-item-header">
-                    <div className="post-platform">{PLATFORM_LABELS[post.platform] || post.platform}</div>
-                    <span className={`status-badge ${meta.cls}`}>{meta.text}</span>
+                    <div className={`post-platform${post.platform ? ` post-platform--${post.platform}` : ''}`}>
+                      {PLATFORM_LABELS[post.platform]
+                        ? <><span className="post-platform-icon">{PLATFORM_LABELS[post.platform].icon}</span><span className="post-platform-text">{PLATFORM_LABELS[post.platform].text}</span></>
+                        : post.platform}
+                    </div>
+                    <div className="post-item-header-right">
+                      <span className={`status-badge ${meta.cls}`}>{meta.text}</span>
+                      {isSelectable && (
+                        <label className="post-checkbox" onClick={e => e.stopPropagation()}>
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(post.id)} />
+                        </label>
+                      )}
+                    </div>
                   </div>
 
                   {!activeClientId && post.client_username && (
                     <div className="post-client-tag">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                        <circle cx="12" cy="7" r="4"/>
-                      </svg>
+                      <FiUser />
                       {post.client_first_name || post.client_last_name
                         ? [post.client_first_name, post.client_last_name].filter(Boolean).join(' ')
                         : post.client_username}
@@ -267,12 +372,7 @@ function PostsList() {
                   {/* Rejection note callout — shown on draft posts that were previously rejected */}
                   {isRejectedDraft && (
                     <div className="post-rejection-callout">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="12" y1="8" x2="12" y2="12"/>
-                        <line x1="12" y1="16" x2="12.01" y2="16"/>
-                      </svg>
+                      <FiAlertCircle />
                       <div>
                         <strong>{t('approval.clientRejected')}</strong>
                         {post.approval_note && <p>{post.approval_note}</p>}
@@ -283,11 +383,7 @@ function PostsList() {
                   {/* Awaiting approval callout */}
                   {post.status === 'pending_approval' && (
                     <div className="post-pending-callout">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polyline points="12 6 12 12 16 14"/>
-                      </svg>
+                      <FiClock />
                       {t('approval.waitingReview')}
                     </div>
                   )}
@@ -295,10 +391,7 @@ function PostsList() {
                   {/* Approved callout */}
                   {isApproved && (
                     <div className="post-approved-callout">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
+                      <FiCheck />
                       {t('approval.clientApproved')}
                     </div>
                   )}
@@ -342,12 +435,7 @@ function PostsList() {
                           <><span className="btn-publish-ig-spinner" /> {t('instagram.publishing')}</>
                         ) : (
                           <>
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-                              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-                              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-                            </svg>
+                            <FaInstagram />
                             {t('instagram.publishBtn')}
                           </>
                         )}

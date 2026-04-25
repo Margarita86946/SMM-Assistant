@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { profileAPI, brandAPI, instagramAPI } from '../services/api';
+import { profileAPI, brandAPI, instagramAPI, emailConfigAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
+import {
+  FiCamera, FiEdit2, FiLock, FiLink, FiInstagram, FiMail,
+  FiCheck, FiAlertCircle, FiCheckSquare, FiTag, FiEye, FiEyeOff,
+} from 'react-icons/fi';
 import '../styles/Account.css';
 import '../styles/Auth.css';
+import '../styles/Clients.css';
 
 const AVATAR_GRADIENTS = [
   ['#6366F1', '#8B5CF6'],
@@ -44,9 +49,20 @@ function Account() {
   const [autoApproveSaving, setAutoApproveSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState('');
+  const [editingProfile, setEditingProfile] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
   const [profileError, setProfileError] = useState('');
+
+  // Email config state (specialist only)
+  const [emailCfg, setEmailCfg] = useState(null);
+  const [cfgLoading, setCfgLoading] = useState(false);
+  const [cfgOpen, setCfgOpen] = useState(false);
+  const [appPassword, setAppPassword] = useState('');
+  const [cfgSaving, setCfgSaving] = useState(false);
+  const [cfgMsg, setCfgMsg] = useState('');
+  const [cfgError, setCfgError] = useState('');
+  const [cfgRemoving, setCfgRemoving] = useState(false);
 
   const [pwData, setPwData] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [pwSaving, setPwSaving] = useState(false);
@@ -154,6 +170,14 @@ function Account() {
         banned_words: res.data.banned_words || '',
       });
     }).catch(() => setBrandError(t('account.failedSave')));
+
+    if (localStorage.getItem('role') === 'specialist') {
+      setCfgLoading(true);
+      emailConfigAPI.get()
+        .then(res => setEmailCfg(res.data.configured ? res.data : null))
+        .catch(() => setEmailCfg(null))
+        .finally(() => setCfgLoading(false));
+    }
   }, [t]);
 
   const handleBrandSave = async () => {
@@ -184,6 +208,27 @@ function Account() {
     } finally {
       setAutoApproveSaving(false);
     }
+  };
+
+  const handleSaveEmailCfg = async () => {
+    if (!emailCfg && !appPassword.trim()) { setCfgError(t('clients.emailSaveError')); return; }
+    setCfgSaving(true); setCfgMsg(''); setCfgError('');
+    try {
+      const payload = appPassword.trim() ? { app_password: appPassword.trim() } : {};
+      const res = await emailConfigAPI.save(payload);
+      setEmailCfg(res.data);
+      setCfgMsg(res.data.warning || t('clients.emailSaved'));
+      setAppPassword(''); setCfgOpen(false);
+    } catch (err) { setCfgError(err.message || t('clients.emailSaveError')); }
+    finally { setCfgSaving(false); }
+  };
+
+  const handleRemoveEmailCfg = async () => {
+    if (!window.confirm(t('clients.revoke') + '?')) return;
+    setCfgRemoving(true); setCfgMsg(''); setCfgError('');
+    try { await emailConfigAPI.remove(); setEmailCfg(null); }
+    catch (err) { setCfgError(err.message || t('clients.emailRemoveError')); }
+    finally { setCfgRemoving(false); }
   };
 
   const handleAvatarClick = () => {
@@ -236,6 +281,7 @@ function Account() {
       const res = await profileAPI.update(formData);
       setProfile(res.data);
       setProfileMsg(t('account.savedMsg'));
+      setEditingProfile(false);
       setTimeout(() => setProfileMsg(''), 3000);
     } catch (err) {
       const code = err.message;
@@ -299,15 +345,11 @@ function Account() {
               {avatarUploading ? (
                 <div className="account-avatar-spinner" />
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                  <circle cx="12" cy="13" r="4"/>
-                </svg>
+                <FiCamera />
               )}
             </div>
             <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp"
-              className="account-avatar-input" onChange={handleAvatarChange} />
+className="account-avatar-input" onChange={handleAvatarChange} />
           </div>
           {avatarError && <p className="account-avatar-error">{avatarError}</p>}
         </div>
@@ -335,12 +377,14 @@ function Account() {
       {/* Edit Profile */}
       <div className="account-card">
         <div className="account-card-title">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
+          <FiEdit2 />
           {t('account.editProfile')}
+          {!editingProfile && (
+            <button className="account-edit-btn" onClick={() => setEditingProfile(true)}>
+              <FiEdit2 />
+              {t('common.edit')}
+            </button>
+          )}
         </div>
 
         {profileError && <div className="error-message">{profileError}</div>}
@@ -349,31 +393,47 @@ function Account() {
         <div className="account-form-row">
           <div className="account-form-group">
             <label>{t('auth.firstName')}</label>
-            <input type="text" value={formData.first_name} onChange={e => setFormData({ ...formData, first_name: e.target.value })} placeholder={t('auth.firstNamePlaceholder')} />
+            {editingProfile
+              ? <input type="text" value={formData.first_name} onChange={e => setFormData({ ...formData, first_name: e.target.value })} placeholder={t('auth.firstNamePlaceholder')} />
+              : <div className="account-field-readonly">{formData.first_name || <span className="account-field-empty">—</span>}</div>
+            }
           </div>
           <div className="account-form-group">
             <label>{t('auth.lastName')}</label>
-            <input type="text" value={formData.last_name} onChange={e => setFormData({ ...formData, last_name: e.target.value })} placeholder={t('auth.lastNamePlaceholder')} />
+            {editingProfile
+              ? <input type="text" value={formData.last_name} onChange={e => setFormData({ ...formData, last_name: e.target.value })} placeholder={t('auth.lastNamePlaceholder')} />
+              : <div className="account-field-readonly">{formData.last_name || <span className="account-field-empty">—</span>}</div>
+            }
           </div>
         </div>
         <div className="account-form-group">
           <label>{t('auth.email')}</label>
-          <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder={t('auth.emailPlaceholder')} />
+          {editingProfile
+            ? <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder={t('auth.emailPlaceholder')} />
+            : <div className="account-field-readonly">{formData.email}</div>
+          }
         </div>
 
-        <button className="account-btn-save" onClick={handleProfileSave} disabled={saving}>
-          {saving ? t('common.saving') : t('account.saveChanges')}
-        </button>
+        {editingProfile && (
+          <div className="account-form-actions">
+            <button className="account-btn-save" onClick={handleProfileSave} disabled={saving}>
+              {saving ? t('common.saving') : t('account.saveChanges')}
+            </button>
+            <button className="account-btn-cancel" onClick={() => {
+              setEditingProfile(false);
+              setProfileError('');
+              if (profile) setFormData({ first_name: profile.first_name || '', last_name: profile.last_name || '', email: profile.email || '' });
+            }}>
+              {t('common.cancel')}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Change Password */}
       <div className="account-card">
         <div className="account-card-title">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
+          <FiLock />
           {t('account.changePassword')}
         </div>
 
@@ -397,16 +457,9 @@ function Account() {
                 }}
                 tabIndex={-1}>
                 {(showPw[field === 'current_password' ? 'current' : field === 'new_password' ? 'new' : 'confirm']) ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                    <line x1="1" y1="1" x2="23" y2="23"/>
-                  </svg>
+                  <FiEyeOff />
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
+                  <FiEye />
                 )}
               </button>
             </div>
@@ -420,14 +473,10 @@ function Account() {
         </button>
       </div>
 
-      {/* Connected Accounts */}
-      <div className="account-card">
+      {/* Connected Accounts — hidden for specialists (managed per-client in Clients page) */}
+      {localStorage.getItem('role') !== 'specialist' && <div className="account-card">
         <div className="account-card-title">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-          </svg>
+          <FiLink />
           {t('instagram.cardTitle')}
         </div>
 
@@ -439,12 +488,7 @@ function Account() {
         ) : igAccounts.length === 0 ? (
           <div className="ig-card ig-card--disconnected">
             <div className="ig-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-              </svg>
+              <FiInstagram />
             </div>
             <div className="ig-info">
               <span className="ig-info-name ig-info-muted">{t('instagram.notConnected')}</span>
@@ -461,12 +505,7 @@ function Account() {
             {igAccounts.map(acc => (
               <div key={acc.id} className="ig-card ig-card--connected" style={{ marginBottom: 10 }}>
                 <div className="ig-icon ig-icon--active">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-                  </svg>
+                  <FiInstagram />
                 </div>
                 <div className="ig-info">
                   <div className="ig-info-head">
@@ -507,17 +546,90 @@ function Account() {
             </div>
           </>
         )}
-      </div>
+      </div>}
+
+      {/* Email Setup — specialists only */}
+      {localStorage.getItem('role') === 'specialist' && (
+        <div className="account-card">
+          <div className="account-card-title">
+            <FiMail />
+            {t('clients.emailSetup')}
+          </div>
+
+          {cfgLoading ? (
+            <p className="clients-muted">{t('clients.loading')}</p>
+          ) : emailCfg ? (
+            <div className="cfg-status-row">
+              <div className="cfg-status-ok">
+                <FiCheck />
+                {t('clients.sentFrom')} <strong>{emailCfg.from_email}</strong>
+                {emailCfg.is_verified
+                  ? <span className="cfg-verified-badge">{t('clients.verified')}</span>
+                  : <span className="cfg-unverified-badge">{t('clients.unverified')}</span>}
+              </div>
+              <div className="cfg-status-actions">
+                <button className="cfg-btn-edit" onClick={() => { setAppPassword(''); setCfgMsg(''); setCfgError(''); setCfgOpen(true); }}>
+                  {t('clients.updatePassword')}
+                </button>
+                <button className="cfg-btn-remove" onClick={handleRemoveEmailCfg} disabled={cfgRemoving}>
+                  {cfgRemoving ? t('clients.revoking') : t('clients.remove')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="cfg-warn-banner">
+              <FiAlertCircle />
+              {t('clients.emailBanner')}
+              <button className="cfg-btn-setup" onClick={() => { setAppPassword(''); setCfgMsg(''); setCfgError(''); setCfgOpen(true); }}>
+                {t('clients.setupNow')}
+              </button>
+            </div>
+          )}
+
+          {cfgMsg && <div className="clients-msg-ok" style={{ marginTop: 12 }}>{cfgMsg}</div>}
+          {cfgError && <div className="clients-msg-err" style={{ marginTop: 12 }}>{cfgError}</div>}
+
+          {cfgOpen && (
+            <div className="cfg-form">
+              <div className="cfg-form-group">
+                <label>
+                  Gmail App Password
+                  {emailCfg && <span className="cfg-pw-hint"> — leave blank to keep existing</span>}
+                </label>
+                <input
+                  type="password"
+                  value={appPassword}
+                  onChange={e => { setAppPassword(e.target.value); setCfgError(''); }}
+                  placeholder={emailCfg ? '••••••••••••' : 'xxxx xxxx xxxx xxxx'}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="cfg-hint-box">
+                <div className="cfg-hint-title">How to get a Gmail App Password</div>
+                <ol className="cfg-hint-steps">
+                  <li>Go to your <strong>Google Account</strong> → <strong>Security</strong></li>
+                  <li>Enable <strong>2-Step Verification</strong></li>
+                  <li>Search for <strong>"App passwords"</strong></li>
+                  <li>Select <strong>Mail</strong> → click <strong>Generate</strong></li>
+                  <li>Paste the 16-character password above</li>
+                </ol>
+              </div>
+              <div className="cfg-form-actions">
+                <button className="cfg-btn-save" onClick={handleSaveEmailCfg} disabled={cfgSaving}>
+                  {cfgSaving ? t('clients.sending') : t('common.save')}
+                </button>
+                <button className="cfg-btn-cancel" onClick={() => setCfgOpen(false)}>{t('common.cancel')}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Auto-approve toggle — clients only */}
       {localStorage.getItem('role') === 'client' && (
         <div className="account-card">
           <div className="account-card-title">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 11 12 14 22 4"/>
-              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-            </svg>
+            <FiCheckSquare />
             {t('account.postApprovals')}
           </div>
           <div className="auto-approve-row">
@@ -540,11 +652,7 @@ function Account() {
       {/* Brand Profile — hidden for specialists (they use each client's profile) */}
       {localStorage.getItem('role') !== 'specialist' && <div className="account-card">
         <div className="account-card-title">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-            <line x1="7" y1="7" x2="7.01" y2="7"/>
-          </svg>
+          <FiTag />
           Brand Profile
         </div>
 

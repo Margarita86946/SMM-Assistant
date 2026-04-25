@@ -4,6 +4,7 @@ import { dashboardAPI, postsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import { useActiveClient } from '../context/ActiveClientContext';
+import { FiUser } from 'react-icons/fi';
 import {
   PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, CartesianGrid,
@@ -201,11 +202,7 @@ function Dashboard() {
 
       {activeClient && (
         <div className="dashboard-client-banner">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-          </svg>
+          <FiUser />
           Showing data for <strong>{[activeClient.first_name, activeClient.last_name].filter(Boolean).join(' ') || activeClient.username}</strong>
         </div>
       )}
@@ -267,11 +264,33 @@ function Dashboard() {
           <h2 className="dashboard-chart-title">Posts Created (Last 7 Days)</h2>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={activityData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#6366F1" radius={[4, 4, 0, 0]} />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="var(--border)"
+              />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
+                axisLine={{ stroke: 'var(--border)' }}
+                tickLine={false}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: 'var(--text-primary)',
+                }}
+                cursor={{ fill: 'var(--primary-muted)' }}
+              />
+              <Bar dataKey="count" fill="var(--primary)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

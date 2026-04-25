@@ -137,9 +137,9 @@
 }
 
 .accept-inline-error {
-  background: rgba(239, 68, 68, 0.08);
-  color: #B91C1C;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid var(--error-border);
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 13px;
@@ -231,8 +231,8 @@
 }
 
 .accept-result-icon--error {
-  background: rgba(239, 68, 68, 0.1);
-  color: #EF4444;
+  background: var(--error-bg);
+  color: var(--error);
 }
 
 .accept-result-icon--warn {

@@ -14,14 +14,14 @@ from ..models import Post, User
 
 
 def _client_filtered_posts(request):
-    """Base queryset for the requesting user, optionally filtered by a specific client."""
     qs = Post.objects.filter(user=request.user)
     client_id = request.query_params.get('client_id', '').strip()
     if client_id and request.user.role != 'client':
         try:
-            client = User.objects.get(id=int(client_id), specialist=request.user, role='client')
-            qs = qs.filter(client=client)
-        except (User.DoesNotExist, ValueError):
+            client_id_int = int(client_id)
+            if User.objects.filter(id=client_id_int, specialist=request.user, role='client').exists():
+                qs = qs.filter(client_id=client_id_int)
+        except ValueError:
             pass
     return qs
 
@@ -29,6 +29,8 @@ def _client_filtered_posts(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
+    if request.user.role == 'client':
+        return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
     user_posts = _client_filtered_posts(request)
     total_posts = user_posts.count()
 
@@ -49,11 +51,9 @@ def dashboard_stats(request):
     rejected_posts = user_posts.filter(status='rejected').count()
     posted_posts = user_posts.filter(status='posted').count()
 
-    all_posts = user_posts.only('hashtags')
     hashtags_list = []
-    for post in all_posts:
-        if post.hashtags:
-            hashtags_list.extend(post.hashtags.split())
+    for (raw,) in user_posts.exclude(hashtags='').values_list('hashtags'):
+        hashtags_list.extend(raw.split())
 
     hashtag_counts = Counter(hashtags_list)
     most_used_hashtags = [
@@ -77,6 +77,8 @@ def dashboard_stats(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_activity(request):
+    if request.user.role == 'client':
+        return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
     today = timezone.now().date()
     start = today - timedelta(days=6)
 

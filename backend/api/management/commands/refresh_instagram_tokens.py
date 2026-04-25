@@ -29,6 +29,9 @@ class Command(BaseCommand):
             is_active=True,
             token_expires_at__isnull=False,
             token_expires_at__lte=threshold,
+        ).only(
+            'id', 'access_token', 'account_username', 'instagram_user_id',
+            'token_expires_at', 'token_last_refreshed', 'encryption_key_id',
         )
 
         total = accounts.count()
@@ -41,21 +44,30 @@ class Command(BaseCommand):
         refreshed = 0
         failed = 0
         for account in accounts:
-            if not account.access_token:
+            try:
+                decrypted_token = account.decrypted_token
+            except Exception as e:
+                logger.error('refresh_instagram_tokens: account %s decryption failed: %s', account.pk, e)
+                failed += 1
+                continue
+
+            if not decrypted_token:
                 logger.warning('refresh_instagram_tokens: account %s has no token, skipping', account.pk)
                 continue
             try:
-                result = instagram_service.refresh_long_lived_token(account.access_token)
+                result = instagram_service.refresh_long_lived_token(decrypted_token)
             except instagram_service.InstagramAPIError as e:
                 logger.error('refresh_instagram_tokens: account %s failed: %s', account.pk, e)
                 failed += 1
                 continue
 
-            account.access_token = result['access_token']
+            from api.encryption import encrypt
+            account.access_token = encrypt(result['access_token'])
             account.token_expires_at = timezone.now() + timedelta(
                 seconds=result.get('expires_in', 5184000)
             )
-            account.save(update_fields=['access_token', 'token_expires_at'])
+            account.token_last_refreshed = timezone.now()
+            account.save(update_fields=['access_token', 'token_expires_at', 'token_last_refreshed'])
             refreshed += 1
             self.stdout.write(f'  refreshed account {account.pk} ({account.account_username})')
 

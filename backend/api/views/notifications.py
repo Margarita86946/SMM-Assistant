@@ -27,6 +27,10 @@ def notifications_list(request):
         Notification.objects
         .filter(recipient=request.user)
         .select_related('actor', 'post')
+        .only(
+            'id', 'notification_type', 'is_read', 'created_at', 'post_id',
+            'actor__id', 'actor__first_name', 'actor__last_name', 'actor__username',
+        )
         .order_by('-created_at')[:20]
     )
     unread_count = Notification.objects.filter(recipient=request.user, is_read=False).count()

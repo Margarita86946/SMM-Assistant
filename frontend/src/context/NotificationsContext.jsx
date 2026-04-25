@@ -3,7 +3,7 @@ import { notificationsAPI, profileAPI } from '../services/api';
 
 const NotificationsContext = createContext(null);
 
-const POLL_INTERVAL = 12000; // 12s
+const POLL_INTERVAL = 12000;
 
 export function NotificationsProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
@@ -14,7 +14,6 @@ export function NotificationsProvider({ children }) {
   const audioRef = useRef(null);
   const token = localStorage.getItem('token');
 
-  // Load sound preference from DB on mount, then keep in sync via storage events
   useEffect(() => {
     if (!localStorage.getItem('token')) return;
     profileAPI.get().then(res => {
@@ -23,11 +22,19 @@ export function NotificationsProvider({ children }) {
         setSoundEnabled(val);
         localStorage.setItem('notifications_sound', String(val));
       }
+      if (res.data.role) {
+        const serverRole = res.data.role;
+        const localRole = localStorage.getItem('role');
+        if (localRole !== serverRole) {
+          localStorage.setItem('role', serverRole);
+          window.dispatchEvent(new StorageEvent('storage', { key: 'role', newValue: serverRole }));
+        }
+      }
     }).catch(() => {
       const stored = localStorage.getItem('notifications_sound');
       if (stored !== null) setSoundEnabled(stored !== 'false');
     });
-  }, [token]); // re-runs when token changes (login/logout)
+  }, [token]);
 
   const playDing = useCallback(() => {
     if (!soundEnabled) return;
@@ -48,7 +55,6 @@ export function NotificationsProvider({ children }) {
       const { unread_count, notifications: list } = res.data;
       setNotifications(list);
       setUnreadCount(unread_count);
-      // Play ding + shake if new unread notifications arrived
       if (prevUnreadRef.current !== null && unread_count > prevUnreadRef.current) {
         playDing();
         setShaking(true);

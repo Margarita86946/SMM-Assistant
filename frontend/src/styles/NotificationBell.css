@@ -58,7 +58,7 @@
   right: -5px;
   min-width: 18px;
   height: 18px;
-  background: #EF4444;
+  background: var(--error);
   border-radius: 9px;
   font-size: 10px;
   font-weight: 700;
@@ -215,6 +215,24 @@
   max-width: 320px;
   pointer-events: all;
   animation: toastIn 0.25s ease;
+}
+
+.notif-toast--error {
+  border-left-color: var(--error);
+}
+
+.notif-toast--error .notif-toast-icon {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.notif-toast--warning {
+  border-left-color: var(--warning);
+}
+
+.notif-toast--warning .notif-toast-icon {
+  background: var(--warning-bg);
+  color: var(--warning-dark);
 }
 
 @keyframes toastIn {

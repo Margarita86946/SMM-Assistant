@@ -51,7 +51,7 @@
   width: 100%;
   aspect-ratio: 16/9;
   overflow: hidden;
-  background: #F3F4F6;
+  background: var(--surface-2);
 }
 .client-card-img img {
   width: 100%;
@@ -89,7 +89,7 @@
 
 .client-hashtags {
   font-size: 12px;
-  color: #6366F1;
+  color: var(--primary);
   margin: 0;
   line-height: 1.5;
 }
@@ -102,7 +102,7 @@
 
 .client-btn-approve {
   flex: 1;
-  background: #10B981;
+  background: var(--success);
   color: #FFF;
   border: none;
   padding: 10px 14px;
@@ -112,14 +112,14 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.client-btn-approve:hover:not(:disabled) { background: #059669; }
+.client-btn-approve:hover:not(:disabled) { background: var(--success-dark); }
 .client-btn-approve:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .client-btn-reject-open {
   flex: 1;
-  background: #FEF2F2;
-  color: #B91C1C;
-  border: 1px solid #FECACA;
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid var(--error-border);
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 13px;
@@ -127,7 +127,7 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.client-btn-reject-open:hover { background: #FEE2E2; }
+.client-btn-reject-open:hover { background: var(--error-bg); filter: brightness(0.95); }
 
 .client-reject-box {
   margin-top: 6px;
@@ -146,7 +146,7 @@
 }
 .client-reject-textarea:focus {
   outline: none;
-  border-color: #6366F1;
+  border-color: var(--primary);
 }
 .client-reject-actions {
   display: flex;
@@ -154,7 +154,7 @@
 }
 .client-btn-reject {
   flex: 1;
-  background: #DC2626;
+  background: var(--error-dark);
   color: #FFF;
   border: none;
   padding: 9px 14px;
@@ -163,16 +163,16 @@
   font-weight: 600;
   cursor: pointer;
 }
-.client-btn-reject:hover:not(:disabled) { background: #B91C1C; }
+.client-btn-reject:hover:not(:disabled) { filter: brightness(0.9); }
 .client-btn-reject:disabled { opacity: 0.6; cursor: not-allowed; }
 .client-btn-cancel {
-  background: #F3F4F6;
+  background: var(--surface-2);
   color: var(--text-primary);
-  border: none;
+  border: 1px solid var(--border);
   padding: 9px 14px;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
-.client-btn-cancel:hover { background: #E5E7EB; }
+.client-btn-cancel:hover { background: var(--border); }

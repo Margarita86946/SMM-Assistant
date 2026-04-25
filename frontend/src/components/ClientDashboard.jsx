@@ -27,15 +27,15 @@ function ClientDashboard() {
     try {
       // Backend filters to client=request.user automatically, so no extra params needed.
       // We show all posts assigned to this client; they can filter by pending_approval locally.
-      const res = await postsAPI.getAll({ page: 1, page_size: 100 });
+      const res = await postsAPI.getAll({ page: 1, page_size: 50, status: 'pending_approval' });
       const results = res.data.results ?? res.data;
-      setPosts(results.filter(p => p.status === 'pending_approval'));
+      setPosts(results);
     } catch {
       setError(t('approval.failedSubmit'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 

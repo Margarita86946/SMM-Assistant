@@ -68,6 +68,19 @@ export const postsAPI = {
   create: (postData) => api.post('/posts/', postData),
   update: (id, postData) => api.put(`/posts/${id}/`, postData),
   delete: (id) => api.delete(`/posts/${id}/`),
+  uploadImage: (file) => {
+    const form = new FormData();
+    form.append('image', file);
+    return api.post('/posts/upload-image/', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  uploadVideo: (file, onProgress) => {
+    const form = new FormData();
+    form.append('video', file);
+    return api.post('/posts/upload-video/', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: onProgress ? (e) => onProgress(Math.round((e.loaded * 100) / e.total)) : undefined,
+    });
+  },
 };
 
 export const dashboardAPI = {
@@ -138,6 +151,16 @@ export const notificationsAPI = {
   list: () => api.get('/notifications/'),
   markRead: (id) => api.post(`/notifications/${id}/read/`),
   markAllRead: () => api.post('/notifications/read-all/'),
+};
+
+export const analyzerAPI = {
+  getAccounts: () => api.get('/analyzer/accounts/'),
+  getOverview: (accountId) => api.get(`/analyzer/${accountId}/overview/`),
+  getPosts: (accountId, sort = 'date') => api.get(`/analyzer/${accountId}/posts/`, { params: { sort } }),
+  getAudience: (accountId) => api.get(`/analyzer/${accountId}/audience/`),
+  getAI: (accountId) => api.post(`/analyzer/${accountId}/ai/`),
+  refresh: (accountId) => api.post(`/analyzer/${accountId}/refresh/`),
+  toggleDemo: (enabled) => api.post('/analyzer/demo-toggle/', { enabled }),
 };
 
 export default api;

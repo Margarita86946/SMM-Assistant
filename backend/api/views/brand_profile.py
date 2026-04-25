@@ -15,10 +15,14 @@ def brand_profile(request):
             {'error': 'Specialists do not have a personal brand profile. Each client manages their own.'},
             status=status.HTTP_403_FORBIDDEN,
         )
-    profile, _ = BrandProfile.objects.get_or_create(user=request.user)
     if request.method == 'GET':
+        try:
+            profile = BrandProfile.objects.get(user=request.user)
+        except BrandProfile.DoesNotExist:
+            return Response(BrandProfileSerializer(BrandProfile()).data)
         return Response(BrandProfileSerializer(profile).data)
 
+    profile, _ = BrandProfile.objects.get_or_create(user=request.user)
     serializer = BrandProfileSerializer(profile, data=request.data, partial=True)
     if serializer.is_valid():
         serializer.save()
