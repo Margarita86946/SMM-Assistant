@@ -88,7 +88,6 @@ function Clients() {
   const [sendMsg, setSendMsg] = useState('');
   const [sendError, setSendError] = useState('');
 
-  const [revoking, setRevoking] = useState(null);
   const [removing, setRemoving] = useState(null);
 
 
@@ -155,18 +154,6 @@ function Clients() {
     }
   };
 
-  const handleRevoke = async (id) => {
-    if (!window.confirm(t('clients.revoke') + '?')) return;
-    setRevoking(id);
-    try {
-      await invitationsAPI.revoke(id);
-      setInvitations(prev => prev.map(inv => inv.id === id ? { ...inv, status: 'revoked' } : inv));
-    } catch (err) {
-      setInvError(err.message || t('clients.revoking'));
-    } finally {
-      setRevoking(null);
-    }
-  };
 
   const fmt = (iso) => {
     if (!iso) return '—';
@@ -262,7 +249,6 @@ function Clients() {
                     <th>{t('clients.colStatus')}</th>
                     <th>{t('clients.colSent')}</th>
                     <th>{t('clients.colExpires')}</th>
-                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -272,15 +258,6 @@ function Clients() {
                       <td><StatusBadge status={inv.status} t={t} /></td>
                       <td className="inv-td-date">{fmt(inv.created_at)}</td>
                       <td className="inv-td-date">{fmt(inv.expires_at)}</td>
-                      <td className="inv-td-action">
-                        <button
-                          className="inv-revoke-btn"
-                          onClick={() => handleRevoke(inv.id)}
-                          disabled={revoking === inv.id}
-                        >
-                          {revoking === inv.id ? t('clients.revoking') : t('clients.revoke')}
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>

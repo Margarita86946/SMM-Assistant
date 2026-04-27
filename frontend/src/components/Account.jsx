@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { profileAPI, brandAPI, instagramAPI, emailConfigAPI } from '../services/api';
+import { profileAPI, brandAPI, instagramAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import {
-  FiCamera, FiEdit2, FiLock, FiLink, FiInstagram, FiMail,
-  FiCheck, FiAlertCircle, FiCheckSquare, FiTag, FiEye, FiEyeOff,
+  FiCamera, FiEdit2, FiLock, FiLink, FiInstagram,
+  FiCheckSquare, FiTag, FiEye, FiEyeOff,
 } from 'react-icons/fi';
 import '../styles/Account.css';
 import '../styles/Auth.css';
@@ -44,7 +44,7 @@ function Account() {
   const fileInputRef = useRef(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({ first_name: '', last_name: '', email: '' });
+  const [formData, setFormData] = useState({ first_name: '', last_name: '' });
   const [autoApprove, setAutoApprove] = useState(false);
   const [autoApproveSaving, setAutoApproveSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -54,15 +54,6 @@ function Account() {
   const [profileMsg, setProfileMsg] = useState('');
   const [profileError, setProfileError] = useState('');
 
-  // Email config state (specialist only)
-  const [emailCfg, setEmailCfg] = useState(null);
-  const [cfgLoading, setCfgLoading] = useState(false);
-  const [cfgOpen, setCfgOpen] = useState(false);
-  const [appPassword, setAppPassword] = useState('');
-  const [cfgSaving, setCfgSaving] = useState(false);
-  const [cfgMsg, setCfgMsg] = useState('');
-  const [cfgError, setCfgError] = useState('');
-  const [cfgRemoving, setCfgRemoving] = useState(false);
 
   const [pwData, setPwData] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [pwSaving, setPwSaving] = useState(false);
@@ -149,7 +140,7 @@ function Account() {
   useEffect(() => {
     profileAPI.get().then(res => {
       setProfile(res.data);
-      setFormData({ first_name: res.data.first_name || '', last_name: res.data.last_name || '', email: res.data.email || '' });
+      setFormData({ first_name: res.data.first_name || '', last_name: res.data.last_name || '' });
       setAutoApprove(!!res.data.auto_approve);
       if (res.data.avatar) localStorage.setItem('avatar', res.data.avatar);
       else localStorage.removeItem('avatar');
@@ -171,13 +162,6 @@ function Account() {
       });
     }).catch(() => setBrandError(t('account.failedSave')));
 
-    if (localStorage.getItem('role') === 'specialist') {
-      setCfgLoading(true);
-      emailConfigAPI.get()
-        .then(res => setEmailCfg(res.data.configured ? res.data : null))
-        .catch(() => setEmailCfg(null))
-        .finally(() => setCfgLoading(false));
-    }
   }, [t]);
 
   const handleBrandSave = async () => {
@@ -210,26 +194,6 @@ function Account() {
     }
   };
 
-  const handleSaveEmailCfg = async () => {
-    if (!emailCfg && !appPassword.trim()) { setCfgError(t('clients.emailSaveError')); return; }
-    setCfgSaving(true); setCfgMsg(''); setCfgError('');
-    try {
-      const payload = appPassword.trim() ? { app_password: appPassword.trim() } : {};
-      const res = await emailConfigAPI.save(payload);
-      setEmailCfg(res.data);
-      setCfgMsg(res.data.warning || t('clients.emailSaved'));
-      setAppPassword(''); setCfgOpen(false);
-    } catch (err) { setCfgError(err.message || t('clients.emailSaveError')); }
-    finally { setCfgSaving(false); }
-  };
-
-  const handleRemoveEmailCfg = async () => {
-    if (!window.confirm(t('clients.revoke') + '?')) return;
-    setCfgRemoving(true); setCfgMsg(''); setCfgError('');
-    try { await emailConfigAPI.remove(); setEmailCfg(null); }
-    catch (err) { setCfgError(err.message || t('clients.emailRemoveError')); }
-    finally { setCfgRemoving(false); }
-  };
 
   const handleAvatarClick = () => {
     setAvatarError('');
@@ -284,8 +248,7 @@ function Account() {
       setEditingProfile(false);
       setTimeout(() => setProfileMsg(''), 3000);
     } catch (err) {
-      const code = err.message;
-      setProfileError(code === 'email_taken' ? t('account.emailTaken') : (err.message || t('account.failedSave')));
+      setProfileError(err.message || t('account.failedSave'));
     } finally {
       setSaving(false);
     }
@@ -406,14 +369,6 @@ className="account-avatar-input" onChange={handleAvatarChange} />
             }
           </div>
         </div>
-        <div className="account-form-group">
-          <label>{t('auth.email')}</label>
-          {editingProfile
-            ? <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder={t('auth.emailPlaceholder')} />
-            : <div className="account-field-readonly">{formData.email}</div>
-          }
-        </div>
-
         {editingProfile && (
           <div className="account-form-actions">
             <button className="account-btn-save" onClick={handleProfileSave} disabled={saving}>
@@ -422,7 +377,7 @@ className="account-avatar-input" onChange={handleAvatarChange} />
             <button className="account-btn-cancel" onClick={() => {
               setEditingProfile(false);
               setProfileError('');
-              if (profile) setFormData({ first_name: profile.first_name || '', last_name: profile.last_name || '', email: profile.email || '' });
+              if (profile) setFormData({ first_name: profile.first_name || '', last_name: profile.last_name || '' });
             }}>
               {t('common.cancel')}
             </button>
@@ -514,11 +469,7 @@ className="account-avatar-input" onChange={handleAvatarChange} />
                       <span className="ig-badge-dot" />
                       {t('instagram.connected')}
                     </span>
-                    {acc.is_client_account && (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 999, padding: '2px 8px' }}>
-                        Client{acc.client_username ? `: @${acc.client_username}` : ''}
-                      </span>
-                    )}
+
                   </div>
                   {acc.expires_at && (
                     <span className="ig-info-meta">
@@ -526,17 +477,15 @@ className="account-avatar-input" onChange={handleAvatarChange} />
                     </span>
                   )}
                 </div>
-                {!acc.is_client_account && (
-                  <div className="ig-actions">
-                    <button
-                      className="account-btn-save account-btn-danger ig-btn"
-                      onClick={() => handleInstagramDisconnect(acc.id)}
-                      disabled={igDisconnecting === acc.id}
-                    >
-                      {igDisconnecting === acc.id ? t('instagram.disconnecting') : t('instagram.disconnect')}
-                    </button>
-                  </div>
-                )}
+                <div className="ig-actions">
+                  <button
+                    className="account-btn-save account-btn-danger ig-btn"
+                    onClick={() => handleInstagramDisconnect(acc.id)}
+                    disabled={igDisconnecting === acc.id}
+                  >
+                    {igDisconnecting === acc.id ? t('instagram.disconnecting') : t('instagram.disconnect')}
+                  </button>
+                </div>
               </div>
             ))}
             <div style={{ marginTop: 14 }}>
@@ -547,83 +496,6 @@ className="account-avatar-input" onChange={handleAvatarChange} />
           </>
         )}
       </div>}
-
-      {/* Email Setup — specialists only */}
-      {localStorage.getItem('role') === 'specialist' && (
-        <div className="account-card">
-          <div className="account-card-title">
-            <FiMail />
-            {t('clients.emailSetup')}
-          </div>
-
-          {cfgLoading ? (
-            <p className="clients-muted">{t('clients.loading')}</p>
-          ) : emailCfg ? (
-            <div className="cfg-status-row">
-              <div className="cfg-status-ok">
-                <FiCheck />
-                {t('clients.sentFrom')} <strong>{emailCfg.from_email}</strong>
-                {emailCfg.is_verified
-                  ? <span className="cfg-verified-badge">{t('clients.verified')}</span>
-                  : <span className="cfg-unverified-badge">{t('clients.unverified')}</span>}
-              </div>
-              <div className="cfg-status-actions">
-                <button className="cfg-btn-edit" onClick={() => { setAppPassword(''); setCfgMsg(''); setCfgError(''); setCfgOpen(true); }}>
-                  {t('clients.updatePassword')}
-                </button>
-                <button className="cfg-btn-remove" onClick={handleRemoveEmailCfg} disabled={cfgRemoving}>
-                  {cfgRemoving ? t('clients.revoking') : t('clients.remove')}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="cfg-warn-banner">
-              <FiAlertCircle />
-              {t('clients.emailBanner')}
-              <button className="cfg-btn-setup" onClick={() => { setAppPassword(''); setCfgMsg(''); setCfgError(''); setCfgOpen(true); }}>
-                {t('clients.setupNow')}
-              </button>
-            </div>
-          )}
-
-          {cfgMsg && <div className="clients-msg-ok" style={{ marginTop: 12 }}>{cfgMsg}</div>}
-          {cfgError && <div className="clients-msg-err" style={{ marginTop: 12 }}>{cfgError}</div>}
-
-          {cfgOpen && (
-            <div className="cfg-form">
-              <div className="cfg-form-group">
-                <label>
-                  Gmail App Password
-                  {emailCfg && <span className="cfg-pw-hint"> — leave blank to keep existing</span>}
-                </label>
-                <input
-                  type="password"
-                  value={appPassword}
-                  onChange={e => { setAppPassword(e.target.value); setCfgError(''); }}
-                  placeholder={emailCfg ? '••••••••••••' : 'xxxx xxxx xxxx xxxx'}
-                  autoComplete="new-password"
-                />
-              </div>
-              <div className="cfg-hint-box">
-                <div className="cfg-hint-title">How to get a Gmail App Password</div>
-                <ol className="cfg-hint-steps">
-                  <li>Go to your <strong>Google Account</strong> → <strong>Security</strong></li>
-                  <li>Enable <strong>2-Step Verification</strong></li>
-                  <li>Search for <strong>"App passwords"</strong></li>
-                  <li>Select <strong>Mail</strong> → click <strong>Generate</strong></li>
-                  <li>Paste the 16-character password above</li>
-                </ol>
-              </div>
-              <div className="cfg-form-actions">
-                <button className="cfg-btn-save" onClick={handleSaveEmailCfg} disabled={cfgSaving}>
-                  {cfgSaving ? t('clients.sending') : t('common.save')}
-                </button>
-                <button className="cfg-btn-cancel" onClick={() => setCfgOpen(false)}>{t('common.cancel')}</button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Auto-approve toggle — clients only */}
       {localStorage.getItem('role') === 'client' && (
