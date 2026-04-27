@@ -25,9 +25,9 @@ class BrandProfileAdmin(admin.ModelAdmin):
 
 @admin.register(SocialAccount)
 class SocialAccountAdmin(admin.ModelAdmin):
-    list_display = ['id', 'user', 'platform', 'account_username', 'account_type', 'is_active', 'token_expires_at', 'connected_at']
+    list_display = ['id', 'account_user', 'specialist', 'platform', 'account_username', 'account_type', 'is_active', 'token_expires_at', 'connected_at']
     list_filter = ['platform', 'is_active', 'account_type']
-    search_fields = ['user__username', 'account_username', 'instagram_user_id']
+    search_fields = ['account_user__username', 'specialist__username', 'account_username', 'instagram_user_id']
     readonly_fields = ['connected_at']
 
 

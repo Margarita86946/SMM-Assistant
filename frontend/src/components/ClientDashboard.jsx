@@ -5,9 +5,9 @@ import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import '../styles/ClientDashboard.css';
 
 const PLATFORM_LABELS = {
-  instagram: '📷 Instagram',
-  linkedin:  '💼 LinkedIn',
-  twitter:   '🐦 Twitter',
+  instagram: { emoji: '📷', text: 'Instagram' },
+  linkedin:  { emoji: '💼', text: 'LinkedIn' },
+  twitter:   { emoji: '🐦', text: 'Twitter' },
 };
 
 function ClientDashboard() {
@@ -108,7 +108,10 @@ function ClientDashboard() {
               )}
               <div className="client-card-body">
                 <div className="client-card-meta">
-                  <span className="client-platform">{PLATFORM_LABELS[post.platform] || post.platform}</span>
+                  <span className="client-platform">
+                    <span className="platform-emoji">{(PLATFORM_LABELS[post.platform] || {}).emoji}</span>
+                    {(PLATFORM_LABELS[post.platform] || {}).text || post.platform}
+                  </span>
                   <span className="client-date">{formatDate(post.scheduled_time)}</span>
                 </div>
                 <p className="client-caption">

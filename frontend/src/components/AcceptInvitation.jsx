@@ -33,9 +33,7 @@ function AcceptInvitation() {
     <div className="accept-page">
       <div className="accept-card">
         <div className="accept-logo">
-          <div className="accept-logo-icon">
-            <SmmLogo size={36} />
-          </div>
+          <SmmLogo size={36} />
           <span className="accept-logo-text">SMM Assistant</span>
         </div>
 

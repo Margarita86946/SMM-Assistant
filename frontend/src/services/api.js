@@ -60,6 +60,10 @@ export const authAPI = {
   register: (userData) => api.post('/register/', userData),
   login: (credentials) => api.post('/login/', credentials),
   logout: () => api.post('/logout/'),
+  verifyEmail: (token) => api.post(`/verify-email/${token}/`),
+  resendVerification: (email) => api.post('/resend-verification/', { email }),
+  forgotPassword: (email) => api.post('/forgot-password/', { email }),
+  resetPassword: (token, new_password) => api.post(`/reset-password/${token}/`, { new_password }),
 };
 
 export const postsAPI = {
@@ -139,13 +143,9 @@ export const invitationsAPI = {
 export const clientsAPI = {
   list: () => api.get('/clients/'),
   remove: (id) => api.delete(`/clients/${id}/`),
+  igAccounts: (clientId) => api.get(`/clients/${clientId}/instagram-accounts/`),
 };
 
-export const emailConfigAPI = {
-  get: () => api.get('/email-config/'),
-  save: (data) => api.post('/email-config/', data),
-  remove: () => api.delete('/email-config/'),
-};
 
 export const notificationsAPI = {
   list: () => api.get('/notifications/'),

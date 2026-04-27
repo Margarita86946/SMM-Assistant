@@ -3,8 +3,6 @@ import { notificationsAPI, profileAPI } from '../services/api';
 
 const NotificationsContext = createContext(null);
 
-const POLL_INTERVAL = 12000;
-
 export function NotificationsProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -12,6 +10,7 @@ export function NotificationsProvider({ children }) {
   const [shaking, setShaking] = useState(false);
   const prevUnreadRef = useRef(null);
   const audioRef = useRef(null);
+  const esRef = useRef(null);
   const token = localStorage.getItem('token');
 
   useEffect(() => {
@@ -48,28 +47,71 @@ export function NotificationsProvider({ children }) {
     } catch (_) {}
   }, [soundEnabled]);
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchInitial = useCallback(async () => {
     if (!localStorage.getItem('token')) return;
     try {
       const res = await notificationsAPI.list();
       const { unread_count, notifications: list } = res.data;
       setNotifications(list);
       setUnreadCount(unread_count);
-      if (prevUnreadRef.current !== null && unread_count > prevUnreadRef.current) {
-        playDing();
-        setShaking(true);
-        setTimeout(() => setShaking(false), 600);
-      }
       prevUnreadRef.current = unread_count;
     } catch (_) {}
-  }, [playDing]);
+  }, []);
 
   useEffect(() => {
     if (!token) return;
-    fetchNotifications();
-    const id = setInterval(fetchNotifications, POLL_INTERVAL);
-    return () => clearInterval(id);
-  }, [token, fetchNotifications]);
+
+    fetchInitial();
+
+    const connectSSE = () => {
+      if (esRef.current) esRef.current.close();
+
+      const url = `http://localhost:8000/api/notifications/stream/?token=${token}`;
+      const es = new EventSource(url);
+      esRef.current = es;
+
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'connected') return;
+
+          const newNotification = {
+            id: data.id,
+            type: data.type,
+            is_read: data.is_read,
+            created_at: data.created_at,
+            post_id: data.post_id,
+            actor_name: data.actor_name,
+          };
+
+          setNotifications(prev => [newNotification, ...prev.slice(0, 19)]);
+          setUnreadCount(data.unread_count);
+
+          if (prevUnreadRef.current !== null && data.unread_count > prevUnreadRef.current) {
+            playDing();
+            setShaking(true);
+            setTimeout(() => setShaking(false), 600);
+          }
+          prevUnreadRef.current = data.unread_count;
+        } catch (_) {}
+      };
+
+      es.onerror = () => {
+        es.close();
+        esRef.current = null;
+        setTimeout(connectSSE, 5000);
+      };
+    };
+
+    connectSSE();
+
+    return () => {
+      if (esRef.current) {
+        esRef.current.close();
+        esRef.current = null;
+      }
+    };
+  }, [token, fetchInitial, playDing]);
 
   const markRead = useCallback(async (id) => {
     await notificationsAPI.markRead(id);
@@ -91,6 +133,16 @@ export function NotificationsProvider({ children }) {
     profileAPI.update({ notifications_sound: val }).catch(() => {});
   }, []);
 
+  const refetch = useCallback(async () => {
+    try {
+      const res = await notificationsAPI.list();
+      const { unread_count, notifications: list } = res.data;
+      setNotifications(list);
+      setUnreadCount(unread_count);
+      prevUnreadRef.current = unread_count;
+    } catch (_) {}
+  }, []);
+
   return (
     <NotificationsContext.Provider value={{
       notifications,
@@ -100,7 +152,7 @@ export function NotificationsProvider({ children }) {
       updateSoundEnabled,
       markRead,
       markAllRead,
-      refetch: fetchNotifications,
+      refetch,
     }}>
       {children}
     </NotificationsContext.Provider>

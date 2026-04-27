@@ -556,7 +556,7 @@
   gap: 10px;
 }
 
-.post-modal-platform-icon { font-size: 20px; line-height: 1; }
+.post-modal-platform-icon { font-size: 20px; line-height: 0; position: relative; top: -3px; flex-shrink: 0; }
 
 .post-modal-platform-label {
   font-size: 14px;

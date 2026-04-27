@@ -571,6 +571,13 @@ button:focus, input:focus, select:focus, textarea:focus {
   background: var(--text-tertiary);
 }
 
+.platform-emoji {
+  line-height: 0;
+  position: relative;
+  top: -3px;
+  flex-shrink: 0;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -591,11 +598,6 @@ button:focus, input:focus, select:focus, textarea:focus {
 .badge-scheduled {
   background: var(--info-bg);
   color: var(--info-text);
-}
-
-.badge-ready {
-  background: var(--warning-bg);
-  color: var(--warning-text);
 }
 
 .badge-posted {

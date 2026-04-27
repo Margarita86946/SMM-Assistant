@@ -21,6 +21,7 @@ class User(AbstractUser):
     auto_approve = models.BooleanField(default=False)
     notifications_sound = models.BooleanField(default=True)
     analyzer_demo_mode = models.BooleanField(default=False)
+    email_verified = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'users'
@@ -39,6 +40,34 @@ class TokenExpiry(models.Model):
 
     def __str__(self):
         return f"{self.token.user.username} - expires {self.expires_at}"
+
+
+class EmailVerificationToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification_tokens')
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    expires_at = models.DateTimeField()
+    used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'email_verification_tokens'
+
+    def __str__(self):
+        return f"VerifyToken({self.user.username})"
+
+
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_tokens')
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    expires_at = models.DateTimeField()
+    used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'password_reset_tokens'
+
+    def __str__(self):
+        return f"ResetToken({self.user.username})"
 
 
 class EncryptionKey(models.Model):
@@ -82,7 +111,6 @@ class Post(models.Model):
     STATUS_CHOICES = [
         ('draft', 'Draft'),
         ('scheduled', 'Scheduled'),
-        ('ready_to_post', 'Ready to Post'),
         ('pending_approval', 'Pending Approval'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
@@ -108,9 +136,12 @@ class Post(models.Model):
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name='approved_posts'
     )
     instagram_post_id = models.CharField(max_length=100, blank=True)
+    social_account = models.ForeignKey(
+        'SocialAccount', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='posts',
+    )
     video_url = models.URLField(max_length=1000, blank=True, default='')
     media_type = models.CharField(max_length=10, default='image', choices=[('image', 'Image'), ('video', 'Video')])
-    auto_publish = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
@@ -158,10 +189,12 @@ class SocialAccount(models.Model):
         ('instagram', 'Instagram'),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='social_accounts')
-    owned_by = models.ForeignKey(
+    account_user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='social_accounts',
+    )
+    specialist = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='managed_accounts',
+        related_name='managed_accounts', limit_choices_to={'role': 'specialist'},
     )
     platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
     instagram_user_id = models.CharField(max_length=100)
@@ -175,16 +208,14 @@ class SocialAccount(models.Model):
         related_name='social_accounts',
     )
     is_active = models.BooleanField(default=True)
-    is_client_account = models.BooleanField(default=False)
-    client_email = models.TextField(blank=True, default='')
     connected_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'social_accounts'
-        unique_together = ('user', 'platform', 'instagram_user_id')
+        unique_together = ('platform', 'instagram_user_id')
 
     def __str__(self):
-        return f"{self.user.username} - {self.platform} - {self.account_username}"
+        return f"{self.account_user.username} - {self.platform} - {self.account_username}"
 
     @property
     def decrypted_token(self):
@@ -192,13 +223,6 @@ class SocialAccount(models.Model):
         if not self.access_token:
             return None
         return decrypt(self.access_token)
-
-    @property
-    def decrypted_client_email(self):
-        from .encryption import decrypt
-        if not self.client_email:
-            return ''
-        return decrypt(self.client_email) or ''
 
 
 class ClientInvitation(models.Model):
@@ -224,10 +248,6 @@ class ClientInvitation(models.Model):
     client = models.OneToOneField(
         User, null=True, blank=True, on_delete=models.SET_NULL,
         related_name='accepted_invitation',
-    )
-    social_account = models.ForeignKey(
-        SocialAccount, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='invitations',
     )
 
     class Meta:
@@ -267,10 +287,6 @@ class OAuthState(models.Model):
         User, on_delete=models.CASCADE, null=True, blank=True,
         related_name='oauth_states',
     )
-    invitation = models.ForeignKey(
-        ClientInvitation, on_delete=models.CASCADE, null=True, blank=True,
-        related_name='oauth_states',
-    )
     platform = models.CharField(max_length=20)
     nonce = models.CharField(max_length=64, unique=True, db_index=True)
     expires_at = models.DateTimeField(db_index=True)
@@ -280,7 +296,7 @@ class OAuthState(models.Model):
         db_table = 'oauth_states'
 
     def __str__(self):
-        who = self.user.username if self.user_id else f'invite#{self.invitation_id}'
+        who = self.user.username if self.user_id else 'anonymous'
         return f"{who} - {self.platform} - expires {self.expires_at}"
 
 
@@ -328,49 +344,6 @@ class AuditLog(models.Model):
     def __str__(self):
         return f"{self.action} by {self.workspace_user_id} at {self.created_at}"
 
-
-class EmailConfiguration(models.Model):
-    PROVIDER_CHOICES = [
-        ('gmail', 'Gmail SMTP'),
-        ('sendgrid', 'SendGrid'),
-        ('mailgun', 'Mailgun'),
-        ('custom', 'Custom SMTP'),
-    ]
-
-    user = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name='email_config'
-    )
-    provider = models.CharField(
-        max_length=20, choices=PROVIDER_CHOICES, default='gmail'
-    )
-    smtp_host = models.CharField(max_length=100, default='smtp.gmail.com')
-    smtp_port = models.IntegerField(default=587)
-    smtp_user = models.EmailField()
-    smtp_password_encrypted = models.TextField()
-    encryption_key = models.ForeignKey(
-        EncryptionKey, on_delete=models.PROTECT, null=True, blank=True,
-        related_name='email_configurations',
-    )
-    from_name = models.CharField(max_length=100)
-    from_email = models.EmailField()
-    is_verified = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
-    last_test_sent = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'email_configurations'
-
-    def __str__(self):
-        return f"EmailConfig({self.user.username}, {self.provider})"
-
-    @property
-    def decrypted_smtp_password(self):
-        from .encryption import decrypt
-        if not self.smtp_password_encrypted:
-            return ''
-        return decrypt(self.smtp_password_encrypted) or ''
 
 
 class InstagramSnapshot(models.Model):

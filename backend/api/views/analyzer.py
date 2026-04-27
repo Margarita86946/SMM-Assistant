@@ -25,22 +25,23 @@ def _demo_mode(user):
 
 
 def _get_account(request, account_id):
-    from django.db.models import Q
+    if _demo_mode(request.user):
+        return type('DemoAccount', (), {'id': account_id})()
     try:
         if request.user.role == 'specialist':
             return SocialAccount.objects.get(
-                Q(user=request.user) | Q(user__specialist=request.user, user__role='client'),
                 pk=account_id,
+                specialist=request.user,
                 platform='instagram',
                 is_active=True,
             )
         return SocialAccount.objects.get(
             pk=account_id,
-            user=request.user,
+            account_user=request.user,
             platform='instagram',
             is_active=True,
         )
-    except SocialAccount.DoesNotExist:
+    except (SocialAccount.DoesNotExist, ValueError):
         return None
 
 
@@ -132,45 +133,56 @@ def analyzer_accounts(request):
 
     if request.user.role == 'specialist':
         accounts = SocialAccount.objects.filter(
-            Q(user=request.user) | Q(user__specialist=request.user, user__role='client'),
+            specialist=request.user,
             platform='instagram',
             is_active=True,
-        ).select_related('user').order_by('connected_at')
+        ).select_related('account_user').order_by('connected_at')
     else:
         accounts = SocialAccount.objects.filter(
-            user=request.user, platform='instagram', is_active=True
-        ).select_related('user').order_by('connected_at')
+            account_user=request.user, platform='instagram', is_active=True
+        ).select_related('account_user').order_by('connected_at')
 
-    def _client_display_name(user):
+    def _display_name(user):
         full = f'{user.first_name} {user.last_name}'.strip()
         return full if full else user.username
 
     demo = _demo_mode(request.user)
 
     def _account_entry(a, idx):
+        is_client = request.user.role == 'specialist'
         if demo:
             return {
                 'id': a.id,
                 'username': 'demobrand',
                 'account_type': 'BUSINESS',
-                'is_client_account': a.is_client_account,
-                'client_display_name': 'Demo Client' if a.is_client_account else None,
+                'is_client_account': is_client,
+                'client_display_name': 'Demo Client' if is_client else None,
             }
-        is_client = a.user_id != request.user.id
         return {
             'id': a.id,
             'username': a.account_username,
             'account_type': a.account_type,
             'is_client_account': is_client,
-            'client_display_name': _client_display_name(a.user) if is_client else None,
+            'client_display_name': _display_name(a.account_user) if is_client else None,
         }
 
     account_list = list(accounts)
     if demo and account_list:
         account_list = account_list[:1]
 
+    if demo and not account_list:
+        result = [{
+            'id': 0,
+            'username': 'demobrand',
+            'account_type': 'BUSINESS',
+            'is_client_account': False,
+            'client_display_name': None,
+        }]
+    else:
+        result = [_account_entry(a, i) for i, a in enumerate(account_list)]
+
     return Response({
-        'accounts': [_account_entry(a, i) for i, a in enumerate(account_list)],
+        'accounts': result,
         'demo_mode': demo,
     })
 

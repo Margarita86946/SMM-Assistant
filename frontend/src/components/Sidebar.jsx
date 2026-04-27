@@ -43,13 +43,15 @@ function Sidebar() {
   const NAV_ITEMS = useMemo(() => {
     if (isClient) {
       return [
-        { path: '/client',  label: 'Pending Approvals',  icon: <FiCheckSquare /> },
-        { path: '/account', label: t('settings.account'), icon: <FiUser /> },
+        { path: '/client',   label: 'Approvals',        icon: <FiCheckSquare /> },
+        { path: '/posts',    label: t('nav.allPosts'),   icon: <FiFileText /> },
+        { path: '/calendar', label: t('nav.calendar'),   icon: <FiCalendar /> },
+        { path: '/analyzer', label: 'Analytics',         icon: <FiBarChart2 /> },
       ];
     }
     if (isSpecialist) return [...COMMON_NAV, CLIENTS_ITEM, ANALYZER_ITEM];
     // owner
-    return COMMON_NAV;
+    return [...COMMON_NAV, ANALYZER_ITEM];
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language, isClient, isOwner, isSpecialist]);
 

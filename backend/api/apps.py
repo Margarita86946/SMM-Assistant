@@ -47,7 +47,8 @@ def _start_scheduler():
 
     def run_publish():
         try:
-            call_command('publish_scheduled', verbosity=0)
+            from api.management.commands.publish_scheduled import publish_due
+            publish_due()
         except Exception as e:
             logger.error('Scheduler publish_scheduled error: %s', e)
 
@@ -63,7 +64,7 @@ def _start_scheduler():
         except Exception as e:
             logger.error('Scheduler remind_scheduled error: %s', e)
 
-    scheduler.add_job(run_publish, IntervalTrigger(minutes=5), id='publish_scheduled', replace_existing=True)
+    scheduler.add_job(run_publish, IntervalTrigger(minutes=1), id='publish_scheduled', replace_existing=True)
     scheduler.add_job(run_reminder, IntervalTrigger(minutes=10), id='remind_scheduled', replace_existing=True)
     scheduler.add_job(run_token_refresh, IntervalTrigger(hours=12), id='refresh_tokens', replace_existing=True)
     scheduler.start()

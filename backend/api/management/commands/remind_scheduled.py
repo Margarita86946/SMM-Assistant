@@ -29,10 +29,10 @@ class Command(BaseCommand):
 
         due_posts = Post.objects.filter(
             status='scheduled',
-            auto_publish=True,
             scheduled_time__gte=window_start,
             scheduled_time__lte=window_end,
             deleted_at__isnull=True,
+            client__isnull=False,
         ).select_related('user', 'client')
 
         due_post_ids = [p.pk for p in due_posts]

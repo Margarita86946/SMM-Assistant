@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import User, Post, BrandProfile
 
 
-VALID_POST_STATUSES = ['draft', 'scheduled', 'ready_to_post', 'pending_approval', 'approved', 'rejected', 'posted']
+VALID_POST_STATUSES = ['draft', 'scheduled', 'pending_approval', 'approved', 'rejected', 'posted']
 
 
 def validate_scheduled_status(status_value, scheduled_time):
@@ -48,7 +48,7 @@ class PostSerializer(serializers.ModelSerializer):
             'caption', 'hashtags', 'topic', 'tone',
             'image_prompt', 'image_url', 'video_url', 'media_type', 'platform', 'scheduled_time', 'status',
             'approval_note', 'approved_by',
-            'auto_publish', 'instagram_post_id',
+            'instagram_post_id', 'social_account',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'username', 'client_username', 'client_first_name', 'client_last_name', 'approved_by', 'instagram_post_id']
@@ -72,12 +72,7 @@ class PostSerializer(serializers.ModelSerializer):
         status_value = data.get('status', getattr(self.instance, 'status', None))
         scheduled_time = data.get('scheduled_time', getattr(self.instance, 'scheduled_time', None))
         platform_value = data.get('platform', getattr(self.instance, 'platform', None))
-        auto_publish = data.get('auto_publish', getattr(self.instance, 'auto_publish', False))
         validate_scheduled_status(status_value, scheduled_time)
-        if auto_publish and platform_value != 'instagram':
-            raise serializers.ValidationError(
-                {'auto_publish': 'Auto-publish is only supported for Instagram posts.'}
-            )
         return data
 
 
@@ -94,9 +89,9 @@ class PostCreateSerializer(serializers.ModelSerializer):
             'video_url',
             'media_type',
             'platform',
+            'social_account',
             'scheduled_time',
             'status',
-            'auto_publish',
             'client',
         ]
 
@@ -115,19 +110,19 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         new_status = data.get('status', getattr(self.instance, 'status', 'draft'))
-        current_approval = getattr(self.instance, 'status', None)
+        current_status = getattr(self.instance, 'status', None)
         client = data.get('client', getattr(self.instance, 'client', None))
 
         validate_scheduled_status(new_status, data.get('scheduled_time', getattr(self.instance, 'scheduled_time', None)))
 
-        if data.get('auto_publish') and data.get('platform', getattr(self.instance, 'platform', 'instagram')) != 'instagram':
+        MANUAL_ALLOWED = {'draft', 'scheduled'}
+        if 'status' in data and new_status not in MANUAL_ALLOWED:
             raise serializers.ValidationError(
-                {'auto_publish': 'Auto-publish is only supported for Instagram posts.'}
+                {'status': f'Status "{new_status}" cannot be set manually. Use the approval workflow.'}
             )
 
         if new_status == 'scheduled' and client is not None:
-            approved = current_approval in ('approved', 'ready_to_post')
-            if not approved and data.get('status') == 'scheduled':
+            if current_status not in ('approved', 'scheduled'):
                 raise serializers.ValidationError(
                     {'status': 'This post must be approved by the client before it can be scheduled.'}
                 )

@@ -4,6 +4,14 @@
   background: var(--auth-page-bg);
 }
 
+.auth-container--centered {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: var(--auth-page-bg);
+}
+
 /* ── Left branding panel ── */
 .auth-left {
   flex: 1;
@@ -42,17 +50,10 @@
 .auth-brand-logo {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, #6366F1, #8B5CF6);
-  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 32px;
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
-}
-
-.auth-brand-logo svg {
-  color: #fff;
 }
 
 .auth-left h1 {

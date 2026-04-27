@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { postsAPI, approvalAPI, instagramAPI } from '../services/api';
+import { postsAPI, approvalAPI, instagramAPI, clientsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import { useActiveClient } from '../context/ActiveClientContext';
@@ -15,12 +15,11 @@ const PLATFORM_LABELS = {
 };
 
 const STATUS_META = {
-  draft:            { text: 'Draft',               cls: 'badge-draft'     },
-  pending_approval: { text: 'Awaiting Approval',   cls: 'badge-pending'   },
-  approved:         { text: 'Ready to Post',        cls: 'badge-approved'  },
-  ready_to_post:    { text: 'Ready to Post',        cls: 'badge-approved'  },
-  scheduled:        { text: 'Scheduled',            cls: 'badge-scheduled' },
-  posted:           { text: 'Posted',               cls: 'badge-posted'    },
+  draft:            { text: 'Draft',             cls: 'badge-draft'     },
+  pending_approval: { text: 'Awaiting Approval', cls: 'badge-pending'   },
+  approved:         { text: 'Approved',          cls: 'badge-approved'  },
+  scheduled:        { text: 'Scheduled',         cls: 'badge-scheduled' },
+  posted:           { text: 'Posted',            cls: 'badge-posted'    },
 };
 
 const PAGE_SIZE = 3;
@@ -48,11 +47,18 @@ function PostsList() {
   const [bulkScheduleDate, setBulkScheduleDate] = useState('');
   const [bulkScheduleTime, setBulkScheduleTime] = useState('09:00');
   const [showBulkSchedule, setShowBulkSchedule] = useState(false);
+  const [igPickerPost, setIgPickerPost] = useState(null);
+  const [igPickerAccounts, setIgPickerAccounts] = useState([]);
+  const [igPickerSelected, setIgPickerSelected] = useState('');
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { language } = useSettings();
   const locale = LOCALE_MAP[language] || 'en-US';
   const { activeClientId, activeClient } = useActiveClient();
+  const role = localStorage.getItem('role');
+  const isOwner = role === 'owner';
+  const isSpecialist = role === 'specialist';
+  const isClient = role === 'client';
 
   const loadPosts = useCallback(async (pg, srch, platform, st) => {
     try {
@@ -121,14 +127,16 @@ function PostsList() {
     }
   };
 
-  const handlePublishNow = async (e, post) => {
-    e.stopPropagation();
+  const doPublishNow = async (postId, socialAccountId) => {
     setPublishError('');
     setPublishMsg('');
-    setPublishingId(post.id);
+    setPublishingId(postId);
     try {
-      await instagramAPI.publishNow(post.id);
-      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, status: 'posted' } : p));
+      if (socialAccountId) {
+        await postsAPI.update(postId, { social_account: socialAccountId });
+      }
+      await instagramAPI.publishNow(postId);
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, status: 'posted' } : p));
       setPublishMsg(t('instagram.publishSuccess'));
       setTimeout(() => setPublishMsg(''), 4000);
     } catch (err) {
@@ -141,17 +149,36 @@ function PostsList() {
     }
   };
 
+  const handlePublishNow = async (e, post) => {
+    e.stopPropagation();
+    if (isSpecialist && post.client) {
+      try {
+        const res = await clientsAPI.igAccounts(post.client);
+        const accounts = res.data.accounts || [];
+        if (accounts.length > 1 && !post.social_account) {
+          setIgPickerAccounts(accounts);
+          setIgPickerPost(post);
+          setIgPickerSelected(accounts[0].id);
+          return;
+        }
+      } catch {}
+    }
+    await doPublishNow(post.id, null);
+  };
+
   const toggleSelect = (id) => setSelected(prev => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
     return next;
   });
 
+  const isPostSelectable = (p) => isOwner
+    ? ['draft', 'scheduled'].includes(p.status)
+    : p.status === 'approved';
+
   const toggleSelectAll = () => {
-    const selectableIds = posts
-      .filter(p => !['pending_approval', 'posted'].includes(p.status))
-      .map(p => p.id);
-    const allSelected = selectableIds.every(id => selected.has(id));
+    const selectableIds = posts.filter(isPostSelectable).map(p => p.id);
+    const allSelected = selectableIds.length > 0 && selectableIds.every(id => selected.has(id));
     if (allSelected) setSelected(new Set());
     else setSelected(new Set(selectableIds));
   };
@@ -178,7 +205,10 @@ function PostsList() {
     const iso = new Date(yr, mo - 1, dy, hr, mn, 0).toISOString();
     setBulkLoading(true);
     try {
-      await Promise.all([...selected].map(id => postsAPI.update(id, { scheduled_time: iso, status: 'scheduled' })));
+      const payload = isOwner
+        ? { scheduled_time: iso, status: 'scheduled' }
+        : { scheduled_time: iso, status: 'scheduled' };
+      await Promise.all([...selected].map(id => postsAPI.update(id, payload).catch(() => null)));
       setSelected(new Set());
       setShowBulkSchedule(false);
       setBulkScheduleDate('');
@@ -216,13 +246,15 @@ function PostsList() {
     <div className="posts-container">
       <div className="posts-header">
         <h1>
-          {t('posts.title')}
+          {isClient ? 'My Posts' : t('posts.title')}
           {totalAllCount > 0 && <span className="posts-count-badge">{totalAllCount}</span>}
         </h1>
-        <div className="header-actions">
-          <button onClick={() => navigate('/create')} className="btn-create btn-create--outline">{t('posts.createManual')}</button>
-          <button onClick={() => navigate('/generate')} className="btn-create">{t('posts.createNew')}</button>
-        </div>
+        {!isClient && (
+          <div className="header-actions">
+            <button onClick={() => navigate('/create')} className="btn-create btn-create--outline">{t('posts.createManual')}</button>
+            <button onClick={() => navigate('/generate')} className="btn-create">{t('posts.createNew')}</button>
+          </div>
+        )}
       </div>
 
       {activeClient && (
@@ -239,15 +271,17 @@ function PostsList() {
       {publishMsg && <div className="success-message">{publishMsg}</div>}
 
       <div className="posts-filter-bar">
-        <label className="posts-select-all">
-          <input
-            type="checkbox"
-            checked={posts.filter(p => !['pending_approval','posted'].includes(p.status)).length > 0 &&
-              posts.filter(p => !['pending_approval','posted'].includes(p.status)).every(p => selected.has(p.id))}
-            onChange={toggleSelectAll}
-          />
-          <span>Select all</span>
-        </label>
+        {!isClient && (
+          <label className="posts-select-all">
+            <input
+              type="checkbox"
+              checked={posts.filter(isPostSelectable).length > 0 &&
+                posts.filter(isPostSelectable).every(p => selected.has(p.id))}
+              onChange={toggleSelectAll}
+            />
+            <span>Select all</span>
+          </label>
+        )}
         <div className="posts-search-wrap">
           <FiSearch className="posts-search-icon" />
           <input type="text" className="posts-search-input"
@@ -267,9 +301,12 @@ function PostsList() {
         <select className="posts-filter-select" value={filterStatus}
           onChange={e => { setFilterStatus(e.target.value); setPage(1); }}>
           <option value="all">{t('posts.allStatuses')}</option>
-          <option value="draft">Draft</option>
-          <option value="pending_approval">Awaiting Approval</option>
-          <option value="approved">Ready to Post</option>
+          {!isClient && <option value="draft">Draft</option>}
+          {isSpecialist && <option value="pending_approval">Awaiting Approval</option>}
+          {isSpecialist && <option value="approved">Approved</option>}
+          {isClient && <option value="pending_approval">Awaiting Approval</option>}
+          {isClient && <option value="approved">Approved</option>}
+          {isClient && <option value="rejected">Rejected</option>}
           <option value="scheduled">{t('posts.scheduled')}</option>
           <option value="posted">{t('posts.posted')}</option>
         </select>
@@ -279,7 +316,7 @@ function PostsList() {
         )}
       </div>
 
-      {selected.size > 0 && (
+      {!isClient && selected.size > 0 && (
         <div className="bulk-bar">
           <span className="bulk-bar-count">{selected.size} selected</span>
           <div className="bulk-bar-actions">
@@ -287,6 +324,7 @@ function PostsList() {
               <>
                 <input type="date" className="bulk-date-input" value={bulkScheduleDate}
                   min={new Date().toISOString().slice(0,10)}
+                  max="2099-12-31"
                   onChange={e => setBulkScheduleDate(e.target.value)} />
                 <input type="time" className="bulk-date-input" value={bulkScheduleTime}
                   onChange={e => setBulkScheduleTime(e.target.value)} />
@@ -336,9 +374,9 @@ function PostsList() {
           <div className="posts-grid">
             {posts.map(post => {
               const meta = STATUS_META[post.status] || { text: post.status, cls: 'badge-draft' };
-              const isApproved = post.status === 'approved' || post.status === 'ready_to_post';
+              const isApproved = post.status === 'approved';
               const isRejectedDraft = post.status === 'draft' && post.approval_note;
-              const isSelectable = !['pending_approval', 'posted'].includes(post.status);
+              const isSelectable = isPostSelectable(post);
               const isSelected = selected.has(post.id);
 
               return (
@@ -352,7 +390,7 @@ function PostsList() {
                     </div>
                     <div className="post-item-header-right">
                       <span className={`status-badge ${meta.cls}`}>{meta.text}</span>
-                      {isSelectable && (
+                      {!isClient && isSelectable && (
                         <label className="post-checkbox" onClick={e => e.stopPropagation()}>
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(post.id)} />
                         </label>
@@ -360,7 +398,7 @@ function PostsList() {
                     </div>
                   </div>
 
-                  {!activeClientId && post.client_username && (
+                  {!isClient && !activeClientId && post.client_username && (
                     <div className="post-client-tag">
                       <FiUser />
                       {post.client_first_name || post.client_last_name
@@ -406,17 +444,20 @@ function PostsList() {
                     <span>📅 {formatDate(post.scheduled_time)}</span>
                   </div>
 
-                  <div className="post-actions">
-                    {/* Edit — available on draft, approved, scheduled */}
-                    {(isApproved || ['draft', 'scheduled'].includes(post.status)) && (
+                  {!isClient && <div className="post-actions">
+                    {/* Edit */}
+                    {(isOwner
+                      ? ['draft', 'scheduled'].includes(post.status)
+                      : isApproved || ['draft', 'scheduled'].includes(post.status)
+                    ) && (
                       <button className="btn-edit"
                         onClick={e => { e.stopPropagation(); navigate(`/edit/${post.id}`); }}>
-                        {isApproved ? t('approval.scheduleBtn') : t('posts.edit')}
+                        {!isOwner && isApproved ? t('approval.scheduleBtn') : t('posts.edit')}
                       </button>
                     )}
 
-                    {/* Submit for Approval — only on draft */}
-                    {post.status === 'draft' && (
+                    {/* Submit for Approval — specialist only, draft only */}
+                    {isSpecialist && post.status === 'draft' && (
                       <button className="btn-submit-approval"
                         onClick={e => handleSubmitForApproval(e, post.id)}
                         disabled={submitting === post.id}>
@@ -424,9 +465,11 @@ function PostsList() {
                       </button>
                     )}
 
-                    {/* Publish Now — only on approved or scheduled Instagram posts with image */}
+                    {/* Publish Now — Instagram only, with image */}
                     {post.platform === 'instagram'
-                      && (isApproved || post.status === 'scheduled')
+                      && (isOwner
+                        ? ['draft', 'scheduled'].includes(post.status)
+                        : isApproved || post.status === 'scheduled')
                       && post.image_url && (
                       <button className="btn-publish-ig"
                         onClick={e => handlePublishNow(e, post)}
@@ -434,10 +477,7 @@ function PostsList() {
                         {publishingId === post.id ? (
                           <><span className="btn-publish-ig-spinner" /> {t('instagram.publishing')}</>
                         ) : (
-                          <>
-                            <FaInstagram />
-                            {t('instagram.publishBtn')}
-                          </>
+                          <><FaInstagram />{t('instagram.publishBtn')}</>
                         )}
                       </button>
                     )}
@@ -448,7 +488,7 @@ function PostsList() {
                         {t('posts.delete')}
                       </button>
                     )}
-                  </div>
+                  </div>}
                 </div>
               );
             })}
@@ -474,6 +514,37 @@ function PostsList() {
           )}
         </div>
       )}
+    {igPickerPost && (
+      <div className="edit-modal-backdrop" onClick={() => setIgPickerPost(null)}>
+        <div className="edit-modal" onClick={e => e.stopPropagation()}>
+          <div className="edit-modal-header">
+            <span className="edit-modal-icon"><FaInstagram /></span>
+            <h3>Select Instagram Account</h3>
+          </div>
+          <p className="edit-modal-msg">This client has multiple Instagram accounts. Choose which one to publish to.</p>
+          <select
+            className="posts-filter-select"
+            style={{ width: '100%', marginBottom: 16 }}
+            value={igPickerSelected}
+            onChange={e => setIgPickerSelected(parseInt(e.target.value, 10))}
+          >
+            {igPickerAccounts.map(a => (
+              <option key={a.id} value={a.id}>@{a.account_username}</option>
+            ))}
+          </select>
+          <div className="edit-modal-actions">
+            <button className="edit-modal-stay-btn" onClick={async () => {
+              const post = igPickerPost;
+              setIgPickerPost(null);
+              await doPublishNow(post.id, igPickerSelected);
+            }}>
+              Publish
+            </button>
+            <button className="edit-modal-leave-btn" onClick={() => setIgPickerPost(null)}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }

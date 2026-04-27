@@ -17,10 +17,11 @@ const PLATFORM_META = {
 };
 
 const STATUS_CLS = {
-  draft:         'badge-draft',
-  scheduled:     'badge-scheduled',
-  ready_to_post: 'badge-ready',
-  posted:        'badge-posted',
+  draft:            'badge-draft',
+  pending_approval: 'badge-pending',
+  approved:         'badge-approved',
+  scheduled:        'badge-scheduled',
+  posted:           'badge-posted',
 };
 
 function formatTime(dateStr, locale) {
@@ -49,12 +50,14 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
   const { t } = useTranslation();
   const { language } = useSettings();
   const locale = LOCALE_MAP[language] || 'en-US';
+  const isClientRole = localStorage.getItem('role') === 'client';
   const platform = PLATFORM_META[post.platform] || { icon: '📄', label: post.platform };
   const statusCls = STATUS_CLS[post.status] || 'badge-draft';
   const statusText = {
     draft: t('posts.draft'),
+    pending_approval: 'Awaiting Approval',
+    approved: 'Approved',
     scheduled: t('posts.scheduled'),
-    ready_to_post: t('posts.ready'),
     posted: t('posts.posted'),
   }[post.status] || post.status;
 
@@ -84,8 +87,9 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
   useEffect(() => {
     if (post.scheduled_time) {
       const dt = new Date(post.scheduled_time);
-      setNewDate(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`);
-      setNewTime(`${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`);
+      const pad = n => String(n).padStart(2, '0');
+      setNewDate(`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`);
+      setNewTime(`${pad(dt.getHours())}:${pad(dt.getMinutes())}`);
     }
   }, [post.scheduled_time]);
 
@@ -139,7 +143,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
               <p className="cal-modal-value cal-modal-date">
                 {formatFullDate(post.scheduled_time, locale) || t('calendar.notScheduled')}
               </p>
-              {!isPosted && (
+              {!isClientRole && !isPosted && (
                 isPast ? (
                   <span className="cal-modal-locked-badge" title="Past posts cannot be rescheduled">
                     <FiLock />
@@ -164,6 +168,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
                     type="date"
                     value={newDate}
                     min={todayInputMin}
+                    max="2099-12-31"
                     onChange={e => setNewDate(e.target.value)}
                     className="cal-drawer-time-input"
                   />
@@ -203,16 +208,27 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
               <p className="cal-modal-value cal-modal-hashtags">{post.hashtags}</p>
             </div>
           )}
-          {post.image_prompt && (
+          {post.media_type === 'video' && post.video_url ? (
             <div className="cal-modal-section">
-              <p className="cal-modal-label">{t('calendar.labelImagePrompt')}</p>
-              <p className="cal-modal-value cal-modal-caption">{post.image_prompt}</p>
+              <video
+                src={post.video_url}
+                controls
+                className="cal-modal-media"
+              />
             </div>
-          )}
+          ) : post.image_url ? (
+            <div className="cal-modal-section">
+              <img
+                src={post.image_url}
+                alt=""
+                className="cal-modal-media"
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="cal-modal-footer">
-          {!isPosted && (
+          {!isClientRole && !isPosted && (
             <button
               className="cal-modal-edit-btn"
               onClick={() => { close(); setTimeout(() => onEdit(post.id), 180); }}
@@ -401,13 +417,77 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
   );
 }
 
+function DropTimeModal({ post, targetKey, defaultTime, locale, onConfirm, onCancel }) {
+  const { t } = useTranslation();
+  const [time, setTime] = useState(defaultTime);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const displayDate = new Date(targetKey + 'T12:00:00').toLocaleDateString(locale, {
+    weekday: 'long', month: 'long', day: 'numeric',
+  });
+
+  const handleConfirm = async () => {
+    const [ty, tm, td] = targetKey.split('-').map(Number);
+    const [hr, mn] = time.split(':').map(Number);
+    const dt = new Date(ty, tm - 1, td, hr, mn, 0);
+    if (dt <= new Date()) { setErr(t('calendar.mustBeFuture')); return; }
+    setSaving(true);
+    try {
+      await onConfirm(post.id, dt.toISOString());
+    } catch {
+      setErr(t('calendar.rescheduleFailed'));
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onCancel(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onCancel]);
+
+  return (
+    <div className="cal-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div className="cal-modal cal-drop-modal">
+        <div className="cal-modal-header">
+          <h3 className="cal-drop-modal-title"><FiClock /> {t('calendar.selectTime')}</h3>
+          <button className="cal-modal-close" onClick={onCancel}><FiX /></button>
+        </div>
+        <div className="cal-modal-body">
+          <p className="cal-drop-modal-date">{displayDate}</p>
+          <div className="cal-drop-modal-time-row">
+            <label className="cal-drawer-time-label"><FiClock />{t('calendar.publishTime')}</label>
+            <input
+              type="time"
+              value={time}
+              onChange={e => { setTime(e.target.value); setErr(''); }}
+              className="cal-drawer-time-input"
+              autoFocus
+            />
+          </div>
+          {err && <p className="cal-drawer-err">{err}</p>}
+        </div>
+        <div className="cal-modal-footer">
+          <button className="cal-drawer-confirm" style={{ flex: 1 }} onClick={handleConfirm} disabled={saving}>
+            {saving ? <><span className="cal-drawer-confirm-spinner" />{t('calendar.saving')}</> : <><FiCheck />{t('calendar.confirm')}</>}
+          </button>
+          <button className="cal-modal-cancel-btn" onClick={onCancel}>{t('calendar.cancel')}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Calendar() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { language } = useSettings();
   const locale = LOCALE_MAP[language] || 'en-US';
   const today = new Date();
+  const todayRef = useRef(today);
   const { activeClientId, activeClient } = useActiveClient();
+  const isClient = localStorage.getItem('role') === 'client';
 
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [posts, setPosts] = useState([]);
@@ -420,6 +500,7 @@ function Calendar() {
   const pendingFlash = useRef(false);
 
   // ── Drag state ──────────────────────────────────────────────────────────────
+  const [dropPending, setDropPending] = useState(null);   // { post, targetKey, defaultTime }
   const [dragging, setDragging]       = useState(null);   // post object being dragged
   const [dragOver, setDragOver]       = useState(null);   // dateKey hovered
   const [dragOverNav, setDragOverNav] = useState(null);   // 'prev' | 'next' | null
@@ -497,12 +578,16 @@ function Calendar() {
 
   const prevPeriod = () => {
     setPosts([]);
+    handledRef.current = false; succeededRef.current = false; snapshotRef.current = [];
+    setDragging(null); setDragOver(null); setDragOverNav(null); draggingRef.current = null;
     if (calView === 'month') setCurrentDate(new Date(year, month - 2, 1));
     else if (calView === 'week') setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 7); return d; });
     else setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d; });
   };
   const nextPeriod = () => {
     setPosts([]);
+    handledRef.current = false; succeededRef.current = false; snapshotRef.current = [];
+    setDragging(null); setDragOver(null); setDragOverNav(null); draggingRef.current = null;
     if (calView === 'month') setCurrentDate(new Date(year, month, 1));
     else if (calView === 'week') setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 7); return d; });
     else setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d; });
@@ -623,45 +708,37 @@ function Calendar() {
     if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(null);
   }, []);
 
-  const onDrop = useCallback(async (e, targetKey) => {
+  const onDrop = useCallback((e, targetKey) => {
     e.preventDefault();
     setDragOver(null);
 
     const post = draggingRef.current;
-    if (!post || isCellPast(targetKey)) return;
+    if (!post || isCellPast(targetKey)) { endDrag(); return; }
 
     const srcDate = post.scheduled_time ? new Date(post.scheduled_time) : null;
     const srcKey  = srcDate
       ? `${srcDate.getFullYear()}-${String(srcDate.getMonth()+1).padStart(2,'0')}-${String(srcDate.getDate()).padStart(2,'0')}`
       : null;
-    if (srcKey === targetKey) return;
+    if (srcKey === targetKey) { endDrag(); return; }
 
-    // Keep original time-of-day
-    const h  = srcDate ? srcDate.getHours()   : 9;
-    const m  = srcDate ? srcDate.getMinutes() : 0;
-    const [ty, tm, td] = targetKey.split('-').map(Number);
-    const newTime = new Date(ty, tm - 1, td, h, m, 0).toISOString();
+    const h = srcDate ? srcDate.getHours()   : 9;
+    const m = srcDate ? srcDate.getMinutes() : 0;
+    const defaultTime = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 
     succeededRef.current = true;
+    endDrag();
 
-    // Optimistic: update or inject
-    setPosts(prev => {
-      const exists = prev.some(p => p.id === post.id);
-      if (exists) return prev.map(p => p.id === post.id ? { ...p, scheduled_time: newTime } : p);
-      return [...prev, { ...post, scheduled_time: newTime }];
-    });
-
-    try {
-      await postsAPI.update(post.id, { scheduled_time: newTime });
-    } catch {
-      succeededRef.current = false;
-      loadPosts();
-    }
-  }, [loadPosts, todayKey]); // eslint-disable-line
+    setDropPending({ post, targetKey, defaultTime });
+  }, [todayKey, endDrag]); // eslint-disable-line
 
   // Nav portal: hover arrow for 600ms while dragging → flip month
   const onNavDragOver = useCallback((e, dir) => {
     if (!draggingRef.current) return;
+    if (dir === 'prev') {
+      const prev = new Date(currentDateRef.current.getFullYear(), currentDateRef.current.getMonth() - 1, 1);
+      const t = todayRef.current;
+      if (prev.getFullYear() < t.getFullYear() || (prev.getFullYear() === t.getFullYear() && prev.getMonth() < t.getMonth())) return;
+    }
     e.preventDefault();
     e.dataTransfer.dropEffect = 'none';
     if (navTimerRef.current?.dir === dir) return;
@@ -694,14 +771,16 @@ function Calendar() {
           <h1>{t('calendar.title')}</h1>
           <p className="cal-subtitle">{t('calendar.subtitle')}</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="cal-new-btn cal-new-btn--outline" onClick={() => navigate('/create')}>
-            {t('posts.createManual')}
-          </button>
-          <button className="cal-new-btn" onClick={() => navigate('/generate')}>
-            {t('posts.createNew')}
-          </button>
-        </div>
+        {!isClient && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="cal-new-btn cal-new-btn--outline" onClick={() => navigate('/create')}>
+              {t('posts.createManual')}
+            </button>
+            <button className="cal-new-btn" onClick={() => navigate('/generate')}>
+              {t('posts.createNew')}
+            </button>
+          </div>
+        )}
       </div>
 
       {activeClient && (
@@ -721,6 +800,7 @@ function Calendar() {
               data-portal-key={dragOverNav === 'prev' ? navPortalKey : undefined}
               onClick={prevPeriod}
               aria-label="Previous"
+              disabled={!!dragging && (year < today.getFullYear() || (year === today.getFullYear() && month - 1 <= today.getMonth()))}
               onDragOver={e => onNavDragOver(e, 'prev')}
               onDragLeave={onNavDragLeave}
             >
@@ -772,8 +852,8 @@ function Calendar() {
                   const isBlocked = dragging && isPast;
                   return (
                     <div key={key} id={isToday ? 'cal-today-cell' : undefined} data-col={col}
-                      className={['cal-cell', isToday ? 'cal-cell--today' : '', isOver ? 'cal-cell--drag-over' : '', isBlocked ? 'cal-cell--blocked' : ''].filter(Boolean).join(' ')}
-                      onClick={() => !dragging && setScheduleDrawer(key)}
+                      className={['cal-cell', isToday ? 'cal-cell--today' : '', isPast ? 'cal-cell--past' : '', isOver ? 'cal-cell--drag-over' : '', isBlocked ? 'cal-cell--blocked' : ''].filter(Boolean).join(' ')}
+                      onClick={() => !isClient && !dragging && !isPast && setScheduleDrawer(key)}
                       onDragOver={e => onDragOver(e, key)} onDragLeave={onDragLeave} onDrop={e => onDrop(e, key)}
                     >
                       {isToday && flashKey > 0 && <div key={flashKey} className="cal-today-flash-overlay" />}
@@ -783,10 +863,10 @@ function Calendar() {
                           const p = PLATFORM_META[post.platform] || { icon: '📄' };
                           const isDraggingThis = dragging?.id === post.id;
                           return (
-                            <button key={post.id} draggable={!isPast}
+                            <button key={post.id} draggable={!isClient && !isPast}
                               className={['cal-post-chip', `cal-chip--${post.platform}`, isPast ? 'cal-chip--past' : '', isDraggingThis ? 'cal-chip--dragging' : ''].filter(Boolean).join(' ')}
-                              onDragStart={isPast ? undefined : e => { e.stopPropagation(); onDragStart(e, post); }}
-                              onDragEnd={isPast ? undefined : onDragEnd}
+                              onDragStart={isClient || isPast ? undefined : e => { e.stopPropagation(); onDragStart(e, post); }}
+                              onDragEnd={isClient || isPast ? undefined : onDragEnd}
                               onClick={e => { e.stopPropagation(); setSelectedPost(post); }}
                               title={post.caption}
                             >
@@ -797,7 +877,7 @@ function Calendar() {
                                   {(post.client_first_name || post.client_username || '').charAt(0).toUpperCase()}
                                 </span>
                               )}
-                              {!isPast && <FiMove className="cal-chip-grip" />}
+                              {!isClient && !isPast && <FiMove className="cal-chip-grip" />}
                             </button>
                           );
                         })}
@@ -834,7 +914,7 @@ function Calendar() {
                 const isToday = key === todayKey;
                 return (
                   <div key={key} className={`cal-week-col${isToday ? ' cal-week-col--today' : ''}${dragging && isPast ? ' cal-cell--blocked' : ''}${dragOver === key ? ' cal-cell--drag-over' : ''}`}
-                    onClick={() => !dragging && setScheduleDrawer(key)}
+                    onClick={() => !isClient && !dragging && !isPast && setScheduleDrawer(key)}
                     onDragOver={e => onDragOver(e, key)} onDragLeave={onDragLeave} onDrop={e => onDrop(e, key)}
                   >
                     {dayPosts.length === 0
@@ -843,16 +923,16 @@ function Calendar() {
                           const p = PLATFORM_META[post.platform] || { icon: '📄' };
                           const isDraggingThis = dragging?.id === post.id;
                           return (
-                            <button key={post.id} draggable={!isPast}
+                            <button key={post.id} draggable={!isClient && !isPast}
                               className={['cal-post-chip cal-week-chip', `cal-chip--${post.platform}`, isPast ? 'cal-chip--past' : '', isDraggingThis ? 'cal-chip--dragging' : ''].filter(Boolean).join(' ')}
-                              onDragStart={isPast ? undefined : e => { e.stopPropagation(); onDragStart(e, post); }}
-                              onDragEnd={isPast ? undefined : onDragEnd}
+                              onDragStart={isClient || isPast ? undefined : e => { e.stopPropagation(); onDragStart(e, post); }}
+                              onDragEnd={isClient || isPast ? undefined : onDragEnd}
                               onClick={e => { e.stopPropagation(); setSelectedPost(post); }}
                               title={post.caption}
                             >
                               <span className="cal-chip-icon">{p.icon}</span>
                               <span className="cal-chip-time">{formatTime(post.scheduled_time, locale)}</span>
-                              {!isPast && <FiMove className="cal-chip-grip" />}
+                              {!isClient && !isPast && <FiMove className="cal-chip-grip" />}
                             </button>
                           );
                         })
@@ -875,8 +955,8 @@ function Calendar() {
               <div className={`cal-day-header${isToday ? ' cal-day-header--today' : ''}`}>
                 {currentDate.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' })}
               </div>
-              <div className={`cal-day-body${dragging && isPast ? ' cal-cell--blocked' : ''}${dragOver === key ? ' cal-cell--drag-over' : ''}`}
-                onClick={() => !dragging && setScheduleDrawer(key)}
+              <div className={`cal-day-body${isPast ? ' cal-cell--past' : ''}${dragging && isPast ? ' cal-cell--blocked' : ''}${dragOver === key ? ' cal-cell--drag-over' : ''}`}
+                onClick={() => !isClient && !dragging && !isPast && setScheduleDrawer(key)}
                 onDragOver={e => onDragOver(e, key)} onDragLeave={onDragLeave} onDrop={e => onDrop(e, key)}
               >
                 {dayPosts.length === 0
@@ -885,10 +965,10 @@ function Calendar() {
                       const p = PLATFORM_META[post.platform] || { icon: '📄' };
                       const isDraggingThis = dragging?.id === post.id;
                       return (
-                        <button key={post.id} draggable={!isPast}
+                        <button key={post.id} draggable={!isClient && !isPast}
                           className={['cal-day-post-row', `cal-chip--${post.platform}`, isPast ? 'cal-chip--past' : '', isDraggingThis ? 'cal-chip--dragging' : ''].filter(Boolean).join(' ')}
-                          onDragStart={isPast ? undefined : e => { e.stopPropagation(); onDragStart(e, post); }}
-                          onDragEnd={isPast ? undefined : onDragEnd}
+                          onDragStart={isClient || isPast ? undefined : e => { e.stopPropagation(); onDragStart(e, post); }}
+                          onDragEnd={isClient || isPast ? undefined : onDragEnd}
                           onClick={e => { e.stopPropagation(); setSelectedPost(post); }}
                         >
                           <span className="cal-day-post-time">{formatTime(post.scheduled_time, locale)}</span>
@@ -955,12 +1035,47 @@ function Calendar() {
         />
       )}
 
-      {scheduleDrawer && (
+      {!isClient && scheduleDrawer && (
         <ScheduleDrawer
           dateKey={scheduleDrawer}
           locale={locale}
           onClose={() => setScheduleDrawer(null)}
           onScheduled={() => { setScheduleDrawer(null); loadPosts(); }}
+        />
+      )}
+
+      {dropPending && (
+        <DropTimeModal
+          post={dropPending.post}
+          targetKey={dropPending.targetKey}
+          defaultTime={dropPending.defaultTime}
+          locale={locale}
+          onConfirm={async (postId, isoTime) => {
+            const { post } = dropPending;
+            setPosts(prev => {
+              const exists = prev.some(p => p.id === postId);
+              if (exists) return prev.map(p => p.id === postId ? { ...p, scheduled_time: isoTime } : p);
+              return [...prev, { ...post, scheduled_time: isoTime }];
+            });
+            setDropPending(null);
+            try {
+              await postsAPI.update(postId, { scheduled_time: isoTime });
+              const target = new Date(isoTime);
+              if (target.getFullYear() !== year || target.getMonth() !== month - 1) {
+                setPosts([]);
+                setCurrentDate(new Date(target.getFullYear(), target.getMonth(), 1));
+              } else {
+                loadPosts();
+              }
+            } catch {
+              loadPosts();
+            }
+          }}
+          onCancel={() => {
+            setPosts(snapshotRef.current.length > 0 ? snapshotRef.current : posts);
+            snapshotRef.current = [];
+            setDropPending(null);
+          }}
         />
       )}
     </div>

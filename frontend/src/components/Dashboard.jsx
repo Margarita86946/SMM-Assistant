@@ -51,9 +51,8 @@ function PostDetailModal({ post, onClose, t, formatDate, getStatusBadge }) {
           )}
           <div className="post-modal-meta">
             <span className="post-platform">
-              {post.platform === 'instagram' && '📷 Instagram'}
-              {post.platform === 'linkedin' && '💼 LinkedIn'}
-              {post.platform === 'twitter' && '🐦 Twitter'}
+              <span className="platform-emoji">{post.platform === 'instagram' ? '📷' : post.platform === 'linkedin' ? '💼' : '🐦'}</span>
+              {post.platform === 'instagram' ? 'Instagram' : post.platform === 'linkedin' ? 'LinkedIn' : 'Twitter'}
             </span>
             {getStatusBadge(post.status)}
           </div>
@@ -149,10 +148,9 @@ function Dashboard() {
   const getStatusBadge = (status) => {
     const badges = {
       draft: { text: t('posts.draft'), class: 'badge-draft' },
-      scheduled: { text: t('posts.scheduled'), class: 'badge-scheduled' },
-      ready_to_post: { text: t('posts.ready'), class: 'badge-ready' },
-      pending_approval: { text: 'Pending', class: 'badge-pending' },
+      pending_approval: { text: 'Awaiting Approval', class: 'badge-pending' },
       approved: { text: 'Approved', class: 'badge-approved' },
+      scheduled: { text: t('posts.scheduled'), class: 'badge-scheduled' },
       rejected: { text: 'Rejected', class: 'badge-rejected' },
       posted: { text: t('posts.posted'), class: 'badge-posted' },
     };
@@ -343,9 +341,8 @@ function Dashboard() {
                 </div>
                 <div className="post-meta">
                   <span className="post-platform">
-                    {post.platform === 'instagram' && '📷 Instagram'}
-                    {post.platform === 'linkedin' && '💼 LinkedIn'}
-                    {post.platform === 'twitter' && '🐦 Twitter'}
+                    <span className="platform-emoji">{post.platform === 'instagram' ? '📷' : post.platform === 'linkedin' ? '💼' : '🐦'}</span>
+                    {post.platform === 'instagram' ? 'Instagram' : post.platform === 'linkedin' ? 'LinkedIn' : 'Twitter'}
                   </span>
                   <span className="post-date">{formatDate(post.scheduled_time)}</span>
                 </div>

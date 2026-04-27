@@ -771,6 +771,7 @@ function CreatePost() {
               value={scheduledTime}
               onChange={(e) => setScheduledTime(e.target.value)}
               min={new Date().toISOString().slice(0, 16)}
+              max="2099-12-31T23:59"
             />
             {scheduledTime && (
               <p className="create-schedule-hint">{t('create.scheduleHint')}</p>

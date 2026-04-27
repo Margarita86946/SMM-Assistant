@@ -30,6 +30,11 @@ OAUTH_STATE_TTL_MINUTES = 10
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def instagram_oauth_start(request):
+    if request.user.role not in ('client', 'owner'):
+        return Response(
+            {'error': 'Specialists cannot connect Instagram accounts'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
     try:
         nonce = secrets.token_urlsafe(32)
         expires_at = timezone.now() + timedelta(minutes=OAUTH_STATE_TTL_MINUTES)
@@ -60,56 +65,40 @@ def instagram_oauth_callback(request):
     state = request.query_params.get('state')
     error = request.query_params.get('error')
 
-    def fail_redirect(flow, reason):
-        if flow == 'invitation':
-            return redirect(f'{frontend_url}/accept-invitation?result={reason}')
-        return redirect(f'{frontend_url}/account?instagram={reason}')
-
-    flow = 'own'
-
     if error or not code or not state:
-        return fail_redirect(flow, 'error')
+        return redirect(f'{frontend_url}/account?instagram=error')
 
     try:
         with transaction.atomic():
             oauth_state = (
                 OAuthState.objects
                 .select_for_update(of=('self',))
-                .select_related('user', 'invitation', 'invitation__specialist')
+                .select_related('user')
                 .get(nonce=state, platform='instagram')
             )
-            invitation = oauth_state.invitation
-            owning_user = oauth_state.user
-            had_invitation = oauth_state.invitation_id is not None
+            client_user = oauth_state.user
             is_expired = oauth_state.expires_at < timezone.now()
             oauth_state.delete()
             if is_expired:
-                flow = 'invitation' if had_invitation else 'own'
-                return fail_redirect(flow, 'error')
+                return redirect(f'{frontend_url}/account?instagram=error')
     except OAuthState.DoesNotExist:
-        return fail_redirect('own', 'error')
+        return redirect(f'{frontend_url}/account?instagram=error')
 
-    if invitation is not None:
-        flow = 'invitation'
-        if invitation.status != 'pending' or invitation.is_expired:
-            return fail_redirect(flow, 'expired')
-        specialist = invitation.specialist
-    else:
-        specialist = owning_user
+    if client_user is None or client_user.role not in ('client', 'owner'):
+        return redirect(f'{frontend_url}/account?instagram=error')
 
-    if specialist is None:
-        return fail_redirect(flow, 'error')
+    specialist = client_user.specialist if client_user.role == 'client' else None
 
     try:
         short = instagram_service.exchange_code_for_token(code)
         long_lived = instagram_service.get_long_lived_token(short['access_token'])
         info = instagram_service.get_instagram_user_info(long_lived['access_token'])
     except instagram_service.InstagramAPIError:
-        return fail_redirect(flow, 'error')
+        return redirect(f'{frontend_url}/account?instagram=error')
 
     account_type = (info.get('account_type') or '').upper()
     if account_type and account_type not in {'BUSINESS', 'CREATOR', 'MEDIA_CREATOR'}:
-        return fail_redirect(flow, 'personal')
+        return redirect(f'{frontend_url}/account?instagram=personal')
 
     instagram_user_id = info['instagram_user_id'] or short.get('user_id', '')
     instagram_username = info.get('username', '')
@@ -118,70 +107,13 @@ def instagram_oauth_callback(request):
     active_key = EncryptionKey.get_active()
     encrypted_token = encrypt(long_lived['access_token'], active_key.id)
 
-    if flow == 'invitation':
-        encrypted_email = invitation.client_email
-        try:
-            with transaction.atomic():
-                social_account, _ = SocialAccount.objects.update_or_create(
-                    user=specialist,
-                    platform='instagram',
-                    instagram_user_id=instagram_user_id,
-                    defaults={
-                        'owned_by': specialist,
-                        'account_username': instagram_username,
-                        'account_type': account_type,
-                        'access_token': encrypted_token,
-                        'encryption_key': active_key,
-                        'token_expires_at': expires_at,
-                        'token_last_refreshed': timezone.now(),
-                        'is_active': True,
-                        'is_client_account': True,
-                        'client_email': encrypted_email or '',
-                    },
-                )
-                invitation.status = 'accepted'
-                invitation.accepted_at = timezone.now()
-                invitation.accepted_ip = get_client_ip(request)
-                invitation.social_account = social_account
-                invitation.save(update_fields=[
-                    'status', 'accepted_at', 'accepted_ip', 'social_account'
-                ])
-        except Exception:
-            return fail_redirect(flow, 'error')
-
-        decrypted_email = invitation.decrypted_client_email
-        email_domain = decrypted_email.split('@', 1)[1] if '@' in decrypted_email else ''
-        log_action(
-            specialist,
-            'invitation_accepted',
-            request=request,
-            target=invitation,
-            metadata={
-                'client_email_domain': email_domain,
-                'platform': 'instagram',
-                'instagram_username': instagram_username,
-            },
-        )
-        log_action(
-            specialist,
-            'account_connected',
-            request=request,
-            target=social_account,
-            metadata={
-                'platform': 'instagram',
-                'username': instagram_username,
-                'is_client_account': True,
-            },
-        )
-        return redirect(f'{frontend_url}/accept-invitation?result=connected')
-
     try:
         social_account, _ = SocialAccount.objects.update_or_create(
-            user=specialist,
             platform='instagram',
             instagram_user_id=instagram_user_id,
             defaults={
-                'owned_by': specialist,
+                'account_user': client_user,
+                'specialist': specialist,
                 'account_username': instagram_username,
                 'account_type': account_type,
                 'access_token': encrypted_token,
@@ -189,23 +121,17 @@ def instagram_oauth_callback(request):
                 'token_expires_at': expires_at,
                 'token_last_refreshed': timezone.now(),
                 'is_active': True,
-                'is_client_account': False,
-                'client_email': '',
             },
         )
     except Exception:
-        return fail_redirect(flow, 'error')
+        return redirect(f'{frontend_url}/account?instagram=error')
 
     log_action(
-        specialist,
+        client_user,
         'account_connected',
         request=request,
         target=social_account,
-        metadata={
-            'platform': 'instagram',
-            'username': instagram_username,
-            'is_client_account': False,
-        },
+        metadata={'platform': 'instagram', 'username': instagram_username},
     )
     return redirect(f'{frontend_url}/account?instagram=connected')
 
@@ -213,10 +139,11 @@ def instagram_oauth_callback(request):
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def instagram_disconnect(request, pk):
+    user = request.user
+    if user.role == 'specialist':
+        return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
     try:
-        account = SocialAccount.objects.get(
-            pk=pk, user=request.user, platform='instagram',
-        )
+        account = SocialAccount.objects.get(pk=pk, account_user=user, platform='instagram')
     except SocialAccount.DoesNotExist:
         return Response({'error': 'No Instagram account found'}, status=status.HTTP_404_NOT_FOUND)
     username_snapshot = account.account_username
@@ -225,10 +152,9 @@ def instagram_disconnect(request, pk):
         account.access_token = ''
         account.token_expires_at = None
         account.save(update_fields=['is_active', 'access_token', 'token_expires_at'])
-        if not account.is_client_account:
-            Post.objects.filter(user=request.user, auto_publish=True, status='scheduled').update(auto_publish=False)
+        Post.objects.filter(client=account.account_user, status='scheduled').update(status='draft')
     log_action(
-        request.user,
+        user,
         'account_disconnected',
         request=request,
         target=account,
@@ -240,33 +166,40 @@ def instagram_disconnect(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def instagram_status(request):
-    from django.db.models import Q as DQ
-    if request.user.role == 'specialist':
+    user = request.user
+    if user.role == 'specialist':
         accounts = SocialAccount.objects.filter(
-            DQ(user=request.user) |
-            DQ(user__specialist=request.user, user__role='client'),
-            platform='instagram',
-            is_active=True,
-        ).select_related('user').only(
-            'id', 'account_username', 'account_type', 'user_id', 'token_expires_at',
-            'connected_at', 'is_client_account', 'user__id', 'user__username',
+            specialist=user, platform='instagram', is_active=True,
+        ).select_related('account_user').only(
+            'id', 'account_username', 'account_type', 'account_user_id', 'token_expires_at',
+            'connected_at', 'account_user__id', 'account_user__username',
         ).order_by('connected_at')
-    else:
-        accounts = SocialAccount.objects.filter(
-            user=request.user, platform='instagram', is_active=True,
-        ).only(
-            'id', 'account_username', 'account_type', 'user_id', 'token_expires_at',
-            'connected_at', 'is_client_account',
-        ).order_by('connected_at')
-
+        return Response({
+            'accounts': [
+                {
+                    'id': a.id,
+                    'username': a.account_username,
+                    'account_type': a.account_type,
+                    'is_client_account': True,
+                    'client_username': a.account_user.username,
+                    'expires_at': a.token_expires_at.isoformat() if a.token_expires_at else None,
+                }
+                for a in accounts
+            ]
+        })
+    accounts = SocialAccount.objects.filter(
+        account_user=user, platform='instagram', is_active=True,
+    ).only(
+        'id', 'account_username', 'account_type', 'token_expires_at', 'connected_at',
+    ).order_by('connected_at')
     return Response({
         'accounts': [
             {
                 'id': a.id,
                 'username': a.account_username,
                 'account_type': a.account_type,
-                'is_client_account': a.user_id != request.user.id,
-                'client_username': a.user.username if a.user_id != request.user.id else None,
+                'is_client_account': False,
+                'client_username': None,
                 'expires_at': a.token_expires_at.isoformat() if a.token_expires_at else None,
             }
             for a in accounts
@@ -279,7 +212,7 @@ def instagram_status(request):
 def publish_post_now(request, pk):
     with transaction.atomic():
         try:
-            post = Post.objects.select_related('client').select_for_update().get(pk=pk, user=request.user)
+            post = Post.objects.select_related('client').select_for_update(of=('self',)).get(pk=pk, user=request.user)
         except Post.DoesNotExist:
             return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -318,21 +251,35 @@ def publish_post_now(request, pk):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        ig_owner = post.client if post.client_id else request.user
-        try:
-            account = SocialAccount.objects.get(
-                user=ig_owner, platform='instagram', is_active=True,
+        if not post.client_id:
+            return Response(
+                {'error': 'Post has no client assigned — cannot publish'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        except SocialAccount.DoesNotExist:
-            if ig_owner != request.user:
+        if post.social_account_id:
+            try:
+                account = SocialAccount.objects.get(
+                    pk=post.social_account_id, account_user=post.client, is_active=True,
+                )
+            except SocialAccount.DoesNotExist:
+                return Response(
+                    {'error': 'Assigned Instagram account is no longer active'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            try:
+                account = SocialAccount.objects.get(
+                    account_user=post.client, platform='instagram', is_active=True,
+                )
+            except SocialAccount.DoesNotExist:
                 return Response(
                     {'error': 'No active Instagram account connected for this client'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            return Response(
-                {'error': 'No active Instagram account connected'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            except SocialAccount.MultipleObjectsReturned:
+                account = SocialAccount.objects.filter(
+                    account_user=post.client, platform='instagram', is_active=True,
+                ).order_by('-token_last_refreshed').first()
 
         if not account.access_token or (
             account.token_expires_at and account.token_expires_at <= timezone.now()
@@ -398,8 +345,7 @@ def publish_post_now(request, pk):
             })
         post.status = 'posted'
         post.instagram_post_id = instagram_post_id
-        post.auto_publish = False
-        post.save(update_fields=['status', 'instagram_post_id', 'auto_publish', 'updated_at'])
+        post.save(update_fields=['status', 'instagram_post_id', 'updated_at'])
 
     log_action(
         request.user,

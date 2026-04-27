@@ -78,6 +78,9 @@
 .client-platform {
   font-weight: 600;
   color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .client-caption {

@@ -8,6 +8,10 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('profile/', views.profile_view, name='profile'),
     path('change-password/', views.change_password, name='change-password'),
+    path('verify-email/<str:token>/', views.verify_email, name='verify-email'),
+    path('resend-verification/', views.resend_verification, name='resend-verification'),
+    path('forgot-password/', views.forgot_password, name='forgot-password'),
+    path('reset-password/<str:token>/', views.reset_password, name='reset-password'),
 
     # Posts
     path('posts/', views.posts_list, name='posts-list'),
@@ -49,15 +53,14 @@ urlpatterns = [
     path('invitations/lookup/<str:token>/', views.invitation_lookup, name='invitation-lookup'),
     path('clients/', views.clients_list, name='clients-list'),
     path('clients/<int:pk>/', views.client_detail, name='client-detail'),
-
-    # Email Configuration
-    path('email-config/', views.email_config_view, name='email-config'),
+    path('clients/<int:pk>/instagram-accounts/', views.client_instagram_accounts, name='client-instagram-accounts'),
 
     # Audit Logs
     path('audit-logs/', views.audit_logs_view, name='audit-logs'),
 
     # Notifications
     path('notifications/', views.notifications_list, name='notifications-list'),
+    path('notifications/stream/', views.notifications_stream, name='notifications-stream'),
     path('notifications/<int:pk>/read/', views.mark_read, name='notification-read'),
     path('notifications/read-all/', views.mark_all_read, name='notifications-read-all'),
 

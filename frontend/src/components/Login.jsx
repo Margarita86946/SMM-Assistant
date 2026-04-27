@@ -43,7 +43,6 @@ function Login({ isLoginMode }) {
         setFormData(prev => ({
           ...prev,
           email: res.data.client_email || '',
-          // Pre-fill username if this is a reactivation so the field can be locked
           username: res.data.existing_username || prev.username,
         }));
       })
@@ -98,6 +97,10 @@ function Login({ isLoginMode }) {
           payload.role = chosenRole;
         }
         const registerResponse = await authAPI.register(payload);
+        if (registerResponse.data.requires_verification) {
+          navigate('/check-email', { state: { email: registerResponse.data.email } });
+          return;
+        }
         localStorage.setItem('token', registerResponse.data.token);
         localStorage.setItem('username', formData.username);
         if (registerResponse.data.role) localStorage.setItem('role', registerResponse.data.role);
@@ -108,6 +111,11 @@ function Login({ isLoginMode }) {
         navigate(registerResponse.data.role === 'client' ? '/client' : '/dashboard');
       }
     } catch (err) {
+      if (err.message === 'email_not_verified') {
+        const email = err.response?.data?.email || '';
+        navigate('/check-email', { state: { email } });
+        return;
+      }
       const errorMap = {
         user_not_found: t('auth.errorUserNotFound'),
         wrong_password: t('auth.errorWrongPassword'),
@@ -333,6 +341,17 @@ function Login({ isLoginMode }) {
                 <button type="submit" className="btn-primary" disabled={loading || (isClientInvite && (invLoading || !!invError))}>
                   {loading ? t('auth.pleaseWait') : (isLogin ? t('auth.signIn') : t('auth.createAccount'))}
                 </button>
+
+                {isLogin && (
+                  <p style={{ textAlign: 'center', marginTop: 12, fontSize: 14 }}>
+                    <span
+                      className="toggle-link"
+                      onClick={() => navigate('/forgot-password')}
+                    >
+                      Forgot password?
+                    </span>
+                  </p>
+                )}
               </form>
 
               <p className="toggle-text">

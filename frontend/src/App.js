@@ -13,6 +13,10 @@ import ClientDashboard from './components/ClientDashboard';
 import Clients from './components/Clients';
 import Analyzer from './components/Analyzer';
 import AcceptInvitation from './components/AcceptInvitation';
+import VerifyEmail from './components/VerifyEmail';
+import CheckEmail from './components/CheckEmail';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
 import Sidebar from './components/Sidebar';
 import { NotificationBell, NotificationToast } from './components/NotificationBell';
 import { ActiveClientProvider } from './context/ActiveClientContext';
@@ -61,9 +65,9 @@ function PublicRoute({ children }) {
 
 // Routes each role is allowed to access (prefix match)
 const ROLE_ALLOWED_PATHS = {
-  owner:      ['/dashboard', '/posts', '/create', '/edit', '/calendar', '/generate', '/account'],
+  owner:      ['/dashboard', '/posts', '/create', '/edit', '/calendar', '/generate', '/account', '/analyzer'],
   specialist: ['/dashboard', '/posts', '/create', '/edit', '/calendar', '/generate', '/account', '/clients', '/analyzer'],
-  client:     ['/client', '/account'],
+  client:     ['/client', '/posts', '/calendar', '/analyzer', '/account'],
 };
 
 function ProtectedRoute({ children }) {
@@ -139,6 +143,10 @@ const router = createBrowserRouter([
       { path: '/analyzer', element: <ProtectedRoute><Analyzer /></ProtectedRoute> },
       { path: '/accept-invitation/:token', element: <AcceptInvitation /> },
       { path: '/accept-invitation', element: <AcceptInvitation /> },
+      { path: '/verify-email/:token', element: <VerifyEmail /> },
+      { path: '/check-email', element: <CheckEmail /> },
+      { path: '/forgot-password', element: <ForgotPassword /> },
+      { path: '/reset-password/:token', element: <ResetPassword /> },
       { path: '*', element: <NotFound /> },
     ],
   },

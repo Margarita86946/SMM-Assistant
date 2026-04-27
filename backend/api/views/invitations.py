@@ -16,7 +16,7 @@ from ..encryption import (
 from ..audit import log_action, get_client_ip
 
 
-INVITATION_TTL_DAYS_DEFAULT = 7
+INVITATION_TTL_DAYS_DEFAULT = 1
 
 
 def _invitation_ttl_days():
@@ -31,7 +31,6 @@ def _serialize_invitation(inv, include_email=True):
         'expires_at': inv.expires_at.isoformat() if inv.expires_at else None,
         'accepted_at': inv.accepted_at.isoformat() if inv.accepted_at else None,
         'revoked_at': inv.revoked_at.isoformat() if inv.revoked_at else None,
-        'social_account_id': inv.social_account_id,
     }
     if include_email:
         try:
@@ -53,7 +52,7 @@ def invitations_list(request):
             .filter(specialist=request.user)
             .only(
                 'id', 'status', 'client_email', 'created_at', 'expires_at',
-                'accepted_at', 'revoked_at', 'social_account_id',
+                'accepted_at', 'revoked_at',
             )
             .order_by('-created_at')[:200]
         )
@@ -162,8 +161,6 @@ def invitation_lookup(request, token):
     specialist = invitation.specialist
     client_email = invitation.decrypted_client_email
 
-    # Check if this email belongs to a deactivated account so the frontend
-    # can pre-fill and lock the username field.
     existing_username = None
     existing = User.objects.filter(email=client_email, is_active=False, role='client').first()
     if existing:
@@ -189,7 +186,7 @@ def clients_list(request):
 
     accounts_qs = SocialAccount.objects.filter(
         platform='instagram', is_active=True
-    ).only('id', 'account_username', 'account_type', 'connected_at', 'token_expires_at', 'user_id')
+    ).only('id', 'account_username', 'account_type', 'connected_at', 'token_expires_at', 'account_user_id')
 
     clients = (
         User.objects
@@ -251,7 +248,7 @@ def client_detail(request, pk):
         client.save(update_fields=['specialist_id', 'is_active'])
 
         # Disconnect all Instagram accounts belonging to this client
-        SocialAccount.objects.filter(user=client, platform='instagram').update(is_active=False)
+        SocialAccount.objects.filter(account_user=client, platform='instagram').update(is_active=False)
 
         # Unassign any posts this specialist created for this client
         Post.objects.filter(user=request.user, client=client).update(client=None)
@@ -268,3 +265,21 @@ def client_detail(request, pk):
     )
 
     return Response({'message': 'Client removed from your workspace.'})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def client_instagram_accounts(request, pk):
+    if request.user.role != 'specialist':
+        return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+    try:
+        client = User.objects.get(pk=pk, specialist=request.user, role='client')
+    except User.DoesNotExist:
+        return Response({'error': 'Client not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    from ..models import SocialAccount
+    accounts = SocialAccount.objects.filter(
+        account_user=client, platform='instagram', is_active=True,
+    ).values('id', 'account_username', 'token_expires_at')
+
+    return Response({'accounts': list(accounts)})

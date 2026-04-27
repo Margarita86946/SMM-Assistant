@@ -4,6 +4,10 @@ from .authentication import (
     logout_view,
     profile_view,
     change_password,
+    verify_email,
+    resend_verification,
+    forgot_password,
+    reset_password,
 )
 from .posts import (
     posts_list,
@@ -43,10 +47,10 @@ from .invitations import (
     invitation_lookup,
     clients_list,
     client_detail,
+    client_instagram_accounts,
 )
-from .email_config import email_config_view
 from .audit_logs import audit_logs_view
-from .notifications import notifications_list, mark_read, mark_all_read
+from .notifications import notifications_list, mark_read, mark_all_read, notifications_stream
 from .analyzer import (
     analyzer_accounts,
     analyzer_overview,

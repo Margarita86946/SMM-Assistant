@@ -77,7 +77,7 @@ def posts_list(request):
             posts = posts.filter(platform=platform)
         if post_status:
             if post_status == 'approved':
-                posts = posts.filter(status__in=['approved', 'ready_to_post'])
+                posts = posts.filter(status='approved')
             else:
                 posts = posts.filter(status=post_status)
 
@@ -122,7 +122,7 @@ def post_detail(request, pk):
         serializer = PostCreateSerializer(post, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated = serializer.save()
-            if old_status in ('scheduled', 'approved', 'ready_to_post'):
+            if old_status in ('scheduled', 'approved'):
                 new_content = {f: getattr(updated, f, '') or '' for f in _CONTENT_FIELDS}
                 content_changed = any(old_content[f] != new_content[f] for f in _CONTENT_FIELDS)
                 explicit_status = (request.data.get('status') or '').strip()
@@ -137,6 +137,7 @@ def post_detail(request, pk):
                             notification_type='post_submitted',
                             post=updated,
                         )
+                    return Response(PostSerializer(updated).data)
             return Response(PostSerializer(updated).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -149,8 +150,6 @@ def post_detail(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def calendar_view(request):
-    if request.user.role == 'client':
-        return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
     from django.utils import timezone
     import zoneinfo
 
@@ -173,21 +172,29 @@ def calendar_view(request):
     month_start = timezone.datetime(year, month, 1, 0, 0, 0, tzinfo=user_tz)
     month_end = timezone.datetime(year, month, last_day, 23, 59, 59, tzinfo=user_tz)
 
-    qs = Post.objects.filter(
-        user=request.user,
-        scheduled_time__gte=month_start,
-        scheduled_time__lte=month_end,
-        deleted_at__isnull=True,
-    ).select_related('user', 'client')
+    if request.user.role == 'client':
+        qs = Post.objects.filter(
+            client=request.user,
+            scheduled_time__gte=month_start,
+            scheduled_time__lte=month_end,
+            deleted_at__isnull=True,
+        ).select_related('user', 'client')
+    else:
+        qs = Post.objects.filter(
+            user=request.user,
+            scheduled_time__gte=month_start,
+            scheduled_time__lte=month_end,
+            deleted_at__isnull=True,
+        ).select_related('user', 'client')
 
-    client_id = request.GET.get('client_id', '').strip()
-    if client_id:
-        try:
-            from ..models import User
-            client = User.objects.get(id=int(client_id), specialist=request.user, role='client')
-            qs = qs.filter(client=client)
-        except (User.DoesNotExist, ValueError):
-            pass
+        client_id = request.GET.get('client_id', '').strip()
+        if client_id:
+            try:
+                from ..models import User
+                client = User.objects.get(id=int(client_id), specialist=request.user, role='client')
+                qs = qs.filter(client=client)
+            except (User.DoesNotExist, ValueError):
+                pass
 
     serializer = PostSerializer(qs.order_by('scheduled_time'), many=True)
     return Response(serializer.data)
@@ -226,10 +233,19 @@ def upload_post_image(request):
     if file.size > 10 * 1024 * 1024:
         return Response({'error': 'File too large. Maximum size is 10 MB.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    content = file.read()
+    cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME')
+    api_key = os.environ.get('CLOUDINARY_API_KEY')
+    api_secret = os.environ.get('CLOUDINARY_API_SECRET')
+    if cloud_name and api_key and api_secret:
+        import cloudinary, cloudinary.uploader, io
+        cloudinary.config(cloud_name=cloud_name, api_key=api_key, api_secret=api_secret)
+        result = cloudinary.uploader.upload(io.BytesIO(content), folder='smm_assistant', resource_type='image')
+        return Response({'image_url': result['secure_url']}, status=status.HTTP_201_CREATED)
+
     ext = os.path.splitext(file.name)[1].lower() or '.jpg'
     filename = f"post_images/{uuid.uuid4().hex}{ext}"
-    saved_path = default_storage.save(filename, ContentFile(file.read()))
-
+    saved_path = default_storage.save(filename, ContentFile(content))
     url = request.build_absolute_uri(settings.MEDIA_URL + saved_path)
     return Response({'image_url': url}, status=status.HTTP_201_CREATED)
 
@@ -249,9 +265,18 @@ def upload_post_video(request):
     if file.size > 500 * 1024 * 1024:
         return Response({'error': 'File too large. Maximum size is 500 MB.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    content = file.read()
+    cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME')
+    api_key = os.environ.get('CLOUDINARY_API_KEY')
+    api_secret = os.environ.get('CLOUDINARY_API_SECRET')
+    if cloud_name and api_key and api_secret:
+        import cloudinary, cloudinary.uploader, io
+        cloudinary.config(cloud_name=cloud_name, api_key=api_key, api_secret=api_secret)
+        result = cloudinary.uploader.upload(io.BytesIO(content), folder='smm_assistant', resource_type='video')
+        return Response({'video_url': result['secure_url']}, status=status.HTTP_201_CREATED)
+
     ext = os.path.splitext(file.name)[1].lower() or '.mp4'
     filename = f"post_videos/{uuid.uuid4().hex}{ext}"
-    saved_path = default_storage.save(filename, ContentFile(file.read()))
-
+    saved_path = default_storage.save(filename, ContentFile(content))
     url = request.build_absolute_uri(settings.MEDIA_URL + saved_path)
     return Response({'video_url': url}, status=status.HTTP_201_CREATED)

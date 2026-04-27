@@ -13,9 +13,11 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.conf import settings
 from django.utils import timezone
 
-from ..models import User, TokenExpiry
+from ..models import User, TokenExpiry, EmailVerificationToken, PasswordResetToken
 from ..audit import log_action, get_client_ip
 from ..serializers import UserSerializer
+from ..encryption import generate_secure_token, hash_token
+from .. import email_service
 
 logger = logging.getLogger(__name__)
 
@@ -128,13 +130,35 @@ def register(request):
 
         if invitation:
             from ..models import ClientInvitation as _CI
-            _CI.objects.filter(client=user).exclude(pk=invitation.pk).update(client=None)
+            _CI.objects.filter(client=user).update(client=None)
 
             invitation.status = 'accepted'
             invitation.accepted_at = timezone.now()
             invitation.accepted_ip = get_client_ip(request)
             invitation.client = user
             invitation.save(update_fields=['status', 'accepted_at', 'accepted_ip', 'client'])
+
+        if user.role == 'client':
+            user.email_verified = True
+            user.save(update_fields=['email_verified'])
+        else:
+            raw_token = generate_secure_token()
+            EmailVerificationToken.objects.create(
+                user=user,
+                token_hash=hash_token(raw_token),
+                expires_at=timezone.now() + timedelta(hours=24),
+            )
+            try:
+                email_service.send_verification_email(user, raw_token)
+            except email_service.EmailDeliveryError:
+                pass
+
+    if not user.email_verified:
+        return Response({
+            'requires_verification': True,
+            'email': user.email,
+            'message': 'Please check your email to verify your account.',
+        }, status=status.HTTP_201_CREATED)
 
     return Response({
         'token': token.key,
@@ -160,6 +184,12 @@ def login_view(request):
     if not db_user.is_active:
         return Response(
             {'error': 'account_disabled'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    if not db_user.email_verified:
+        return Response(
+            {'error': 'email_not_verified', 'email': db_user.email},
             status=status.HTTP_401_UNAUTHORIZED
         )
 
@@ -222,11 +252,8 @@ def profile_view(request):
             'auto_approve': user.auto_approve,
             'notifications_sound': user.notifications_sound,
         })
-    allowed_fields = ['first_name', 'last_name', 'email', 'avatar', 'auto_approve', 'notifications_sound']
+    allowed_fields = ['first_name', 'last_name', 'avatar', 'auto_approve', 'notifications_sound']
     data = {k: v for k, v in request.data.items() if k in allowed_fields}
-    if 'email' in data and data['email'] != user.email:
-        if User.objects.filter(email=data['email']).exclude(pk=user.pk).exists():
-            return Response({'error': 'email_taken'}, status=status.HTTP_400_BAD_REQUEST)
     if 'avatar' in data:
         avatar_val = data['avatar']
         if avatar_val and not avatar_val.startswith('data:image/'):
@@ -279,3 +306,132 @@ def change_password(request):
         pass
     log_action(user, 'password_changed', request=request)
     return Response({'message': 'Password changed successfully. Please log in again.'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_email(request, token):
+    token_hash = hash_token(token)
+    try:
+        vt = EmailVerificationToken.objects.select_related('user').get(
+            token_hash=token_hash, used=False
+        )
+    except EmailVerificationToken.DoesNotExist:
+        return Response({'error': 'Invalid or expired verification link.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if vt.expires_at < timezone.now():
+        return Response({'error': 'This verification link has expired.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = vt.user
+    user.email_verified = True
+    user.save(update_fields=['email_verified'])
+    vt.used = True
+    vt.save(update_fields=['used'])
+
+    token_obj, _ = Token.objects.get_or_create(user=user)
+    expires_at = timezone.now() + timedelta(days=settings.TOKEN_EXPIRY_DAYS)
+    TokenExpiry.objects.update_or_create(
+        token=token_obj,
+        defaults={'expires_at': expires_at, 'is_revoked': False},
+    )
+    return Response({
+        'token': token_obj.key,
+        **_user_payload(user, expires_at),
+        'message': 'Email verified successfully.',
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def resend_verification(request):
+    email = (request.data.get('email') or '').strip().lower()
+    if not email:
+        return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        user = User.objects.get(email=email, email_verified=False)
+    except User.DoesNotExist:
+        return Response({'message': 'If that email exists and is unverified, a new link has been sent.'})
+
+    EmailVerificationToken.objects.filter(user=user, used=False).update(used=True)
+    raw_token = generate_secure_token()
+    EmailVerificationToken.objects.create(
+        user=user,
+        token_hash=hash_token(raw_token),
+        expires_at=timezone.now() + timedelta(hours=24),
+    )
+    try:
+        email_service.send_verification_email(user, raw_token)
+    except email_service.EmailDeliveryError:
+        pass
+    return Response({'message': 'If that email exists and is unverified, a new link has been sent.'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def forgot_password(request):
+    email = (request.data.get('email') or '').strip().lower()
+    if not email:
+        return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(email=email, is_active=True, email_verified=True)
+    except User.DoesNotExist:
+        return Response({'message': 'If that email is registered, a reset link has been sent.'})
+
+    PasswordResetToken.objects.filter(user=user, used=False).update(used=True)
+    raw_token = generate_secure_token()
+    PasswordResetToken.objects.create(
+        user=user,
+        token_hash=hash_token(raw_token),
+        expires_at=timezone.now() + timedelta(hours=1),
+    )
+    try:
+        email_service.send_password_reset_email(user, raw_token)
+    except email_service.EmailDeliveryError:
+        pass
+    return Response({'message': 'If that email is registered, a reset link has been sent.'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password(request, token):
+    new_password = (request.data.get('new_password') or '').strip()
+    if not new_password:
+        return Response({'error': 'New password is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    token_hash = hash_token(token)
+    try:
+        rt = PasswordResetToken.objects.select_related('user').get(
+            token_hash=token_hash, used=False
+        )
+    except PasswordResetToken.DoesNotExist:
+        return Response({'error': 'Invalid or expired reset link.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if rt.expires_at < timezone.now():
+        return Response({'error': 'This reset link has expired.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = rt.user
+
+    if user.check_password(new_password):
+        return Response({'error': 'New password must be different from your current password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        validate_password(new_password, user)
+    except DjangoValidationError as e:
+        return Response({'error': ' '.join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(new_password)
+    user.save()
+    rt.used = True
+    rt.save(update_fields=['used'])
+
+    try:
+        token_obj = user.auth_token
+        TokenExpiry.objects.update_or_create(
+            token=token_obj,
+            defaults={'is_revoked': True, 'expires_at': timezone.now()}
+        )
+    except Exception:
+        pass
+
+    return Response({'message': 'Password reset successfully. Please log in with your new password.'})

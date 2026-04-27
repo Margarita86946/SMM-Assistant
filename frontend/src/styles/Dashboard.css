@@ -242,6 +242,9 @@
 .post-platform {
   font-weight: 600;
   color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .post-hashtags {

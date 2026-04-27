@@ -27,20 +27,6 @@
   margin-bottom: 32px;
 }
 
-.accept-logo-icon {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, #6366F1, #8B5CF6);
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
-.accept-logo-icon svg {
-  color: white;
-}
 
 .accept-logo-text {
   font-size: 17px;

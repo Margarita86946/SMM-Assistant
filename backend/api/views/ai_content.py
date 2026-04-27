@@ -48,7 +48,7 @@ def _unsplash_keywords(image_prompt):
         import os as _os
         groq_client = Groq(api_key=_os.getenv('GROQ_API_KEY'))
         resp = groq_client.chat.completions.create(
-            model='meta-llama/llama-4-scout-17b-16e-instruct',
+            model='llama-3.3-70b-versatile',
             timeout=10,
             messages=[{
                 'role': 'user',
@@ -91,15 +91,32 @@ def _resolve_brand_context(request):
 
 
 def _save_generated_image(content_bytes, user_id):
-    """Persist AI-generated image bytes to MEDIA_ROOT and return a public URL."""
+    """Upload to Cloudinary if configured, otherwise save locally."""
+    import os as _os
+    cloud_name = _os.getenv('CLOUDINARY_CLOUD_NAME')
+    api_key = _os.getenv('CLOUDINARY_API_KEY')
+    api_secret = _os.getenv('CLOUDINARY_API_SECRET')
+
+    if cloud_name and api_key and api_secret:
+        import cloudinary
+        import cloudinary.uploader
+        import io
+        cloudinary.config(cloud_name=cloud_name, api_key=api_key, api_secret=api_secret)
+        result = cloudinary.uploader.upload(
+            io.BytesIO(content_bytes),
+            folder='smm_assistant',
+            resource_type='image',
+        )
+        return result['secure_url']
+
     from pathlib import Path
     import uuid
-
     posts_dir = Path(settings.MEDIA_ROOT) / 'posts'
     posts_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{user_id}-{uuid.uuid4().hex}.jpg"
     (posts_dir / filename).write_bytes(content_bytes)
-    return f"{settings.BACKEND_PUBLIC_URL}{settings.MEDIA_URL}posts/{filename}"
+    media_base = _os.getenv('MEDIA_PUBLIC_URL', 'http://localhost:8000').rstrip('/')
+    return f"{media_base}{settings.MEDIA_URL}posts/{filename}"
 
 
 @api_view(['GET'])
@@ -191,26 +208,19 @@ def generate_image(request):
             seed = None
 
         import random
-        last_error = None
-        for attempt in range(2):
-            current_seed = seed if (attempt == 0 and seed is not None) else random.randint(1, 10_000_000)
-            url = generate_image_flux(prompt, platform, seed=current_seed)
-            try:
-                img_resp = http_requests.get(url, timeout=60)
-                if img_resp.status_code == 200 and len(img_resp.content) >= 1000:
-                    public_url = _save_generated_image(img_resp.content, request.user.id)
-                    return Response({'image_url': public_url})
-                logger.warning('Flux attempt %d: status=%s size=%s seed=%s',
-                               attempt + 1, img_resp.status_code, len(img_resp.content), current_seed)
-                last_error = f'status {img_resp.status_code}, size {len(img_resp.content)}'
-            except http_requests.Timeout:
-                logger.warning('Flux attempt %d timed out (seed=%s)', attempt + 1, current_seed)
-                last_error = 'timeout'
-            except Exception as e:
-                logger.error('Flux attempt %d failed: %s', attempt + 1, e, exc_info=True)
-                last_error = str(e)
+        current_seed = seed if seed is not None else random.randint(1, 10_000_000)
+        url = generate_image_flux(prompt, platform, seed=current_seed)
+        try:
+            img_resp = http_requests.get(url, timeout=120)
+            if img_resp.status_code == 200 and len(img_resp.content) >= 1000:
+                public_url = _save_generated_image(img_resp.content, request.user.id)
+                return Response({'image_url': public_url})
+            logger.warning('Flux returned status=%s size=%s', img_resp.status_code, len(img_resp.content))
+        except http_requests.Timeout:
+            logger.warning('Flux timed out after 120s')
+        except Exception as e:
+            logger.error('Flux failed: %s', e, exc_info=True)
 
-        logger.error('Flux failed after 3 attempts: %s', last_error)
         return Response(
             {'error': 'Flux image service is currently unavailable. Try again in a moment or switch to Unsplash.'},
             status=status.HTTP_502_BAD_GATEWAY,
@@ -221,22 +231,20 @@ def generate_image(request):
         return Response({'error': 'Image service is not configured'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
     orientation = 'squarish' if platform == 'instagram' else 'landscape'
-
-    # Extract the 3-5 most visually concrete keywords from the image prompt
-    # so Unsplash (keyword-based search) returns a matching photo
-    query = _unsplash_keywords(prompt)
-
-    url = f"https://api.unsplash.com/photos/random?query={http_requests.utils.quote(query)}&orientation={orientation}"
     headers = {'Authorization': f'Client-ID {access_key}'}
+
+    query = _unsplash_keywords(prompt)
+    url = f"https://api.unsplash.com/photos/random?query={http_requests.utils.quote(query)}&orientation={orientation}"
 
     try:
         resp = http_requests.get(url, headers=headers, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             return Response({'image_url': data['urls']['regular']})
+        logger.warning('Unsplash returned %s for query "%s"', resp.status_code, query)
         return Response({'error': 'No image found'}, status=status.HTTP_502_BAD_GATEWAY)
     except Exception as e:
-        logger.error('Unsplash image fetch failed: %s', e, exc_info=True)
+        logger.error('Unsplash fetch failed: %s', e, exc_info=True)
         return Response({'error': 'Image service unavailable. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
 
 

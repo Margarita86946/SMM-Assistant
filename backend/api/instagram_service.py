@@ -331,7 +331,7 @@ def get_media_list(access_token, instagram_user_id, limit=50):
         response = requests.get(
             f'{GRAPH_API_BASE}/{instagram_user_id}/media',
             params={
-                'fields': 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
+                'fields': 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,is_shared_to_feed',
                 'limit': limit,
                 'access_token': access_token,
             },
@@ -353,7 +353,7 @@ def get_media_insights(access_token, media_id):
         response = requests.get(
             f'{GRAPH_API_BASE}/{media_id}/insights',
             params={
-                'metric': 'reach,impressions,likes,comments,shares,saved,total_interactions',
+                'metric': 'reach,impressions,likes,comments,shares,saved,total_interactions,video_views,plays',
                 'access_token': access_token,
             },
             timeout=DEFAULT_TIMEOUT,

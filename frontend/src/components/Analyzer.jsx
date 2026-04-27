@@ -629,7 +629,7 @@ function Analyzer() {
     analyzerAPI.refresh(selectedAccount.id)
       .then(() => setRefreshMsg('Data refreshed'))
       .catch(e => setRefreshMsg(e.message || 'Refresh failed'))
-      .finally(() => setRefreshing(false));
+      .finally(() => { setRefreshing(false); setRefreshMsg(''); });
   };
 
   const selectAccount = (a) => {
@@ -653,16 +653,6 @@ function Analyzer() {
 
   if (loadingAccounts) return <div className="az-page"><LoadingBlock rows={4} /></div>;
 
-  if (accounts.length === 0) {
-    return (
-      <div className="az-page az-empty">
-        <FiInstagram size={48} />
-        <h2>No Instagram accounts connected</h2>
-        <p>Connect a client's Instagram Business or Creator account to start analyzing their performance.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="az-page">
       <div className="az-header">
@@ -681,14 +671,24 @@ function Analyzer() {
             {togglingDemo ? <span className="az-spinner az-spinner--dark" /> : null}
             {demoMode ? 'Demo ON' : 'Demo OFF'}
           </button>
-          <button className="az-refresh-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh data">
-            <FiRefreshCw className={refreshing ? 'az-spin' : ''} />
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
+          {accounts.length > 0 && (
+            <button className="az-refresh-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh data">
+              <FiRefreshCw className={refreshing ? 'az-spin' : ''} />
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="az-selector-panel">
+      {accounts.length === 0 && (
+        <div className="az-empty">
+          <FiInstagram size={48} />
+          <h2>No Instagram accounts connected</h2>
+          <p>Connect a client's Instagram account, or toggle Demo to explore with sample data.</p>
+        </div>
+      )}
+
+      {accounts.length > 0 && <div className="az-selector-panel">
         {groupKeys.map(key => {
           const groupAccounts = groups[key];
           const label = key === '__own__' ? 'My Accounts' : key;
@@ -713,9 +713,9 @@ function Analyzer() {
             </div>
           );
         })}
-      </div>
+      </div>}
 
-      <div className="az-tabs">
+      {accounts.length > 0 && <div className="az-tabs">
         {TABS.map(t => (
           <button
             key={t.id}
@@ -726,14 +726,14 @@ function Analyzer() {
             <span>{t.label}</span>
           </button>
         ))}
-      </div>
+      </div>}
 
-      <div className="az-body">
+      {accounts.length > 0 && <div className="az-body">
         {selectedAccount && tab === 'overview' && <OverviewTab accountId={selectedAccount.id} />}
         {selectedAccount && tab === 'posts' && <PostsTab accountId={selectedAccount.id} />}
         {selectedAccount && tab === 'audience' && <AudienceTab accountId={selectedAccount.id} />}
         {selectedAccount && tab === 'ai' && <AITab accountId={selectedAccount.id} accountUsername={selectedAccount.username} />}
-      </div>
+      </div>}
     </div>
   );
 }
