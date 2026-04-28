@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY is not set in your .env file")
@@ -22,9 +21,6 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 OLLAMA_MODEL = "gemma4:e2b"
 OLLAMA_TIMEOUT = 120
-GEMINI_MODEL = "gemini-2.0-flash-lite"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-GEMINI_TIMEOUT = 30
 
 
 # ---------- Groq (cloud) ----------
@@ -292,133 +288,11 @@ IMAGE_PROMPT: [improved image description]"""
         return {'caption': caption, 'hashtags': hashtags, 'image_prompt': image_prompt}
 
 
-# ---------- Gemini (Google, cloud) ----------
-
-def _gemini_generate(prompt):
-    if not GEMINI_API_KEY:
-        raise RuntimeError('GEMINI_API_KEY is not set in your .env file')
-    response = requests.post(
-        GEMINI_URL,
-        params={'key': GEMINI_API_KEY},
-        json={'contents': [{'parts': [{'text': prompt}]}]},
-        timeout=GEMINI_TIMEOUT,
-    )
-    response.raise_for_status()
-    data = response.json()
-    return data['candidates'][0]['content']['parts'][0]['text'].strip()
-
-
-def generate_caption_gemini(topic, platform, tone, brand_profile=None):
-    brand_ctx = f"\nBrand context: {brand_profile}" if brand_profile else ""
-    prompt = f"""Write a social media caption for {platform}.
-Topic: {topic}
-Tone: {tone}{brand_ctx}
-Rules:
-- Make it engaging and natural
-- Suitable length for {platform}
-- Do NOT include hashtags
-- Do NOT wrap the caption in quotes
-- Return ONLY the caption text, nothing else"""
-    return _clean_ai_output(_gemini_generate(prompt))
-
-
-def generate_hashtags_gemini(topic, platform):
-    prompt = f"""Generate hashtags for a {platform} post about: {topic}
-Rules:
-- Return ONLY hashtags, nothing else
-- Each hashtag starts with #
-- Separate with spaces
-- Instagram: 10-15 hashtags
-- LinkedIn/Twitter: 3-5 hashtags"""
-    return _clean_ai_output(_gemini_generate(prompt))
-
-
-def generate_image_prompt_gemini(topic, caption):
-    prompt = f"""Create a detailed image generation prompt for this social media post.
-Topic: {topic}
-Caption: {caption}
-Rules:
-- Describe the image visually and specifically
-- Include style, lighting, mood
-- Return ONLY the image prompt, nothing else"""
-    return _clean_ai_output(_gemini_generate(prompt))
-
-
-def generate_all_content_gemini(topic, platform, tone, brand_profile=None):
-    try:
-        caption = generate_caption_gemini(topic, platform, tone, brand_profile)
-        hashtags = generate_hashtags_gemini(topic, platform)
-        image_prompt = generate_image_prompt_gemini(topic, caption)
-        return {'caption': caption, 'hashtags': hashtags, 'image_prompt': image_prompt, 'error': None}
-    except Exception as e:
-        logger.error('Gemini generation failed: %s', e, exc_info=True)
-        return {
-            'caption': '', 'hashtags': '', 'image_prompt': '',
-            'error': 'Gemini AI generation failed. Check your GEMINI_API_KEY and quota.',
-        }
-
-
-def polish_content_gemini(caption, hashtags, image_prompt, topic, platform, tone):
-    prompt = f"""Polish this social media post content for {platform} in a {tone} tone.
-
-Topic: {topic if topic else 'not specified'}
-Caption: {caption}
-Current hashtags: {hashtags}
-Current image prompt: {image_prompt if image_prompt else 'none'}
-
-Rules for caption:
-- Fix grammar and improve quality
-- Make it suitable length for {platform}
-- Keep the original message and intent
-- Do NOT include hashtags in the caption
-
-Rules for hashtags:
-- Generate relevant hashtags based on the caption
-- Instagram: 10-15 hashtags
-- LinkedIn/Twitter: 3-5 hashtags
-- Each starts with #, separated by spaces
-
-Rules for image prompt:
-- Improve or generate a vivid image prompt based on the caption
-- Include style, lighting, mood, and composition details
-- Return ONLY the prompt text, no labels
-
-Return ONLY in this exact format (no extra text):
-CAPTION: [polished caption here]
-HASHTAGS: [hashtags here]
-IMAGE_PROMPT: [image prompt here]"""
-    try:
-        text = _gemini_generate(prompt)
-        return _parse_polish_text(text, caption, hashtags, image_prompt)
-    except Exception as e:
-        logger.error('Gemini polish failed: %s', e, exc_info=True)
-        return {'caption': caption, 'hashtags': hashtags, 'image_prompt': image_prompt}
-
-
-def check_gemini_status():
-    if not GEMINI_API_KEY:
-        return {'gemini': False, 'error': 'GEMINI_API_KEY not set'}
-    try:
-        _gemini_generate('ping')
-        return {'gemini': True, 'model': GEMINI_MODEL}
-    except requests.HTTPError as e:
-        try:
-            detail = e.response.json().get('error', {}).get('message', str(e))
-        except Exception:
-            detail = str(e)
-        return {'gemini': False, 'error': detail}
-    except Exception as e:
-        return {'gemini': False, 'error': str(e)}
-
-
 # ---------- Provider dispatchers ----------
 
 def _generate_raw(topic_en, platform, tone, brand_profile, provider):
-    """Generate content in English using the requested provider."""
     if provider == 'ollama':
         return generate_all_content_ollama(topic_en, platform, tone, brand_profile)
-    if provider == 'gemini':
-        return generate_all_content_gemini(topic_en, platform, tone, brand_profile)
     try:
         caption = generate_caption(topic_en, platform, tone, brand_profile)
         hashtags = generate_hashtags(topic_en, platform)
@@ -469,8 +343,6 @@ def polish_content(caption, hashtags, platform, tone='professional', image_promp
 
     if provider == 'ollama':
         result = polish_content_ollama(caption_in, hashtags_in, image_prompt, topic_in, platform, tone)
-    elif provider == 'gemini':
-        result = polish_content_gemini(caption_in, hashtags_in, image_prompt, topic_in, platform, tone)
     else:
         result = _polish_content_groq(caption_in, hashtags_in, image_prompt, topic_in, platform, tone, brand_profile=brand_profile)
 

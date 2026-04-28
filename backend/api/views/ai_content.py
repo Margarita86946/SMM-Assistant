@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 VALID_PLATFORMS = {'instagram', 'linkedin', 'twitter'}
 VALID_TONES = {'professional', 'casual', 'funny', 'inspirational'}
-VALID_PROVIDERS = {'groq', 'ollama', 'gemini'}
+VALID_PROVIDERS = {'groq', 'ollama'}
 VALID_IMAGE_PROVIDERS = {'unsplash', 'flux'}
 
 _CLIENT_FORBIDDEN = Response(
