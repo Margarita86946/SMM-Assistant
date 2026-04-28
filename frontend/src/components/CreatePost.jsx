@@ -430,7 +430,11 @@ function CreatePost() {
   const openVideoFromFile = (file) => {
     if (!file) return;
     setShowImageMenu(false);
-    setVideoEditorSrc(URL.createObjectURL(file));
+    if (isMobile) {
+      handleVideoUpload(file);
+    } else {
+      setVideoEditorSrc(URL.createObjectURL(file));
+    }
   };
 
   const clearMedia = () => {
