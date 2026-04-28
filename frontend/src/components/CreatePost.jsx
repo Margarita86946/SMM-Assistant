@@ -114,8 +114,8 @@ function CreatePost() {
   const [showCamera, setShowCamera] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [capturedSrc, setCapturedSrc] = useState(null);
-  const [facingMode, setFacingMode] = useState('environment');
-  const facingModeRef = useRef('environment');
+  const [facingMode, setFacingMode] = useState('user');
+  const facingModeRef = useRef('user');
   const [cameraMode, setCameraMode] = useState('photo');
   const [isRecording, setIsRecording] = useState(false);
   const isRecordingRef = useRef(false);
@@ -130,7 +130,6 @@ function CreatePost() {
   const recordedChunksRef = useRef([]);
   const recordedMimeRef = useRef('video/webm');
   const recordingStartRef = useRef(null);
-  const isFlippingRef = useRef(false);
   const canvasRef = useRef(null);
   const canvasStreamRef = useRef(null);
   const rafRef = useRef(null);
@@ -139,6 +138,8 @@ function CreatePost() {
   const pinchStartDistRef = useRef(null);
   const pinchStartZoomRef = useRef(1);
   const previewVideoRef = useRef(null);
+  const mobileCameraInputRef = useRef(null);
+  const mobileCameraVideoInputRef = useRef(null);
 
 
   useEffect(() => {
@@ -255,32 +256,33 @@ function CreatePost() {
     pinchStartDistRef.current = null;
   };
 
-  const openCamera = async () => {
+  const openCamera = async (mode = 'photo') => {
     setShowImageMenu(false);
+    if (isMobile) {
+      if (mode === 'video') mobileCameraVideoInputRef.current?.click();
+      else mobileCameraInputRef.current?.click();
+      return;
+    }
     setCameraError('');
     facingModeRef.current = 'user';
     setFacingMode('user');
     setZoomLevel(1);
+    setCameraMode(mode);
     setShowCamera(true);
     await startStream('user');
   };
 
-  const flipCamera = async () => {
-    const next = facingModeRef.current === 'environment' ? 'user' : 'environment';
-    facingModeRef.current = next;
-    setFacingMode(next);
-    if (isRecordingRef.current) {
-      try {
-        const oldStream = streamRef.current;
-        oldStream?.getTracks().forEach(t => t.stop());
-        const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: next }, audio: true });
-        streamRef.current = newStream;
-        if (videoRef.current) videoRef.current.srcObject = newStream;
-      } catch {}
+  const handleMobileCameraCapture = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.type.startsWith('video/')) {
+      openVideoFromFile(file);
     } else {
-      await startStream(next);
+      openEditorFromFile(file);
     }
   };
+
 
   const capturePhoto = () => {
     const video = videoRef.current;
@@ -755,6 +757,22 @@ function CreatePost() {
                   else openEditorFromFile(file);
                 }}
               />
+              <input
+                ref={mobileCameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={handleMobileCameraCapture}
+              />
+              <input
+                ref={mobileCameraVideoInputRef}
+                type="file"
+                accept="video/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={handleMobileCameraCapture}
+              />
               <button
                 className="create-upload-cam-btn"
                 onClick={() => setShowImageMenu(m => !m)}
@@ -768,9 +786,20 @@ function CreatePost() {
                   <button onClick={() => { setShowImageMenu(false); fileInputRef.current?.click(); }}>
                     <FiUpload /> Upload a file
                   </button>
-                  <button onClick={openCamera}>
-                    <FiCamera /> Open camera
-                  </button>
+                  {isMobile ? (
+                    <>
+                      <button onClick={() => openCamera('photo')}>
+                        <FiCamera /> Take a photo
+                      </button>
+                      <button onClick={() => openCamera('video')}>
+                        <FiVideo /> Record a video
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={() => openCamera('photo')}>
+                      <FiCamera /> Open camera
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -828,16 +857,11 @@ function CreatePost() {
                     autoPlay
                     playsInline
                     muted
-                    className={`create-camera-video${(facingMode === 'user' || !isMobile) ? ' create-camera-preview' : ''}`}
+                    className="create-camera-video create-camera-preview"
                     onTouchStart={handlePinchStart}
                     onTouchMove={handlePinchMove}
                     onTouchEnd={handlePinchEnd}
                   />
-                  {isMobile && (
-                    <button className="create-camera-flip" onClick={flipCamera} title="Flip camera">
-                      <FiRefreshCcw />
-                    </button>
-                  )}
                   {cameraMode === 'photo' ? (
                     <button className="create-camera-capture" onClick={capturePhoto}>
                       <span className="create-camera-shutter" />
