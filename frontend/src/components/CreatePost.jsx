@@ -137,7 +137,6 @@ function CreatePost() {
   const imageMenuRef = useRef(null);
   const pinchStartDistRef = useRef(null);
   const pinchStartZoomRef = useRef(1);
-  const previewVideoRef = useRef(null);
   const mobileCameraInputRef = useRef(null);
   const mobileCameraVideoInputRef = useRef(null);
 
