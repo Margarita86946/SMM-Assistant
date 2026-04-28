@@ -16,7 +16,7 @@ if not DB_PASSWORD:
 
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.0.15', 'granddad-unneeded-divisible.ngrok-free.dev']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.0.15', '10.14.107.72', 'granddad-unneeded-divisible.ngrok-free.dev']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -97,7 +97,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-_cors_env = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://192.168.0.15:3000')
+_cors_env = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://192.168.0.15:3000,http://10.14.107.72:3000')
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _cors_env.split(',') if origin.strip()]
 CORS_ALLOWED_ORIGIN_REGEXES = [r'^https://.*\.ngrok-free\.app$', r'^https://.*\.ngrok-free\.dev$']
 

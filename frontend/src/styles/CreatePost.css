@@ -330,6 +330,11 @@
   display: block;
   max-height: 60vh;
   object-fit: cover;
+  touch-action: none;
+}
+
+.create-camera-preview {
+  transform: scaleX(-1);
 }
 
 .create-camera-capture {
@@ -436,9 +441,27 @@
   background: rgba(255,255,255,0.25);
 }
 
+.create-camera-download {
+  position: absolute;
+  top: 12px;
+  right: 54px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0,0,0,0.45);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  z-index: 3;
+}
+
 .create-camera-retake-row {
   position: absolute;
-  bottom: 20px;
+  bottom: 60px;
   left: 0;
   right: 0;
   display: flex;

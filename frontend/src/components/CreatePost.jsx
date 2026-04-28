@@ -3,7 +3,8 @@ import { useNavigate, useBlocker } from 'react-router-dom';
 import { aiAPI, postsAPI, clientsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useActiveClient } from '../context/ActiveClientContext';
-import { FiRefreshCw, FiCheck, FiCopy, FiCamera, FiX, FiUpload, FiRefreshCcw, FiVideo } from 'react-icons/fi';
+import { FiRefreshCw, FiCheck, FiCopy, FiCamera, FiX, FiUpload, FiRefreshCcw, FiVideo, FiDownload } from 'react-icons/fi';
+import fixWebmDuration from 'fix-webm-duration';
 import ImageEditor from './ImageEditor';
 import VideoEditor from './VideoEditor';
 import { PostPreview, CaptionCounter, HashtagsCounter, LIMITS } from './PostPreview';
@@ -114,20 +115,31 @@ function CreatePost() {
   const [cameraError, setCameraError] = useState('');
   const [capturedSrc, setCapturedSrc] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
+  const facingModeRef = useRef('environment');
   const [cameraMode, setCameraMode] = useState('photo');
   const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
   const [recordedSrc, setRecordedSrc] = useState(null);
+  const [recordedMime, setRecordedMime] = useState('video/webm');
   const [editorSrc, setEditorSrc] = useState(null);
   const [videoEditorSrc, setVideoEditorSrc] = useState(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
+  const recordedMimeRef = useRef('video/webm');
+  const recordingStartRef = useRef(null);
+  const isFlippingRef = useRef(false);
   const canvasRef = useRef(null);
   const canvasStreamRef = useRef(null);
   const rafRef = useRef(null);
   const fileInputRef = useRef(null);
   const imageMenuRef = useRef(null);
+  const pinchStartDistRef = useRef(null);
+  const pinchStartZoomRef = useRef(1);
+  const previewVideoRef = useRef(null);
+
 
   useEffect(() => {
     if (!showImageMenu) return;
@@ -199,7 +211,7 @@ function CreatePost() {
   const startStream = async (facing) => {
     stopStream();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: true });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
     } catch (err) {
@@ -211,30 +223,59 @@ function CreatePost() {
     }
   };
 
+  const applyZoom = async (zoom) => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const caps = track.getCapabilities?.();
+    if (!caps?.zoom) return;
+    const clamped = Math.min(Math.max(zoom, caps.zoom.min), caps.zoom.max);
+    await track.applyConstraints({ advanced: [{ zoom: clamped }] }).catch(() => {});
+    setZoomLevel(clamped);
+  };
+
+  const handlePinchStart = (e) => {
+    if (e.touches.length !== 2) return;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    pinchStartDistRef.current = Math.hypot(dx, dy);
+    pinchStartZoomRef.current = zoomLevel;
+  };
+
+  const handlePinchMove = (e) => {
+    if (e.touches.length !== 2 || pinchStartDistRef.current === null) return;
+    e.preventDefault();
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    const scale = dist / pinchStartDistRef.current;
+    applyZoom(pinchStartZoomRef.current * scale);
+  };
+
+  const handlePinchEnd = () => {
+    pinchStartDistRef.current = null;
+  };
+
   const openCamera = async () => {
     setShowImageMenu(false);
     setCameraError('');
-    setFacingMode('environment');
+    facingModeRef.current = 'user';
+    setFacingMode('user');
+    setZoomLevel(1);
     setShowCamera(true);
-    await startStream('environment');
+    await startStream('user');
   };
 
   const flipCamera = async () => {
-    const next = facingMode === 'environment' ? 'user' : 'environment';
+    const next = facingModeRef.current === 'environment' ? 'user' : 'environment';
+    facingModeRef.current = next;
     setFacingMode(next);
-    if (isRecording) {
+    if (isRecordingRef.current) {
       try {
-        const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: next } });
         const oldStream = streamRef.current;
-        streamRef.current = newStream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = newStream;
-          await new Promise(res => {
-            videoRef.current.onloadedmetadata = res;
-          });
-          await videoRef.current.play();
-        }
         oldStream?.getTracks().forEach(t => t.stop());
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: next }, audio: true });
+        streamRef.current = newStream;
+        if (videoRef.current) videoRef.current.srcObject = newStream;
       } catch {}
     } else {
       await startStream(next);
@@ -247,7 +288,12 @@ function CreatePost() {
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
+    const ctx = canvas.getContext('2d');
+    if (facingMode === 'user' || !isMobile) {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0);
     canvas.toBlob(blob => {
       if (!blob) return;
       stopStream();
@@ -277,34 +323,59 @@ function CreatePost() {
     const ctx = canvas.getContext('2d');
 
     const drawFrame = () => {
-      if (!videoRef.current) return;
-      canvas.width = videoRef.current.videoWidth || canvas.width;
-      canvas.height = videoRef.current.videoHeight || canvas.height;
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const v = videoRef.current;
+      if (v && v.readyState >= 2 && v.videoWidth > 0) {
+        if (canvas.width !== v.videoWidth) canvas.width = v.videoWidth;
+        if (canvas.height !== v.videoHeight) canvas.height = v.videoHeight;
+        const shouldMirror = facingModeRef.current === 'user' || !isMobile;
+        if (shouldMirror) {
+          ctx.save();
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+          ctx.restore();
+        } else {
+          ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+        }
+      }
       rafRef.current = requestAnimationFrame(drawFrame);
     };
     rafRef.current = requestAnimationFrame(drawFrame);
 
     const canvasStream = canvas.captureStream(30);
+    const audioTrack = streamRef.current?.getAudioTracks()[0];
+    if (audioTrack) canvasStream.addTrack(audioTrack);
     canvasStreamRef.current = canvasStream;
 
+    const mimeType = (() => {
+      for (const t of ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']) {
+        if (MediaRecorder.isTypeSupported(t)) return t;
+      }
+      return 'video/webm';
+    })();
+    recordedMimeRef.current = mimeType;
     recordedChunksRef.current = [];
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-      ? 'video/webm;codecs=vp9'
-      : 'video/webm';
+    recordingStartRef.current = Date.now();
+
     const recorder = new MediaRecorder(canvasStream, { mimeType });
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) recordedChunksRef.current.push(e.data);
     };
     recorder.onstop = () => {
       cancelAnimationFrame(rafRef.current);
+      const duration = recordingStartRef.current ? Date.now() - recordingStartRef.current : 0;
       const blob = new Blob(recordedChunksRef.current, { type: mimeType });
       stopStream();
-      setRecordedSrc(URL.createObjectURL(blob));
+      setRecordedMime(mimeType);
+      fixWebmDuration(blob, duration, (fixed) => {
+        setRecordedSrc(URL.createObjectURL(fixed));
+      });
+      isRecordingRef.current = false;
       setIsRecording(false);
     };
     mediaRecorderRef.current = recorder;
-    recorder.start();
+    recorder.start(100);
+    isRecordingRef.current = true;
     setIsRecording(true);
   };
 
@@ -319,12 +390,14 @@ function CreatePost() {
 
   const useVideo = () => {
     const src = recordedSrc;
+    const mime = recordedMime;
     setRecordedSrc(null);
     setShowCamera(false);
     fetch(src)
       .then(r => r.blob())
       .then(blob => {
-        const file = new File([blob], 'recorded.webm', { type: blob.type });
+        const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+        const file = new File([blob], `recorded.${ext}`, { type: mime });
         openVideoFromFile(file);
       });
   };
@@ -369,14 +442,17 @@ function CreatePost() {
   };
 
   const closeCamera = () => {
-    cancelAnimationFrame(rafRef.current);
+    isRecordingRef.current = false;
     mediaRecorderRef.current?.stop();
     stopStream();
     setShowCamera(false);
     setCameraError('');
     setCapturedSrc(null);
     setRecordedSrc(null);
+    setRecordedMime('video/webm');
     setIsRecording(false);
+    isRecordingRef.current = false;
+    setZoomLevel(1);
     setCameraMode('photo');
   };
 
@@ -705,7 +781,7 @@ function CreatePost() {
           <div className="create-camera-overlay">
             <div className="create-camera-modal">
               <button className="create-camera-close" onClick={closeCamera}><FiX /></button>
-              {isMobile && !capturedSrc && !recordedSrc && (
+              {!capturedSrc && !recordedSrc && (
                 <div className="create-camera-mode-tabs">
                   <button className={cameraMode === 'photo' ? 'active' : ''} onClick={() => setCameraMode('photo')}><FiCamera /> Photo</button>
                   <button className={cameraMode === 'video' ? 'active' : ''} onClick={() => setCameraMode('video')}><FiVideo /> Video</button>
@@ -716,6 +792,7 @@ function CreatePost() {
               ) : capturedSrc ? (
                 <>
                   <img src={capturedSrc} alt="captured" className="create-camera-video" />
+                  <a href={capturedSrc} download="captured.jpg" className="create-camera-download"><FiDownload /><span>Download</span></a>
                   <div className="create-camera-retake-row">
                     <button className="create-camera-retake-btn" onClick={retakePhoto}>
                       <FiRefreshCcw /> {t('create.retake')}
@@ -727,7 +804,14 @@ function CreatePost() {
                 </>
               ) : recordedSrc ? (
                 <>
-                  <video src={recordedSrc} controls className="create-camera-video" />
+                  <video
+                    key={recordedSrc}
+                    src={recordedSrc}
+                    controls
+                    playsInline
+                    className="create-camera-video"
+                  />
+                  <a href={recordedSrc} download="recorded.webm" className="create-camera-download"><FiDownload /><span>Download</span></a>
                   <div className="create-camera-retake-row">
                     <button className="create-camera-retake-btn" onClick={retakeVideo}>
                       <FiRefreshCcw /> {t('create.retake')}
@@ -739,7 +823,16 @@ function CreatePost() {
                 </>
               ) : (
                 <>
-                  <video ref={videoRef} autoPlay playsInline muted className="create-camera-video" />
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`create-camera-video${(facingMode === 'user' || !isMobile) ? ' create-camera-preview' : ''}`}
+                    onTouchStart={handlePinchStart}
+                    onTouchMove={handlePinchMove}
+                    onTouchEnd={handlePinchEnd}
+                  />
                   {isMobile && (
                     <button className="create-camera-flip" onClick={flipCamera} title="Flip camera">
                       <FiRefreshCcw />
