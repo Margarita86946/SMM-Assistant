@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useBlocker } from 'react-router-dom';
-import { aiAPI, postsAPI } from '../services/api';
+import { aiAPI, postsAPI, instagramAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useActiveClient } from '../context/ActiveClientContext';
 import { FiCheck, FiCopy, FiRefreshCw } from 'react-icons/fi';
@@ -72,7 +72,6 @@ const { t } = useTranslation();
     const isSpecialist = role === 'specialist';
     const [selectedClientId, setSelectedClientId] = useState(() => activeClientId ? String(activeClientId) : '');
 
-    // Keep in sync when sidebar filter changes
     useEffect(() => {
         setSelectedClientId(activeClientId ? String(activeClientId) : '');
     }, [activeClientId]);
@@ -95,9 +94,18 @@ const { t } = useTranslation();
     const [imageRetry, setImageRetry] = useState(0);
     const [downloading, setDownloading] = useState(false);
     const [regenLoading, setRegenLoading] = useState({ caption: false, hashtags: false, image_prompt: false, image: false });
+    const [igAccounts, setIgAccounts] = useState([]);
+    const [selectedAccountId, setSelectedAccountId] = useState('');
 
     useEffect(() => {
         aiAPI.getStatus().then(res => setOllamaStatus(res.data)).catch(() => {});
+        if (!isSpecialist) {
+            instagramAPI.getStatus().then(res => {
+                const accounts = res.data.accounts || [];
+                setIgAccounts(accounts);
+                if (accounts.length === 1) setSelectedAccountId(String(accounts[0].id));
+            }).catch(() => {});
+        }
     }, [isSpecialist]);
 
     const selectedClient = isSpecialist ? clients.find(c => String(c.id) === selectedClientId) || null : null;
@@ -146,8 +154,9 @@ const { t } = useTranslation();
         setDownloading(false);
 
         const clientPayload = selectedClientId ? { client_id: parseInt(selectedClientId, 10) } : {};
+        const accountPayload = selectedAccountId ? { account_id: parseInt(selectedAccountId, 10) } : {};
         try {
-            const response = await aiAPI.generateContent({ ...formData, provider: textProvider, ...clientPayload });
+            const response = await aiAPI.generateContent({ ...formData, provider: textProvider, ...clientPayload, ...accountPayload });
             setGeneratedContent(response.data);
             setImageLoading(true);
             setImageRetry(0);
@@ -175,7 +184,7 @@ const { t } = useTranslation();
                 setImageUrl(url);
             } else {
                 const cp = selectedClientId ? { client_id: parseInt(selectedClientId, 10) } : {};
-                // Use polishContent so regen is aware of the other existing fields
+                const ap = selectedAccountId ? { account_id: parseInt(selectedAccountId, 10) } : {};
                 const response = await aiAPI.polishContent({
                     topic: formData.topic,
                     caption: generatedContent?.caption || '',
@@ -185,6 +194,7 @@ const { t } = useTranslation();
                     tone: formData.tone,
                     provider: textProvider,
                     ...cp,
+                    ...ap,
                 });
                 setGeneratedContent(prev => ({ ...prev, [section]: response.data[section] }));
             }
@@ -301,9 +311,9 @@ const { t } = useTranslation();
                 {isSpecialist && clients.length > 0 && (
                     <div className="gen-form-group">
                         <label>
-                            Assign to Client{' '}
+                            {t('common2.assignToClient')}{' '}
                             {activeClientId
-                                ? <span className="label-context-set">pre-filled from filter</span>
+                                ? <span className="label-context-set">{t('common2.prefilledFromFilter')}</span>
                                 : <span className="label-required">*</span>
                             }
                         </label>
@@ -321,7 +331,7 @@ const { t } = useTranslation();
                                 value={selectedClientId}
                                 onChange={e => setSelectedClientId(e.target.value)}
                             >
-                                <option value="">— Select a client —</option>
+                                <option value="">{t('common2.selectClient')}</option>
                                 {clients.map(c => (
                                     <option key={c.id} value={c.id}>
                                         {[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username}
@@ -334,15 +344,35 @@ const { t } = useTranslation();
 
                 {isSpecialist && selectedClient && (
                     <div className="brand-banner brand-banner--ok">
-                        <span>✓ Using brand context for <strong>{[selectedClient.first_name, selectedClient.last_name].filter(Boolean).join(' ') || selectedClient.username}</strong></span>
+                        <span>{t('common2.usingBrandContext')} <strong>{[selectedClient.first_name, selectedClient.last_name].filter(Boolean).join(' ') || selectedClient.username}</strong></span>
                     </div>
                 )}
 
+                {!isSpecialist && igAccounts.length > 1 && (
+                    <div className="gen-form-group">
+                        <label>{t('common2.instagramAccount')}</label>
+                        <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)}>
+                            <option value="">{t('common2.noAccountSelected')}</option>
+                            {igAccounts.map(a => (
+                                <option key={a.id} value={a.id}>@{a.username}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                {!isSpecialist && selectedAccountId && (() => {
+                    const a = igAccounts.find(x => String(x.id) === selectedAccountId);
+                    return a ? (
+                        <div className="brand-banner brand-banner--ok">
+                            <span>{t('common2.usingBrandProfile')} <strong>@{a.username}</strong></span>
+                        </div>
+                    ) : null;
+                })()}
+
                 <div className="gen-model-card">
-                    <h4 className="gen-model-title">Model Settings</h4>
+                    <h4 className="gen-model-title">{t('common2.modelSettings')}</h4>
                     <div className="gen-form-row">
                         <div className="gen-form-group">
-                            <label>Text Model</label>
+                            <label>{t('common2.textModel')}</label>
                             <select value={textProvider} onChange={(e) => setTextProvider(e.target.value)}>
                                 <option value="groq">Groq / Llama 4 Scout (Cloud)</option>
                                 <option value="ollama">Gemma 4 E2B / Local (Ollama)</option>
@@ -350,13 +380,13 @@ const { t } = useTranslation();
                             {textProvider === 'ollama' && (
                                 <p className={`gen-model-status ${ollamaStatus.ollama ? 'gen-model-status--ok' : 'gen-model-status--err'}`}
                                    title={ollamaStatus.ollama ? '' : 'Run `ollama serve` in terminal'}>
-                                    {ollamaStatus.ollama ? '● Online' : '● Offline (run `ollama serve`)'}
+                                    {ollamaStatus.ollama ? t('common2.ollamaOnline') : t('common2.ollamaOffline')}
                                 </p>
                             )}
                         </div>
 
                         <div className="gen-form-group">
-                            <label>Image Source</label>
+                            <label>{t('common2.imageSource')}</label>
                             <select value={imageProvider} onChange={(e) => setImageProvider(e.target.value)}>
                                 <option value="unsplash">Unsplash (Stock Photos)</option>
                                 <option value="flux">Flux AI / Pollinations (Generated)</option>
@@ -411,8 +441,8 @@ const { t } = useTranslation();
                         {(imageLoading || regenLoading.image) && (
                             <div className="gen-image-loading">
                                 <span className="gen-image-spinner" />
-                                <span>{regenLoading.image ? 'Regenerating image…' : t('generate.generatingImage')}</span>
-                                {imageProvider === 'flux' && <span className="gen-image-loading-hint">Flux can take 30–60s</span>}
+                                <span>{regenLoading.image ? t('common2.regenImage') : t('generate.generatingImage')}</span>
+                                {imageProvider === 'flux' && <span className="gen-image-loading-hint">{t('common2.fluxHint')}</span>}
                             </div>
                         )}
                         {!imageLoading && !regenLoading.image && imageUrl && (
@@ -423,8 +453,6 @@ const { t } = useTranslation();
                                     className="gen-result-image"
                                     referrerPolicy="no-referrer"
                                     onError={() => {
-                                        // Seed-swap retry only works for Pollinations URLs that contain ?seed=
-                                        // Flux images saved to /media/ have no seed param — just clear and show error
                                         if (imageUrl.includes('seed=') && imageRetry < 2) {
                                             setImageRetry(imageRetry + 1);
                                             setImageUrl(imageUrl.replace(/seed=\d+/, `seed=${Math.floor(Math.random() * 10000000)}`));

@@ -10,6 +10,7 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
 from django.conf import settings
 from django.utils import timezone
 
@@ -112,7 +113,13 @@ def register(request):
             serializer = UserSerializer(data=data)
             if not serializer.is_valid():
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            user = serializer.save()
+            try:
+                user = serializer.save()
+            except IntegrityError:
+                return Response(
+                    {'error': 'A user with that username or email already exists.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             user.role = data['role']
             if invitation:
                 user.specialist = invitation.specialist
@@ -137,6 +144,8 @@ def register(request):
             invitation.accepted_ip = get_client_ip(request)
             invitation.client = user
             invitation.save(update_fields=['status', 'accepted_at', 'accepted_ip', 'client'])
+            log_action(user, 'invitation_accepted', request=request, target=invitation,
+                       metadata={'specialist_id': invitation.specialist_id})
 
         if user.role == 'client':
             user.email_verified = True
@@ -434,4 +443,5 @@ def reset_password(request, token):
     except Exception:
         pass
 
+    log_action(user, 'password_changed', request=request, metadata={'via': 'reset'})
     return Response({'message': 'Password reset successfully. Please log in with your new password.'})

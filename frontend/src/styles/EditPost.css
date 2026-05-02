@@ -53,12 +53,16 @@
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
+  background: #000;
+  display: flex;
+  justify-content: center;
 }
 
-.edit-post-image img {
+.edit-post-image img,
+.edit-post-image video {
   width: 100%;
-  max-height: 320px;
-  object-fit: cover;
+  max-height: 480px;
+  object-fit: contain;
   display: block;
 }
 

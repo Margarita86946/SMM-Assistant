@@ -110,8 +110,8 @@ export const aiAPI = {
 };
 
 export const brandAPI = {
-  get: () => api.get('/brand-profile/'),
-  update: (data) => api.put('/brand-profile/', data),
+  get: (accountId) => api.get(`/brand-profile/${accountId}/`),
+  update: (accountId, data) => api.put(`/brand-profile/${accountId}/`, data),
 };
 
 export const approvalAPI = {
@@ -161,6 +161,9 @@ export const analyzerAPI = {
   getAI: (accountId) => api.post(`/analyzer/${accountId}/ai/`),
   refresh: (accountId) => api.post(`/analyzer/${accountId}/refresh/`),
   toggleDemo: (enabled) => api.post('/analyzer/demo-toggle/', { enabled }),
+  getComments: (accountId, mediaId) => api.get(`/analyzer/${accountId}/media/${mediaId}/comments/`),
+  replyComment: (accountId, mediaId, commentId, message) => api.post(`/analyzer/${accountId}/media/${mediaId}/comments/${commentId}/reply/`, { message }),
+  suggestReply: (accountId, data) => api.post(`/analyzer/${accountId}/suggest-reply/`, data),
 };
 
 export default api;

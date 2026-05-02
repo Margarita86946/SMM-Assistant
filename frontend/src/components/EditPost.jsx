@@ -41,8 +41,8 @@ function EditPost() {
 
   const [formData, setFormData] = useState({
     caption: '', hashtags: '', topic: '', tone: 'professional',
-    image_prompt: '', image_url: '', platform: 'instagram',
-    status: 'draft', scheduled_time: '',
+    image_prompt: '', image_url: '', video_url: '', media_type: 'image',
+    platform: 'instagram', status: 'draft', scheduled_time: '',
   });
   const [originalData, setOriginalData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -84,6 +84,8 @@ function EditPost() {
         tone: post.tone || 'professional',
         image_prompt: post.image_prompt || '',
         image_url: post.image_url || '',
+        video_url: post.video_url || '',
+        media_type: post.media_type || 'image',
         platform: post.platform || 'instagram',
         status: post.status || 'draft',
         scheduled_time: (() => {
@@ -135,11 +137,11 @@ function EditPost() {
 
   const handleSave = async () => {
     if (showScheduling && isApproved && !formData.scheduled_time) {
-      setError('Scheduled time is required.');
+      setError(t('edit.scheduledTimeRequired'));
       return;
     }
     if (isSpecialist && showScheduling && igAccounts.length > 1 && !selectedIgAccount) {
-      setError('Please select an Instagram account.');
+      setError(t('edit.selectIgAccount'));
       return;
     }
     setSaving(true);
@@ -197,11 +199,15 @@ function EditPost() {
         {error && <div className="error-message">{t(error)}</div>}
         {successMsg && <div className="success-message">{successMsg}</div>}
 
-        {formData.image_url && (
+        {formData.media_type === 'video' && formData.video_url ? (
+          <div className="edit-post-image">
+            <video src={formData.video_url} controls />
+          </div>
+        ) : formData.image_url ? (
           <div className="edit-post-image">
             <img src={formData.image_url} alt="Post visual" />
           </div>
-        )}
+        ) : null}
 
         <div className="edit-form-group">
           <div className="edit-field-label-row">
@@ -289,7 +295,7 @@ function EditPost() {
           <>
             {isSpecialist && igAccounts.length > 0 && (
               <div className="edit-form-group">
-                <label>Instagram Account</label>
+                <label>{t('edit.igAccountLabel')}</label>
                 {igAccounts.length === 1 ? (
                   <div className="account-field-readonly">@{igAccounts[0].account_username}</div>
                 ) : (
@@ -297,7 +303,7 @@ function EditPost() {
                     value={selectedIgAccount}
                     onChange={e => setSelectedIgAccount(e.target.value)}
                   >
-                    <option value="">Select account…</option>
+                    <option value="">{t('edit.selectAccount')}</option>
                     {igAccounts.map(a => (
                       <option key={a.id} value={a.id}>@{a.account_username}</option>
                     ))}
@@ -338,6 +344,8 @@ function EditPost() {
           caption={formData.caption}
           hashtags={formData.hashtags}
           imageUrl={formData.image_url || undefined}
+          videoUrl={formData.video_url || undefined}
+          mediaType={formData.media_type}
           username={localStorage.getItem('username') || ''}
         />
       </div>

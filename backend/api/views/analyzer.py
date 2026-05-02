@@ -211,16 +211,18 @@ def analyzer_overview(request, account_id):
 
     for item in insights:
         name = item.get('name')
-        values = item.get('values', [])
-        if not values:
-            continue
-        point = {'date': values[0].get('end_time', '')[:10], 'value': values[0].get('value', 0)}
-        if name == 'reach':
-            reach_series.append(point)
-        elif name == 'impressions':
-            impressions_series.append(point)
-        elif name == 'follower_count':
-            follower_series.append(point)
+        values = item.get('values') or []
+        for v in values:
+            val = v.get('value', 0)
+            if isinstance(val, dict):
+                continue
+            point = {'date': (v.get('end_time') or '')[:10], 'value': val}
+            if name == 'reach':
+                reach_series.append(point)
+            elif name == 'impressions':
+                impressions_series.append(point)
+            elif name == 'follower_count':
+                follower_series.append(point)
 
     total_reach = sum(p['value'] for p in reach_series)
     total_impressions = sum(p['value'] for p in impressions_series)
@@ -316,6 +318,7 @@ def analyzer_ai(request, account_id):
     media = snap.media
     audience = snap.audience
     insights = snap.insights
+    online_followers = snap.online_followers
 
     followers = overview.get('followers_count', 0)
     following = overview.get('follows_count', 0)
@@ -343,7 +346,8 @@ def analyzer_ai(request, account_id):
     reach_values = [
         v.get('value', 0)
         for item in insights if item.get('name') == 'reach'
-        for v in item.get('values', [])
+        for v in (item.get('values') or [])
+        if not isinstance(v.get('value'), dict)
     ]
     avg_reach = round(sum(reach_values) / max(len(reach_values), 1))
 
@@ -359,6 +363,11 @@ def analyzer_ai(request, account_id):
         for s in top_segments
     )
 
+    online_followers_text = 'N/A'
+    if isinstance(online_followers, dict) and online_followers:
+        top_hours = sorted(online_followers.items(), key=lambda x: x[1], reverse=True)[:3]
+        online_followers_text = ', '.join(f'{h}:00 UTC ({v} online)' for h, v in top_hours)
+
     prompt = f"""You are a senior social media strategist analyzing an Instagram account for a specialist.
 
 Account: @{overview.get('username', 'unknown')}
@@ -369,6 +378,7 @@ Avg likes per post: {avg_likes} | Avg comments: {avg_comments}
 Avg daily reach (last 30 days): {avg_reach:,}
 Top audience locations: {', '.join(top_cities) or 'N/A'} | Top countries: {', '.join(top_countries) or 'N/A'}
 Top audience segments: {segment_text or 'N/A'}
+Peak hours when followers are online: {online_followers_text}
 
 Top 5 posts by engagement:
 {chr(10).join(f"- \"{p['caption']}\" | Likes: {p['likes']} | Comments: {p['comments']} | Reach: {p['reach']} | Saved: {p['saved']} | Date: {p['date']}" for p in top_posts_summary)}
@@ -382,7 +392,7 @@ Provide a concise, actionable analysis structured exactly as:
 - (2-3 bullet points with specific issues)
 
 **Best Time to Post**
-- (Based on audience data, specific day/time recommendations)
+- (Based on the peak hours data above, give specific hour recommendations in the account's top audience timezone. If peak hours data is N/A, say so explicitly.)
 
 **Content Recommendations for Next 7 Days**
 - (3-4 specific post ideas with format and angle)

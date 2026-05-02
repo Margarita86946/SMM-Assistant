@@ -17,6 +17,7 @@ OAUTH_SCOPES = [
     'instagram_business_basic',
     'instagram_business_content_publish',
     'instagram_business_manage_insights',
+    'instagram_business_manage_comments',
 ]
 
 DEFAULT_TIMEOUT = 30
@@ -360,7 +361,14 @@ def get_media_insights(access_token, media_id):
         )
         response.raise_for_status()
         raw = response.json().get('data', [])
-        return {item['name']: item.get('values', [{}])[0].get('value', 0) if item.get('values') else item.get('value', 0) for item in raw}
+        return {
+            item['name']: (
+                item['value']
+                if 'value' in item
+                else (item.get('values') or [{}])[0].get('value', 0)
+            )
+            for item in raw
+        }
     except requests.HTTPError as e:
         logger.error('get_media_insights failed media=%s: %s %s', media_id, e, getattr(e.response, 'text', ''))
         raise InstagramAPIError('Failed to fetch media insights')
@@ -420,6 +428,23 @@ def get_online_followers(access_token, instagram_user_id):
     except (requests.HTTPError, requests.RequestException) as e:
         logger.warning('get_online_followers failed: %s', e)
         return {}
+
+
+def reply_to_comment(access_token, comment_id, message):
+    try:
+        response = requests.post(
+            f'{GRAPH_API_BASE}/{comment_id}/replies',
+            data={'message': message, 'access_token': access_token},
+            timeout=DEFAULT_TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.HTTPError as e:
+        logger.error('reply_to_comment failed comment=%s: %s %s', comment_id, e, getattr(e.response, 'text', ''))
+        raise InstagramAPIError('Failed to post reply')
+    except requests.RequestException as e:
+        logger.error('reply_to_comment network error: %s', e)
+        raise InstagramAPIError('Network error posting reply')
 
 
 def get_comments(access_token, media_id, limit=50):

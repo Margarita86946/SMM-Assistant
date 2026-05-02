@@ -3,11 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import SmmLogo from './SmmLogo';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
+import { useTranslation } from '../i18n';
 import '../styles/Auth.css';
 
 function ResetPassword() {
   const { token } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -18,13 +20,13 @@ function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (password !== password2) { setError('Passwords do not match.'); return; }
+    if (password !== password2) { setError(t('resetPassword.mismatch')); return; }
     setLoading(true);
     try {
       await authAPI.resetPassword(token, password);
       setDone(true);
     } catch (err) {
-      setError(err.message || 'This reset link is invalid or has expired.');
+      setError(err.message || t('resetPassword.invalidLink'));
     } finally {
       setLoading(false);
     }
@@ -42,23 +44,23 @@ function ResetPassword() {
           {done ? (
             <div style={{ textAlign: 'center' }}>
               <div className="auth-box-header">
-                <h2>Password reset!</h2>
-                <p>Your password has been updated. Please log in with your new password.</p>
+                <h2>{t('resetPassword.doneTitle')}</h2>
+                <p>{t('resetPassword.doneMsg')}</p>
               </div>
-              <button className="btn-primary" onClick={() => navigate('/login')}>Go to login</button>
+              <button className="btn-primary" onClick={() => navigate('/login')}>{t('resetPassword.goToLogin')}</button>
             </div>
           ) : (
             <>
               <div className="auth-box-header">
-                <h2>Reset password</h2>
-                <p>Enter your new password below.</p>
+                <h2>{t('resetPassword.title')}</h2>
+                <p>{t('resetPassword.subtitle')}</p>
               </div>
 
               {error && <div className="error-message" style={{ marginBottom: 16 }}>{error}</div>}
 
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                  <label>New password</label>
+                  <label>{t('resetPassword.newPassword')}</label>
                   <div className="password-input-wrapper">
                     <input
                       type={showPw ? 'text' : 'password'}
@@ -74,7 +76,7 @@ function ResetPassword() {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>Confirm new password</label>
+                  <label>{t('resetPassword.confirmPassword')}</label>
                   <input
                     type={showPw ? 'text' : 'password'}
                     value={password2}
@@ -84,7 +86,7 @@ function ResetPassword() {
                   />
                 </div>
                 <button className="btn-primary" type="submit" disabled={loading} style={{ marginTop: 8 }}>
-                  {loading ? 'Resetting…' : 'Reset password'}
+                  {loading ? t('resetPassword.resetting') : t('resetPassword.submit')}
                 </button>
               </form>
             </>

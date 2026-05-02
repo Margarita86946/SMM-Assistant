@@ -14,12 +14,12 @@ const PLATFORM_LABELS = {
   twitter:   { icon: <FaTwitter />,   text: 'Twitter' },
 };
 
-const STATUS_META = {
-  draft:            { text: 'Draft',             cls: 'badge-draft'     },
-  pending_approval: { text: 'Awaiting Approval', cls: 'badge-pending'   },
-  approved:         { text: 'Approved',          cls: 'badge-approved'  },
-  scheduled:        { text: 'Scheduled',         cls: 'badge-scheduled' },
-  posted:           { text: 'Posted',            cls: 'badge-posted'    },
+const STATUS_META_KEYS = {
+  draft:            { key: 'status.draft',            cls: 'badge-draft'     },
+  pending_approval: { key: 'status.awaitingApproval', cls: 'badge-pending'   },
+  approved:         { key: 'status.approved',         cls: 'badge-approved'  },
+  scheduled:        { key: 'status.scheduled',        cls: 'badge-scheduled' },
+  posted:           { key: 'status.posted',           cls: 'badge-posted'    },
 };
 
 const PAGE_SIZE = 3;
@@ -184,14 +184,14 @@ function PostsList() {
   };
 
   const handleBulkDelete = async () => {
-    if (!window.confirm(`Delete ${selected.size} post(s)?`)) return;
+    if (!window.confirm(t('posts.bulkDeleteConfirm', { n: selected.size }))) return;
     setBulkLoading(true);
     try {
       await Promise.all([...selected].map(id => postsAPI.delete(id)));
       setSelected(new Set());
       reload();
     } catch {
-      setDeleteError('Failed to delete some posts.');
+      setDeleteError(t('posts.bulkDeleteFailed'));
       setTimeout(() => setDeleteError(''), 4000);
     } finally {
       setBulkLoading(false);
@@ -214,7 +214,7 @@ function PostsList() {
       setBulkScheduleDate('');
       reload();
     } catch {
-      setDeleteError('Failed to schedule some posts.');
+      setDeleteError(t('posts.bulkScheduleFailed'));
       setTimeout(() => setDeleteError(''), 4000);
     } finally {
       setBulkLoading(false);
@@ -246,7 +246,7 @@ function PostsList() {
     <div className="posts-container">
       <div className="posts-header">
         <h1>
-          {isClient ? 'My Posts' : t('posts.title')}
+          {isClient ? t('posts.myPosts') : t('posts.title')}
           {totalAllCount > 0 && <span className="posts-count-badge">{totalAllCount}</span>}
         </h1>
         {!isClient && (
@@ -279,7 +279,7 @@ function PostsList() {
                 posts.filter(isPostSelectable).every(p => selected.has(p.id))}
               onChange={toggleSelectAll}
             />
-            <span>Select all</span>
+            <span>{t('posts.selectAll')}</span>
           </label>
         )}
         <div className="posts-search-wrap">
@@ -301,12 +301,12 @@ function PostsList() {
         <select className="posts-filter-select" value={filterStatus}
           onChange={e => { setFilterStatus(e.target.value); setPage(1); }}>
           <option value="all">{t('posts.allStatuses')}</option>
-          {!isClient && <option value="draft">Draft</option>}
-          {isSpecialist && <option value="pending_approval">Awaiting Approval</option>}
-          {isSpecialist && <option value="approved">Approved</option>}
-          {isClient && <option value="pending_approval">Awaiting Approval</option>}
-          {isClient && <option value="approved">Approved</option>}
-          {isClient && <option value="rejected">Rejected</option>}
+          {!isClient && <option value="draft">{t('status.draft')}</option>}
+          {isSpecialist && <option value="pending_approval">{t('status.awaitingApproval')}</option>}
+          {isSpecialist && <option value="approved">{t('status.approved')}</option>}
+          {isClient && <option value="pending_approval">{t('status.awaitingApproval')}</option>}
+          {isClient && <option value="approved">{t('status.approved')}</option>}
+          {isClient && <option value="rejected">{t('status.rejected')}</option>}
           <option value="scheduled">{t('posts.scheduled')}</option>
           <option value="posted">{t('posts.posted')}</option>
         </select>
@@ -318,7 +318,7 @@ function PostsList() {
 
       {!isClient && selected.size > 0 && (
         <div className="bulk-bar">
-          <span className="bulk-bar-count">{selected.size} selected</span>
+          <span className="bulk-bar-count">{t('posts.selectedCount', { n: selected.size })}</span>
           <div className="bulk-bar-actions">
             {showBulkSchedule ? (
               <>
@@ -330,19 +330,19 @@ function PostsList() {
                   onChange={e => setBulkScheduleTime(e.target.value)} />
                 <button className="bulk-btn bulk-btn--primary" onClick={handleBulkSchedule}
                   disabled={bulkLoading || !bulkScheduleDate}>
-                  <FiCheck /> Confirm
+                  <FiCheck /> {t('posts.bulkConfirm')}
                 </button>
                 <button className="bulk-btn" onClick={() => setShowBulkSchedule(false)}>
-                  <FiX /> Cancel
+                  <FiX /> {t('common.cancel')}
                 </button>
               </>
             ) : (
               <>
                 <button className="bulk-btn" onClick={() => setShowBulkSchedule(true)} disabled={bulkLoading}>
-                  <FiCalendar /> Schedule
+                  <FiCalendar /> {t('posts.bulkSchedule')}
                 </button>
                 <button className="bulk-btn bulk-btn--danger" onClick={handleBulkDelete} disabled={bulkLoading}>
-                  <FiTrash2 /> Delete
+                  <FiTrash2 /> {t('posts.bulkDelete')}
                 </button>
               </>
             )}
@@ -373,7 +373,8 @@ function PostsList() {
         <div className="posts-content">
           <div className="posts-grid">
             {posts.map(post => {
-              const meta = STATUS_META[post.status] || { text: post.status, cls: 'badge-draft' };
+              const metaEntry = STATUS_META_KEYS[post.status];
+              const meta = metaEntry ? { text: t(metaEntry.key), cls: metaEntry.cls } : { text: post.status, cls: 'badge-draft' };
               const isApproved = post.status === 'approved';
               const isRejectedDraft = post.status === 'draft' && post.approval_note;
               const isSelectable = isPostSelectable(post);
@@ -519,9 +520,9 @@ function PostsList() {
         <div className="edit-modal" onClick={e => e.stopPropagation()}>
           <div className="edit-modal-header">
             <span className="edit-modal-icon"><FaInstagram /></span>
-            <h3>Select Instagram Account</h3>
+            <h3>{t('posts.igPickerTitle')}</h3>
           </div>
-          <p className="edit-modal-msg">This client has multiple Instagram accounts. Choose which one to publish to.</p>
+          <p className="edit-modal-msg">{t('posts.igPickerMsg')}</p>
           <select
             className="posts-filter-select"
             style={{ width: '100%', marginBottom: 16 }}
@@ -538,9 +539,9 @@ function PostsList() {
               setIgPickerPost(null);
               await doPublishNow(post.id, igPickerSelected);
             }}>
-              Publish
+              {t('posts.igPickerPublish')}
             </button>
-            <button className="edit-modal-leave-btn" onClick={() => setIgPickerPost(null)}>Cancel</button>
+            <button className="edit-modal-leave-btn" onClick={() => setIgPickerPost(null)}>{t('common.cancel')}</button>
           </div>
         </div>
       </div>

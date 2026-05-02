@@ -19,8 +19,8 @@ class PostAdmin(admin.ModelAdmin):
 
 @admin.register(BrandProfile)
 class BrandProfileAdmin(admin.ModelAdmin):
-    list_display = ['user', 'brand_name', 'updated_at']
-    search_fields = ['user__username', 'brand_name']
+    list_display = ['social_account', 'brand_name', 'updated_at']
+    search_fields = ['social_account__account_username', 'brand_name']
 
 
 @admin.register(SocialAccount)

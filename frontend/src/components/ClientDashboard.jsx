@@ -53,7 +53,7 @@ function ClientDashboard() {
       await approvalAPI.approve(id);
       await load();
     } catch (err) {
-      alert(err.message || 'Approval failed');
+      alert(err.message || t('approval.failedApprove'));
     } finally {
       setActing(s => ({ ...s, [id]: null }));
     }
@@ -74,7 +74,7 @@ function ClientDashboard() {
       setRejectNote('');
       await load();
     } catch (err) {
-      alert(err.message || 'Rejection failed');
+      alert(err.message || t('approval.failedReject'));
     } finally {
       setActing(s => ({ ...s, [id]: null }));
     }

@@ -61,12 +61,10 @@ function Account() {
   const [pwError, setPwError] = useState('');
   const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false });
 
-  const [brandData, setBrandData] = useState({
-    brand_name: '', voice_tone: '', target_audience: '', keywords: '', banned_words: '',
-  });
-  const [brandSaving, setBrandSaving] = useState(false);
-  const [brandMsg, setBrandMsg] = useState('');
-  const [brandError, setBrandError] = useState('');
+  const [brandProfiles, setBrandProfiles] = useState({});
+  const [brandSaving, setBrandSaving] = useState({});
+  const [brandMsg, setBrandMsg] = useState({});
+  const [brandError, setBrandError] = useState({});
 
   const [igAccounts, setIgAccounts] = useState([]);
   const [igLoading, setIgLoading] = useState(true);
@@ -75,10 +73,35 @@ function Account() {
   const [igMsg, setIgMsg] = useState('');
   const [igError, setIgError] = useState('');
 
+  const loadBrandProfiles = async (accounts) => {
+    const profiles = {};
+    await Promise.all(
+      accounts.map(async (acc) => {
+        try {
+          const res = await brandAPI.get(acc.id);
+          profiles[acc.id] = {
+            brand_name: res.data.brand_name || '',
+            voice_tone: res.data.voice_tone || '',
+            target_audience: res.data.target_audience || '',
+            keywords: res.data.keywords || '',
+            banned_words: res.data.banned_words || '',
+          };
+        } catch {
+          profiles[acc.id] = { brand_name: '', voice_tone: '', target_audience: '', keywords: '', banned_words: '' };
+        }
+      })
+    );
+    setBrandProfiles(profiles);
+  };
+
   const loadIgStatus = async () => {
     try {
       const res = await instagramAPI.getStatus();
-      setIgAccounts(res.data.accounts || []);
+      const accounts = res.data.accounts || [];
+      setIgAccounts(accounts);
+      if (localStorage.getItem('role') !== 'specialist' && accounts.length > 0) {
+        await loadBrandProfiles(accounts);
+      }
     } catch {
       setIgAccounts([]);
     } finally {
@@ -106,8 +129,7 @@ function Account() {
       const url = window.location.pathname + (q ? `?${q}` : '') + window.location.hash;
       window.history.replaceState({}, '', url);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleInstagramConnect = async () => {
     setIgConnecting(true);
@@ -144,7 +166,6 @@ function Account() {
       setAutoApprove(!!res.data.auto_approve);
       if (res.data.avatar) localStorage.setItem('avatar', res.data.avatar);
       else localStorage.removeItem('avatar');
-      // Sync sound preference into localStorage for NotificationsContext
       if (res.data.notifications_sound !== undefined) {
         localStorage.setItem('notifications_sound', String(res.data.notifications_sound));
       }
@@ -152,31 +173,28 @@ function Account() {
       setProfileError(t('account.failedSave'));
     }).finally(() => setLoading(false));
 
-    brandAPI.get().then(res => {
-      setBrandData({
-        brand_name: res.data.brand_name || '',
-        voice_tone: res.data.voice_tone || '',
-        target_audience: res.data.target_audience || '',
-        keywords: res.data.keywords || '',
-        banned_words: res.data.banned_words || '',
-      });
-    }).catch(() => setBrandError(t('account.failedSave')));
-
   }, [t]);
 
-  const handleBrandSave = async () => {
-    setBrandSaving(true);
-    setBrandMsg('');
-    setBrandError('');
+  const handleBrandSave = async (accountId) => {
+    setBrandSaving(s => ({ ...s, [accountId]: true }));
+    setBrandMsg(m => ({ ...m, [accountId]: '' }));
+    setBrandError(e => ({ ...e, [accountId]: '' }));
     try {
-      await brandAPI.update(brandData);
-      setBrandMsg(t('account.savedMsg'));
-      setTimeout(() => setBrandMsg(''), 3000);
+      await brandAPI.update(accountId, brandProfiles[accountId] || {});
+      setBrandMsg(m => ({ ...m, [accountId]: t('account.savedMsg') }));
+      setTimeout(() => setBrandMsg(m => ({ ...m, [accountId]: '' })), 3000);
     } catch (err) {
-      setBrandError(err.message || t('account.failedSave'));
+      setBrandError(e => ({ ...e, [accountId]: err.message || t('account.failedSave') }));
     } finally {
-      setBrandSaving(false);
+      setBrandSaving(s => ({ ...s, [accountId]: false }));
     }
+  };
+
+  const handleBrandChange = (accountId, field, value) => {
+    setBrandProfiles(p => ({
+      ...p,
+      [accountId]: { ...(p[accountId] || {}), [field]: value },
+    }));
   };
 
   const handleAutoApproveToggle = async () => {
@@ -295,7 +313,6 @@ function Account() {
         <p className="account-subtitle">{t('account.subtitle')}</p>
       </div>
 
-      {/* Profile Hero */}
       <div className="account-hero-card">
         <div className="account-avatar-col">
           <div className="account-avatar-wrap" onClick={handleAvatarClick} title={t('account.uploadAvatar')}>
@@ -337,7 +354,6 @@ className="account-avatar-input" onChange={handleAvatarChange} />
         </div>
       </div>
 
-      {/* Edit Profile */}
       <div className="account-card">
         <div className="account-card-title">
           <FiEdit2 />
@@ -385,7 +401,6 @@ className="account-avatar-input" onChange={handleAvatarChange} />
         )}
       </div>
 
-      {/* Change Password */}
       <div className="account-card">
         <div className="account-card-title">
           <FiLock />
@@ -428,7 +443,6 @@ className="account-avatar-input" onChange={handleAvatarChange} />
         </button>
       </div>
 
-      {/* Connected Accounts — hidden for specialists (managed per-client in Clients page) */}
       {localStorage.getItem('role') !== 'specialist' && <div className="account-card">
         <div className="account-card-title">
           <FiLink />
@@ -497,7 +511,6 @@ className="account-avatar-input" onChange={handleAvatarChange} />
         )}
       </div>}
 
-      {/* Auto-approve toggle — clients only */}
       {localStorage.getItem('role') === 'client' && (
         <div className="account-card">
           <div className="account-card-title">
@@ -513,7 +526,7 @@ className="account-avatar-input" onChange={handleAvatarChange} />
               className={`auto-approve-toggle${autoApprove ? ' on' : ''}`}
               onClick={handleAutoApproveToggle}
               disabled={autoApproveSaving}
-              title={autoApprove ? 'Disable auto-approve' : 'Enable auto-approve'}
+              title={autoApprove ? t('account.autoApproveDisable') : t('account.autoApproveEnable')}
             >
               <span className="auto-approve-thumb" />
             </button>
@@ -521,55 +534,59 @@ className="account-avatar-input" onChange={handleAvatarChange} />
         </div>
       )}
 
-      {/* Brand Profile — hidden for specialists (they use each client's profile) */}
-      {localStorage.getItem('role') !== 'specialist' && <div className="account-card">
-        <div className="account-card-title">
-          <FiTag />
-          Brand Profile
-        </div>
+      {localStorage.getItem('role') !== 'specialist' && igAccounts.map(acc => {
+        const bp = brandProfiles[acc.id] || { brand_name: '', voice_tone: '', target_audience: '', keywords: '', banned_words: '' };
+        return (
+          <div className="account-card" key={`brand-${acc.id}`}>
+            <div className="account-card-title">
+              <FiTag />
+              {t('account.brandProfileTitle', { username: acc.username })}
+            </div>
 
-        {brandError && <div className="error-message">{brandError}</div>}
-        {brandMsg && <div className="success-message">{brandMsg}</div>}
+            {brandError[acc.id] && <div className="error-message">{brandError[acc.id]}</div>}
+            {brandMsg[acc.id] && <div className="success-message">{brandMsg[acc.id]}</div>}
 
-        <p className="account-pw-hint" style={{ marginTop: 0, marginBottom: 16 }}>
-          {t('account.brandProfileHint')}
-        </p>
+            <p className="account-pw-hint" style={{ marginTop: 0, marginBottom: 16 }}>
+              {t('account.brandProfileHint')}
+            </p>
 
-        <div className="account-form-group">
-          <label>{t('account.brandName')}</label>
-          <input type="text" value={brandData.brand_name}
-            onChange={e => setBrandData({ ...brandData, brand_name: e.target.value })}
-            placeholder={t('account.brandNamePlaceholder')} />
-        </div>
-        <div className="account-form-group">
-          <label>{t('account.voiceTone')}</label>
-          <input type="text" value={brandData.voice_tone}
-            onChange={e => setBrandData({ ...brandData, voice_tone: e.target.value })}
-            placeholder={t('account.voiceTonePlaceholder')} />
-        </div>
-        <div className="account-form-group">
-          <label>{t('account.targetAudience')}</label>
-          <input type="text" value={brandData.target_audience}
-            onChange={e => setBrandData({ ...brandData, target_audience: e.target.value })}
-            placeholder={t('account.targetAudiencePlaceholder')} />
-        </div>
-        <div className="account-form-group">
-          <label>{t('account.keywords')}</label>
-          <input type="text" value={brandData.keywords}
-            onChange={e => setBrandData({ ...brandData, keywords: e.target.value })}
-            placeholder={t('account.keywordsPlaceholder')} />
-        </div>
-        <div className="account-form-group">
-          <label>{t('account.bannedWords')}</label>
-          <input type="text" value={brandData.banned_words}
-            onChange={e => setBrandData({ ...brandData, banned_words: e.target.value })}
-            placeholder={t('account.bannedWordsPlaceholder')} />
-        </div>
+            <div className="account-form-group">
+              <label>{t('account.brandName')}</label>
+              <input type="text" value={bp.brand_name}
+                onChange={e => handleBrandChange(acc.id, 'brand_name', e.target.value)}
+                placeholder={t('account.brandNamePlaceholder')} />
+            </div>
+            <div className="account-form-group">
+              <label>{t('account.voiceTone')}</label>
+              <input type="text" value={bp.voice_tone}
+                onChange={e => handleBrandChange(acc.id, 'voice_tone', e.target.value)}
+                placeholder={t('account.voiceTonePlaceholder')} />
+            </div>
+            <div className="account-form-group">
+              <label>{t('account.targetAudience')}</label>
+              <input type="text" value={bp.target_audience}
+                onChange={e => handleBrandChange(acc.id, 'target_audience', e.target.value)}
+                placeholder={t('account.targetAudiencePlaceholder')} />
+            </div>
+            <div className="account-form-group">
+              <label>{t('account.keywords')}</label>
+              <input type="text" value={bp.keywords}
+                onChange={e => handleBrandChange(acc.id, 'keywords', e.target.value)}
+                placeholder={t('account.keywordsPlaceholder')} />
+            </div>
+            <div className="account-form-group">
+              <label>{t('account.bannedWords')}</label>
+              <input type="text" value={bp.banned_words}
+                onChange={e => handleBrandChange(acc.id, 'banned_words', e.target.value)}
+                placeholder={t('account.bannedWordsPlaceholder')} />
+            </div>
 
-        <button className="account-btn-save" onClick={handleBrandSave} disabled={brandSaving}>
-          {brandSaving ? t('common.saving') : t('account.saveChanges')}
-        </button>
-      </div>}
+            <button className="account-btn-save" onClick={() => handleBrandSave(acc.id)} disabled={brandSaving[acc.id]}>
+              {brandSaving[acc.id] ? t('common.saving') : t('account.saveChanges')}
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

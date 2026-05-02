@@ -38,8 +38,7 @@ export function HashtagsCounter({ hashtags, platform }) {
   );
 }
 
-/* ─── Instagram ──────────────────────────────────────────── */
-function InstagramPreview({ caption, hashtags, imageUrl, username, dark }) {
+function InstagramPreview({ caption, hashtags, imageUrl, videoUrl, mediaType, username, dark }) {
   const [expanded, setExpanded] = useState(false);
   const fullCaption = [caption, hashtags].filter(Boolean).join('\n');
   const TRUNCATE = 125;
@@ -52,7 +51,7 @@ function InstagramPreview({ caption, hashtags, imageUrl, username, dark }) {
   const textMain  = dark ? '#f5f5f5' : '#262626';
   const textMuted = dark ? '#a8a8a8' : '#737373';
   const divider   = dark ? '#262626' : '#efefef';
-  const imgBg     = dark ? '#1a1a1a' : '#efefef';
+
   const avatarBg  = dark ? '#a8a8a8' : '#c7c7c7';
   const avatarBorder = dark ? '#000000' : '#ffffff';
 
@@ -62,7 +61,6 @@ function InstagramPreview({ caption, hashtags, imageUrl, username, dark }) {
   return (
     <div style={{ width: '100%', maxWidth: 400, background: bg, border: `1px solid ${border}`, borderRadius: 3, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", overflow: 'hidden', boxSizing: 'border-box', color: textMain, ...no }}>
 
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', boxSizing: 'border-box' }}>
         <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
           <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: avatarBg, border: `2px solid ${avatarBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#262626', boxSizing: 'border-box' }}>{initial}</div>
@@ -76,18 +74,18 @@ function InstagramPreview({ caption, hashtags, imageUrl, username, dark }) {
         </svg>
       </div>
 
-      {/* Image */}
-      <div style={{ width: '100%', aspectRatio: '1 / 1', background: imgBg, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {imageUrl
-          ? <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke={dark ? '#555' : '#bbb'} strokeWidth="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-              <span style={{ fontSize: 12, color: textMuted }}>No image uploaded</span>
-            </div>
+      <div style={{ width: '100%', aspectRatio: '1 / 1', background: '#000', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {mediaType === 'video' && videoUrl
+          ? <video src={videoUrl} controls playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+          : imageUrl
+            ? <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+            : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke={dark ? '#555' : '#bbb'} strokeWidth="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span style={{ fontSize: 12, color: dark ? '#555' : '#bbb' }}>No media uploaded</span>
+              </div>
         }
       </div>
 
-      {/* Actions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 4px', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke={textMain} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 3px' }}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
@@ -97,10 +95,8 @@ function InstagramPreview({ caption, hashtags, imageUrl, username, dark }) {
         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke={textMain} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 21 12 16 5 21 5 3 19 3 19 21"/></svg>
       </div>
 
-      {/* Likes */}
       <div style={{ padding: '0 14px 5px', fontSize: 13.5, color: textMain, fontWeight: 600, boxSizing: 'border-box' }}>Be the first to like this</div>
 
-      {/* Caption */}
       <div style={{ padding: '0 14px 5px', boxSizing: 'border-box' }}>
         {fullCaption
           ? <p style={{ margin: 0, padding: 0, fontSize: 13.5, lineHeight: '1.5', color: textMain, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
@@ -114,23 +110,19 @@ function InstagramPreview({ caption, hashtags, imageUrl, username, dark }) {
         }
       </div>
 
-      {/* View all comments */}
       <div style={{ padding: '2px 14px', fontSize: 13.5, color: textMuted, boxSizing: 'border-box' }}>View all comments</div>
 
-      {/* Add comment bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px 6px', borderTop: `1px solid ${divider}`, boxSizing: 'border-box' }}>
         <div style={{ width: 24, height: 24, borderRadius: '50%', background: avatarBg, fontSize: 10, fontWeight: 700, color: '#262626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{initial}</div>
         <span style={{ flex: 1, fontSize: 13, color: textMuted }}>Add a comment…</span>
         <span style={{ fontSize: 14, color: textMain }}>😊</span>
       </div>
 
-      {/* Timestamp */}
       <div style={{ padding: '4px 14px 10px', fontSize: 10, color: textMuted, letterSpacing: '0.3px', textTransform: 'uppercase', boxSizing: 'border-box' }}>JUST NOW</div>
     </div>
   );
 }
 
-/* ─── Twitter / X ────────────────────────────────────────── */
 function TwitterPreview({ caption, hashtags, username, dark }) {
   const fullText = [caption, hashtags].filter(Boolean).join(' ');
   const len = fullText.length;
@@ -152,15 +144,12 @@ function TwitterPreview({ caption, hashtags, username, dark }) {
   return (
     <div style={{ width: '100%', maxWidth: 400, background: bg, border: `1px solid ${border}`, borderRadius: 16, padding: '14px 16px 10px', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", display: 'flex', gap: 10, boxSizing: 'border-box', ...no }}>
 
-      {/* Left col: avatar + thread line */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
         <div style={{ width: 42, height: 42, borderRadius: '50%', background: '#1d9bf0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, flexShrink: 0 }}>{initial}</div>
         <div style={{ flex: 1, width: 2, background: trackColor, marginTop: 6, borderRadius: 1, minHeight: 20 }}/>
       </div>
 
-      {/* Right col */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Identity row */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 2, gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', minWidth: 0 }}>
             <span style={{ fontSize: 14, fontWeight: 700, color: textMain, whiteSpace: 'nowrap' }}>{username || 'Your Name'}</span>
@@ -176,12 +165,10 @@ function TwitterPreview({ caption, hashtags, username, dark }) {
           </svg>
         </div>
 
-        {/* Tweet text */}
         <div style={{ fontSize: 15, lineHeight: '1.55', color: textMain, wordBreak: 'break-word', whiteSpace: 'pre-wrap', margin: '4px 0 10px', ...(over ? { border: '1.5px solid #f4212e', borderRadius: 6, padding: '4px 6px' } : {}) }}>
           {fullText || <span style={{ color: dark ? '#555' : '#aaa', fontStyle: 'italic' }}>Tweet will appear here…</span>}
         </div>
 
-        {/* Action icons + ring */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 4 }}>
           {[
             <path key="c" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>,
@@ -191,7 +178,6 @@ function TwitterPreview({ caption, hashtags, username, dark }) {
           ].map((icon, i) => (
             <svg key={i} viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={textMuted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
           ))}
-          {/* Char ring */}
           <div style={{ marginLeft: 'auto', position: 'relative', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="24" height="24" viewBox="0 0 24 24" style={{ position: 'absolute', top: 0, left: 0 }}>
               <circle cx="12" cy="12" r={r} fill="none" stroke={trackColor} strokeWidth="2"/>
@@ -205,7 +191,6 @@ function TwitterPreview({ caption, hashtags, username, dark }) {
   );
 }
 
-/* ─── LinkedIn ───────────────────────────────────────────── */
 function LinkedInPreview({ caption, hashtags, imageUrl, username, dark }) {
   const [expanded, setExpanded] = useState(false);
   const fullText = [caption, hashtags].filter(Boolean).join('\n');
@@ -230,7 +215,6 @@ function LinkedInPreview({ caption, hashtags, imageUrl, username, dark }) {
   return (
     <div style={{ width: '100%', maxWidth: 400, background: bg, border: `1px solid ${border}`, borderRadius: 8, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", overflow: 'hidden', boxSizing: 'border-box', boxShadow: dark ? 'none' : '0 0 0 1px rgba(0,0,0,0.06),0 2px 4px rgba(0,0,0,0.04)', ...no }}>
 
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px 6px', boxSizing: 'border-box' }}>
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#0a66c2', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700 }}>{initial}</div>
@@ -252,7 +236,6 @@ function LinkedInPreview({ caption, hashtags, imageUrl, username, dark }) {
         </div>
       </div>
 
-      {/* Body */}
       <div style={{ padding: '6px 16px 10px', boxSizing: 'border-box' }}>
         {fullText
           ? <p style={{ margin: 0, padding: 0, fontSize: 14, lineHeight: '1.55', color: textMain, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
@@ -264,14 +247,12 @@ function LinkedInPreview({ caption, hashtags, imageUrl, username, dark }) {
         }
       </div>
 
-      {/* Image */}
       {imageUrl && (
         <div style={{ width: '100%', overflow: 'hidden', background: dark ? '#111' : '#f3f2ef' }}>
           <img src={imageUrl} alt="" style={{ width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block' }}/>
         </div>
       )}
 
-      {/* Reactions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 4px', boxSizing: 'border-box' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <span style={{ fontSize: 16 }}>👍</span><span style={{ fontSize: 16 }}>❤️</span><span style={{ fontSize: 16 }}>👏</span>
@@ -279,10 +260,8 @@ function LinkedInPreview({ caption, hashtags, imageUrl, username, dark }) {
         <span style={{ fontSize: 12, color: textMuted }}>Be the first to react</span>
       </div>
 
-      {/* Divider */}
       <div style={{ height: 1, background: divider, margin: '0 16px' }}/>
 
-      {/* Actions */}
       <div style={{ display: 'flex', justifyContent: 'space-around', padding: '2px 4px 4px', boxSizing: 'border-box' }}>
         {[
           { path: <><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></>, label: 'Like' },
@@ -300,12 +279,11 @@ function LinkedInPreview({ caption, hashtags, imageUrl, username, dark }) {
   );
 }
 
-/* ─── Main export ────────────────────────────────────────── */
-export function PostPreview({ platform, caption, hashtags, imageUrl, username }) {
+export function PostPreview({ platform, caption, hashtags, imageUrl, videoUrl, mediaType, username }) {
   const { theme } = useSettings();
   const dark = theme === 'dark';
 
   if (platform === 'twitter') return <TwitterPreview caption={caption} hashtags={hashtags} username={username} dark={dark} />;
   if (platform === 'linkedin') return <LinkedInPreview caption={caption} hashtags={hashtags} imageUrl={imageUrl} username={username} dark={dark} />;
-  return <InstagramPreview caption={caption} hashtags={hashtags} imageUrl={imageUrl} username={username} dark={dark} />;
+  return <InstagramPreview caption={caption} hashtags={hashtags} imageUrl={imageUrl} videoUrl={videoUrl} mediaType={mediaType} username={username} dark={dark} />;
 }

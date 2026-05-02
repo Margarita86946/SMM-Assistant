@@ -3,11 +3,9 @@ import { clientsAPI } from '../services/api';
 
 const ActiveClientContext = createContext();
 
-const CLIENTS_POLL_INTERVAL = 30000; // 30s — picks up newly-registered clients
+const CLIENTS_POLL_INTERVAL = 30000;
 
 export function ActiveClientProvider({ children }) {
-  // Re-read role reactively so the provider responds after login/logout
-  // without requiring a full page reload.
   const [role, setRole] = useState(() => localStorage.getItem('role'));
 
   useEffect(() => {
@@ -53,13 +51,11 @@ export function ActiveClientProvider({ children }) {
 
   const activeClient = clients.find(c => c.id === activeClientId) || null;
 
-  // If the saved client no longer belongs to this specialist, clear it
   useEffect(() => {
     if (!isSpecialist || clients.length === 0 || activeClientId === null) return;
     if (!clients.find(c => c.id === activeClientId)) {
       setActiveClientId(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clients, activeClientId, isSpecialist]);
 
   return (

@@ -46,9 +46,9 @@ function Login({ isLoginMode }) {
           username: res.data.existing_username || prev.username,
         }));
       })
-      .catch(() => setInvError('This invitation link is invalid or has expired.'))
+      .catch(() => setInvError(t('auth.invalidInviteLink')))
       .finally(() => setInvLoading(false));
-  }, [isLogin, invitationToken]);
+  }, [isLogin, invitationToken, t]);
 
   useEffect(() => {
     setIsLogin(isLoginMode);
@@ -181,19 +181,19 @@ function Login({ isLoginMode }) {
           {showQuiz ? (
             <>
               <div className="auth-box-header">
-                <h2>What's your goal?</h2>
-                <p>We'll set up your account based on how you plan to use the platform.</p>
+                <h2>{t('auth.quizTitle')}</h2>
+                <p>{t('auth.quizSubtitle')}</p>
               </div>
               <div className="role-quiz">
                 <button className="role-quiz-card" onClick={() => setChosenRole('owner')}>
                   <span className="role-quiz-icon"><FiUser /></span>
-                  <span className="role-quiz-title">Manage my own account</span>
-                  <span className="role-quiz-desc">Create and schedule posts for your personal or business Instagram.</span>
+                  <span className="role-quiz-title">{t('auth.quizOwnerTitle')}</span>
+                  <span className="role-quiz-desc">{t('auth.quizOwnerDesc')}</span>
                 </button>
                 <button className="role-quiz-card" onClick={() => setChosenRole('specialist')}>
                   <span className="role-quiz-icon"><FiUsers /></span>
-                  <span className="role-quiz-title">Manage clients' accounts</span>
-                  <span className="role-quiz-desc">Invite clients, create content on their behalf, and handle approvals.</span>
+                  <span className="role-quiz-title">{t('auth.quizSpecialistTitle')}</span>
+                  <span className="role-quiz-desc">{t('auth.quizSpecialistDesc')}</span>
                 </button>
               </div>
               <p className="toggle-text">
@@ -206,24 +206,21 @@ function Login({ isLoginMode }) {
               <div className="auth-box-header">
                 {isClientInvite ? (
                   <>
-                    <h2>Create your client account</h2>
-                    {invLoading && <p>Loading invitation…</p>}
+                    <h2>{t('auth.createClientAccount')}</h2>
+                    {invLoading && <p>{t('auth.loadingInvitation')}</p>}
                     {invError && <p className="auth-invite-error">{invError}</p>}
                     {invitation && (
                       <p>
-                        You've been invited by <strong>{invitation.specialist_name}</strong>.
-                        Your account will be linked to them automatically.
+                        {t('auth.invitedBy', { name: invitation.specialist_name })}
                       </p>
                     )}
                   </>
                 ) : !isLogin && chosenRole ? (
                   <>
-                    <h2>{chosenRole === 'owner' ? 'Set up your account' : 'Set up your specialist account'}</h2>
+                    <h2>{chosenRole === 'owner' ? t('auth.setupOwnerTitle') : t('auth.setupSpecialistTitle')}</h2>
                     <p>
-                      {chosenRole === 'owner'
-                        ? 'You\'ll manage your own social media.'
-                        : 'You\'ll manage content for your clients.'}
-                      {' '}<span className="toggle-link" style={{fontSize:'0.85em'}} onClick={() => setChosenRole(null)}>Change</span>
+                      {chosenRole === 'owner' ? t('auth.setupOwnerDesc') : t('auth.setupSpecialistDesc')}
+                      {' '}<span className="toggle-link" style={{fontSize:'0.85em'}} onClick={() => setChosenRole(null)}>{t('auth.change')}</span>
                     </p>
                   </>
                 ) : (
@@ -250,7 +247,7 @@ function Login({ isLoginMode }) {
                     placeholder={t('auth.usernamePlaceholder')}
                   />
                   {isClientInvite && invitation?.existing_username && (
-                    <span className="auth-field-hint">Your existing username has been pre-filled.</span>
+                    <span className="auth-field-hint">{t('auth.existingUsernamePrefilled')}</span>
                   )}
                 </div>
 
@@ -295,7 +292,7 @@ function Login({ isLoginMode }) {
                       readOnly={isClientInvite}
                     />
                     {isClientInvite && (
-                      <span className="auth-field-hint">Email is set by your invitation and cannot be changed.</span>
+                      <span className="auth-field-hint">{t('auth.emailSetByInvitation')}</span>
                     )}
                   </div>
                 )}
@@ -348,7 +345,7 @@ function Login({ isLoginMode }) {
                       className="toggle-link"
                       onClick={() => navigate('/forgot-password')}
                     >
-                      Forgot password?
+                      {t('auth.forgotPassword')}
                     </span>
                   </p>
                 )}

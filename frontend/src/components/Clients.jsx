@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { invitationsAPI, clientsAPI } from '../services/api';
 import { useTranslation } from '../i18n';
+import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import { useActiveClient } from '../context/ActiveClientContext';
 import { FiUsers, FiUser, FiSend, FiMail, FiInstagram, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import '../styles/Clients.css';
@@ -42,7 +43,7 @@ function ClientRow({ client, removing, onRemove, fmt, t }) {
             </button>
           )}
           {accounts.length === 0 && (
-            <span className="client-no-ig">No Instagram connected</span>
+            <span className="client-no-ig">{t('clients.noIgConnected')}</span>
           )}
           <button
             className="inv-revoke-btn"
@@ -61,9 +62,9 @@ function ClientRow({ client, removing, onRemove, fmt, t }) {
               <FiInstagram className="client-ig-icon" />
               <span className="client-ig-username">@{a.username}</span>
               <span className="client-ig-type">{a.account_type}</span>
-              <span className="client-ig-connected">Connected {fmt(a.connected_at)}</span>
+              <span className="client-ig-connected">{t('clients.igConnected', { date: fmt(a.connected_at) })}</span>
               {a.token_expires_at && new Date(a.token_expires_at) < new Date() && (
-                <span className="client-ig-expired">Token expired</span>
+                <span className="client-ig-expired">{t('clients.igTokenExpired')}</span>
               )}
             </div>
           ))}
@@ -75,6 +76,8 @@ function ClientRow({ client, removing, onRemove, fmt, t }) {
 
 function Clients() {
   const { t } = useTranslation();
+  const { language } = useSettings();
+  const locale = LOCALE_MAP[language] || 'en-US';
   const { refreshClients } = useActiveClient();
   const [clients, setClients] = useState([]);
   const [clientsLoading, setClientsLoading] = useState(true);
@@ -157,7 +160,7 @@ function Clients() {
 
   const fmt = (iso) => {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(iso).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   const pendingCount = invitations.filter(i => i.status === 'pending').length;

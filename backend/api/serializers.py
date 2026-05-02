@@ -71,7 +71,6 @@ class PostSerializer(serializers.ModelSerializer):
     def validate(self, data):
         status_value = data.get('status', getattr(self.instance, 'status', None))
         scheduled_time = data.get('scheduled_time', getattr(self.instance, 'scheduled_time', None))
-        platform_value = data.get('platform', getattr(self.instance, 'platform', None))
         validate_scheduled_status(status_value, scheduled_time)
         return data
 
@@ -135,3 +134,6 @@ class BrandProfileSerializer(serializers.ModelSerializer):
         model = BrandProfile
         fields = ['brand_name', 'voice_tone', 'target_audience', 'keywords', 'banned_words', 'updated_at']
         read_only_fields = ['updated_at']
+
+
+

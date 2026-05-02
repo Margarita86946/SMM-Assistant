@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { notificationsAPI, profileAPI } from '../services/api';
 
+const SSE_BASE = (process.env.REACT_APP_API_URL || 'http://localhost:8000/api').replace(/\/api$/, '');
+
 const NotificationsContext = createContext(null);
 
 export function NotificationsProvider({ children }) {
@@ -63,14 +65,21 @@ export function NotificationsProvider({ children }) {
 
     fetchInitial();
 
+    let retryDelay = 5000;
+    let retryCount = 0;
+    const MAX_RETRIES = 10;
+    let retryTimer = null;
+
     const connectSSE = () => {
       if (esRef.current) esRef.current.close();
 
-      const url = `http://localhost:8000/api/notifications/stream/?token=${token}`;
+      const url = `${SSE_BASE}/api/notifications/stream/?token=${token}`;
       const es = new EventSource(url);
       esRef.current = es;
 
       es.onmessage = (e) => {
+        retryDelay = 5000;
+        retryCount = 0;
         try {
           const data = JSON.parse(e.data);
           if (data.type === 'connected') return;
@@ -99,13 +108,19 @@ export function NotificationsProvider({ children }) {
       es.onerror = () => {
         es.close();
         esRef.current = null;
-        setTimeout(connectSSE, 5000);
+        if (retryCount >= MAX_RETRIES) return;
+        retryCount += 1;
+        retryTimer = setTimeout(() => {
+          retryDelay = Math.min(retryDelay * 2, 60000);
+          connectSSE();
+        }, retryDelay);
       };
     };
 
     connectSSE();
 
     return () => {
+      if (retryTimer) clearTimeout(retryTimer);
       if (esRef.current) {
         esRef.current.close();
         esRef.current = null;

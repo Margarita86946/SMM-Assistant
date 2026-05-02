@@ -10,7 +10,7 @@ from rest_framework import status
 from django.conf import settings
 from django.utils import timezone
 
-from ..models import BrandProfile
+from ..models import BrandProfile, SocialAccount
 from ..ai_service import (
     generate_all_content, polish_content, generate_image_flux,
     check_ollama_status, generate_caption, generate_caption_ollama,
@@ -34,15 +34,15 @@ def _resolve_provider(value):
     return value if value in VALID_PROVIDERS else 'groq'
 
 
-def _brand_context_for(user):
+def _brand_context_for_account(account_id, owner_user):
     try:
-        return user.brand_profile.to_context_string()
-    except BrandProfile.DoesNotExist:
+        account = SocialAccount.objects.get(pk=account_id, account_user=owner_user)
+        return account.brand_profile.to_context_string()
+    except (SocialAccount.DoesNotExist, BrandProfile.DoesNotExist):
         return None
 
 
 def _unsplash_keywords(image_prompt):
-    """Extract 3-5 concrete visual keywords from an image prompt for Unsplash search."""
     try:
         from groq import Groq
         import os as _os
@@ -60,38 +60,43 @@ def _unsplash_keywords(image_prompt):
             }],
         )
         keywords = resp.choices[0].message.content.strip()
-        # Fallback if response is too long or looks wrong
         if len(keywords) <= 80:
             return keywords
     except Exception:
         pass
-    # Fallback: take first 80 chars up to a word boundary
     truncated = image_prompt[:80]
     return truncated[:truncated.rfind(' ')] if ' ' in truncated else truncated
 
 
 def _resolve_brand_context(request):
-    """Use client's brand profile when a specialist generates for a specific client.
-    Owners always use their own brand profile. Specialists have no personal brand profile."""
-    from ..models import User
+    account_id = request.data.get('account_id')
+    if account_id:
+        if request.user.role == 'specialist':
+            try:
+                account = SocialAccount.objects.get(pk=account_id, specialist=request.user)
+                return account.brand_profile.to_context_string()
+            except (SocialAccount.DoesNotExist, BrandProfile.DoesNotExist):
+                return None
+        return _brand_context_for_account(account_id, request.user)
+
     if request.user.role == 'specialist':
+        from ..models import User
         client_id = request.data.get('client_id')
         if client_id:
             try:
-                client = (
-                    User.objects
-                    .only('id')
-                    .get(id=client_id, specialist=request.user, role='client')
-                )
-                return _brand_context_for(client)
-            except User.DoesNotExist:
+                account = SocialAccount.objects.filter(
+                    account_user_id=client_id, specialist=request.user,
+                ).select_related('brand_profile').first()
+                if account:
+                    return account.brand_profile.to_context_string()
+            except BrandProfile.DoesNotExist:
                 pass
         return None
-    return _brand_context_for(request.user)
+
+    return None
 
 
 def _save_generated_image(content_bytes, user_id):
-    """Upload to Cloudinary if configured, otherwise save locally."""
     import os as _os
     cloud_name = _os.getenv('CLOUDINARY_CLOUD_NAME')
     api_key = _os.getenv('CLOUDINARY_API_KEY')

@@ -152,7 +152,11 @@ def instagram_disconnect(request, pk):
         account.access_token = ''
         account.token_expires_at = None
         account.save(update_fields=['is_active', 'access_token', 'token_expires_at'])
-        Post.objects.filter(client=account.account_user, status='scheduled').update(status='draft')
+        Post.objects.filter(
+            Q(client=account.account_user) | Q(user=account.account_user, client__isnull=True),
+            status='scheduled',
+            social_account=account,
+        ).update(status='draft')
     log_action(
         user,
         'account_disconnected',
@@ -251,15 +255,12 @@ def publish_post_now(request, pk):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not post.client_id:
-            return Response(
-                {'error': 'Post has no client assigned — cannot publish'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        account_owner = post.client if post.client_id else post.user
+
         if post.social_account_id:
             try:
                 account = SocialAccount.objects.get(
-                    pk=post.social_account_id, account_user=post.client, is_active=True,
+                    pk=post.social_account_id, account_user=account_owner, is_active=True,
                 )
             except SocialAccount.DoesNotExist:
                 return Response(
@@ -269,16 +270,16 @@ def publish_post_now(request, pk):
         else:
             try:
                 account = SocialAccount.objects.get(
-                    account_user=post.client, platform='instagram', is_active=True,
+                    account_user=account_owner, platform='instagram', is_active=True,
                 )
             except SocialAccount.DoesNotExist:
                 return Response(
-                    {'error': 'No active Instagram account connected for this client'},
+                    {'error': 'No active Instagram account connected. Connect one in Account settings.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             except SocialAccount.MultipleObjectsReturned:
                 account = SocialAccount.objects.filter(
-                    account_user=post.client, platform='instagram', is_active=True,
+                    account_user=account_owner, platform='instagram', is_active=True,
                 ).order_by('-token_last_refreshed').first()
 
         if not account.access_token or (

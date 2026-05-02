@@ -155,7 +155,9 @@ class Post(models.Model):
 
 
 class BrandProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='brand_profile')
+    social_account = models.OneToOneField(
+        'SocialAccount', on_delete=models.CASCADE, related_name='brand_profile',
+    )
     brand_name = models.CharField(max_length=255, blank=True)
     voice_tone = models.CharField(max_length=255, blank=True)
     target_audience = models.CharField(max_length=255, blank=True)
@@ -167,7 +169,7 @@ class BrandProfile(models.Model):
         db_table = 'brand_profiles'
 
     def __str__(self):
-        return f"{self.user.username} brand profile"
+        return f"{self.social_account.account_username} brand profile"
 
     def to_context_string(self):
         parts = []

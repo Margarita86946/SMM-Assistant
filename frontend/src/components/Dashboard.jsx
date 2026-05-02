@@ -20,13 +20,13 @@ const STATUS_COLORS = {
   rejected: '#EF4444',
 };
 
-const STATUS_LABELS = {
-  draft: 'Draft',
-  scheduled: 'Scheduled',
-  pending_approval: 'Pending',
-  approved: 'Approved',
-  posted: 'Posted',
-  rejected: 'Rejected',
+const STATUS_LABEL_KEYS = {
+  draft: 'status.draft',
+  scheduled: 'status.scheduled',
+  pending_approval: 'status.pending',
+  approved: 'status.approved',
+  posted: 'status.posted',
+  rejected: 'status.rejected',
 };
 
 function PostDetailModal({ post, onClose, t, formatDate, getStatusBadge }) {
@@ -44,11 +44,15 @@ function PostDetailModal({ post, onClose, t, formatDate, getStatusBadge }) {
           <button className="post-modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="post-modal-body">
-          {post.image_url && (
+          {post.media_type === 'video' && post.video_url ? (
+            <div className="post-modal-image">
+              <video src={post.video_url} controls />
+            </div>
+          ) : post.image_url ? (
             <div className="post-modal-image">
               <img src={post.image_url} alt="Post visual" />
             </div>
-          )}
+          ) : null}
           <div className="post-modal-meta">
             <span className="post-platform">
               <span className="platform-emoji">{post.platform === 'instagram' ? '📷' : post.platform === 'linkedin' ? '💼' : '🐦'}</span>
@@ -127,7 +131,7 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [activeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeClientId]);
 
   useEffect(() => {
     loadDashboardData();
@@ -148,10 +152,10 @@ function Dashboard() {
   const getStatusBadge = (status) => {
     const badges = {
       draft: { text: t('posts.draft'), class: 'badge-draft' },
-      pending_approval: { text: 'Awaiting Approval', class: 'badge-pending' },
-      approved: { text: 'Approved', class: 'badge-approved' },
-      scheduled: { text: t('posts.scheduled'), class: 'badge-scheduled' },
-      rejected: { text: 'Rejected', class: 'badge-rejected' },
+      pending_approval: { text: t('status.awaitingApproval'), class: 'badge-pending' },
+      approved: { text: t('status.approved'), class: 'badge-approved' },
+      scheduled: { text: t('status.scheduled'), class: 'badge-scheduled' },
+      rejected: { text: t('status.rejected'), class: 'badge-rejected' },
       posted: { text: t('posts.posted'), class: 'badge-posted' },
     };
     const badge = badges[status] || { text: status, class: 'badge-default' };
@@ -164,7 +168,7 @@ function Dashboard() {
     { key: 'pending_approval', value: stats.pending_approval_posts || 0 },
     { key: 'approved', value: stats.approved_posts || 0 },
     { key: 'posted', value: stats.posted_posts || 0 },
-  ].filter(d => d.value > 0).map(d => ({ name: STATUS_LABELS[d.key], value: d.value, key: d.key }));
+  ].filter(d => d.value > 0).map(d => ({ name: t(STATUS_LABEL_KEYS[d.key] || d.key), value: d.value, key: d.key }));
 
   const activityData = activity.map(d => ({
     date: new Date(d.date).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
@@ -240,9 +244,9 @@ function Dashboard() {
 
       <div className="dashboard-charts-grid">
         <div className="dashboard-chart-card">
-          <h2 className="dashboard-chart-title">Posts by Status</h2>
+          <h2 className="dashboard-chart-title">{t('dashboard.chartByStatus')}</h2>
           {pieData.length === 0 ? (
-            <p className="hashtag-empty">No posts yet</p>
+            <p className="hashtag-empty">{t('dashboard.noPosts')}</p>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -259,7 +263,7 @@ function Dashboard() {
         </div>
 
         <div className="dashboard-chart-card">
-          <h2 className="dashboard-chart-title">Posts Created (Last 7 Days)</h2>
+          <h2 className="dashboard-chart-title">{t('dashboard.chartActivity')}</h2>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={activityData}>
               <CartesianGrid

@@ -37,16 +37,16 @@ function Sidebar() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [language]);
 
-  const CLIENTS_ITEM = { path: '/clients', label: 'Clients', icon: <FiUsers /> };
-  const ANALYZER_ITEM = { path: '/analyzer', label: 'Analyzer', icon: <FiBarChart2 /> };
+  const CLIENTS_ITEM = { path: '/clients', label: t('sidebar.clients'), icon: <FiUsers /> };
+  const ANALYZER_ITEM = { path: '/analyzer', label: t('sidebar.analyzer'), icon: <FiBarChart2 /> };
 
   const NAV_ITEMS = useMemo(() => {
     if (isClient) {
       return [
-        { path: '/client',   label: 'Approvals',        icon: <FiCheckSquare /> },
-        { path: '/posts',    label: t('nav.allPosts'),   icon: <FiFileText /> },
-        { path: '/calendar', label: t('nav.calendar'),   icon: <FiCalendar /> },
-        { path: '/analyzer', label: 'Analytics',         icon: <FiBarChart2 /> },
+        { path: '/client',   label: t('sidebar.approvals'), icon: <FiCheckSquare /> },
+        { path: '/posts',    label: t('nav.allPosts'),       icon: <FiFileText /> },
+        { path: '/calendar', label: t('nav.calendar'),       icon: <FiCalendar /> },
+        { path: '/analyzer', label: t('sidebar.analytics'),  icon: <FiBarChart2 /> },
       ];
     }
     if (isSpecialist) return [...COMMON_NAV, CLIENTS_ITEM, ANALYZER_ITEM];
@@ -140,7 +140,7 @@ function Sidebar() {
           <div className="sidebar-user-info">
             <span className="sidebar-username">{username}</span>
             <span className="sidebar-user-role">
-              {isClient ? 'Client' : isOwner ? 'Owner' : isSpecialist ? 'Specialist' : t('settings.contentManager')}
+              {isClient ? t('sidebar.roleClient') : isOwner ? t('sidebar.roleOwner') : isSpecialist ? t('sidebar.roleSpecialist') : t('settings.contentManager')}
             </span>
           </div>
         </div>
@@ -204,7 +204,7 @@ function Sidebar() {
           <button
             className={`sidebar-settings-btn${settingsOpen ? ' active' : ''}`}
             onClick={() => setSettingsOpen((o) => !o)}
-            title="Settings"
+            title={t('sidebar.settings')}
           >
             <FiSettings />
           </button>

@@ -59,11 +59,12 @@ function homeForRole(role) {
 function PublicRoute({ children }) {
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('role');
-  if (token) return <Navigate to={homeForRole(role)} replace />;
+  const expiresAt = localStorage.getItem('token_expires_at');
+  const isExpired = expiresAt && new Date(expiresAt) < new Date();
+  if (token && !isExpired) return <Navigate to={homeForRole(role)} replace />;
   return children;
 }
 
-// Routes each role is allowed to access (prefix match)
 const ROLE_ALLOWED_PATHS = {
   owner:      ['/dashboard', '/posts', '/create', '/edit', '/calendar', '/generate', '/account', '/analyzer'],
   specialist: ['/dashboard', '/posts', '/create', '/edit', '/calendar', '/generate', '/account', '/clients', '/analyzer'],
@@ -74,7 +75,6 @@ function ProtectedRoute({ children }) {
   const location = useLocation();
   const [role, setRole] = useState(() => localStorage.getItem('role'));
 
-  // Re-read role whenever localStorage is updated (e.g. after server sync in NotificationsContext)
   useEffect(() => {
     const onStorage = (e) => {
       if (e.key === 'role') setRole(localStorage.getItem('role'));
@@ -97,7 +97,6 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Reject any unknown/tampered role value
   if (!role || !VALID_ROLES.has(role)) {
     return <Navigate to="/login" replace />;
   }

@@ -1,8 +1,8 @@
 import json
+import re
 import time
 
 from django.http import StreamingHttpResponse
-from django.contrib.auth.models import AnonymousUser
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -63,6 +63,10 @@ def mark_all_read(request):
 
 
 def notifications_stream(request):
+    from django.conf import settings
+    from django.utils import timezone
+    from ..models import TokenExpiry
+
     token_key = request.GET.get('token', '').strip()
     if not token_key:
         return StreamingHttpResponse(status=401)
@@ -70,6 +74,12 @@ def notifications_stream(request):
         token = Token.objects.select_related('user').get(key=token_key)
         user = token.user
         if not user.is_active:
+            return StreamingHttpResponse(status=401)
+        try:
+            expiry = token.expiry
+            if expiry.is_revoked or expiry.expires_at <= timezone.now():
+                return StreamingHttpResponse(status=401)
+        except TokenExpiry.DoesNotExist:
             return StreamingHttpResponse(status=401)
     except Token.DoesNotExist:
         return StreamingHttpResponse(status=401)
@@ -108,9 +118,14 @@ def notifications_stream(request):
                 heartbeat = 0
                 yield ": heartbeat\n\n"
 
+    origin = request.META.get('HTTP_ORIGIN', '')
+    allowed_origins = set(getattr(settings, 'CORS_ALLOWED_ORIGINS', []))
+    allowed_regexes = getattr(settings, 'CORS_ALLOWED_ORIGIN_REGEXES', [])
+
     response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
-    response['Access-Control-Allow-Origin'] = 'http://localhost:3000'
-    response['Access-Control-Allow-Credentials'] = 'true'
+    if origin and (origin in allowed_origins or any(re.match(r, origin) for r in allowed_regexes)):
+        response['Access-Control-Allow-Origin'] = origin
+        response['Access-Control-Allow-Credentials'] = 'true'
     return response

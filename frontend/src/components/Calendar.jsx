@@ -54,11 +54,11 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
   const platform = PLATFORM_META[post.platform] || { icon: '📄', label: post.platform };
   const statusCls = STATUS_CLS[post.status] || 'badge-draft';
   const statusText = {
-    draft: t('posts.draft'),
-    pending_approval: 'Awaiting Approval',
-    approved: 'Approved',
-    scheduled: t('posts.scheduled'),
-    posted: t('posts.posted'),
+    draft: t('status.draft'),
+    pending_approval: t('status.awaitingApproval'),
+    approved: t('status.approved'),
+    scheduled: t('status.scheduled'),
+    posted: t('status.posted'),
   }[post.status] || post.status;
 
   const isPosted = post.status === 'posted';
@@ -145,7 +145,7 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
               </p>
               {!isClientRole && !isPosted && (
                 isPast ? (
-                  <span className="cal-modal-locked-badge" title="Past posts cannot be rescheduled">
+                  <span className="cal-modal-locked-badge" title={t('calendar.pastPostsCannotBeRescheduled')}>
                     <FiLock />
                     {t('calendar.past')}
                   </span>
@@ -233,10 +233,10 @@ function PostModal({ post, onClose, onEdit, onReschedule }) {
               className="cal-modal-edit-btn"
               onClick={() => { close(); setTimeout(() => onEdit(post.id), 180); }}
               disabled={isPast}
-              title={isPast ? 'Past posts cannot be edited' : undefined}
+              title={isPast ? t('calendar.pastPostsCannotBeEdited') : undefined}
             >
               {isPast ? (
-                <><FiLock size={13} /> Past post</>
+                <><FiLock size={13} /> {t('calendar.pastPost')}</>
               ) : (
                 <><FiEdit2 /> {t('calendar.editPost')}</>
               )}
@@ -274,9 +274,9 @@ function ScheduleDrawer({ dateKey, locale, onClose, onScheduled }) {
         setApprovedPosts(res.data.results ?? []);
         setHasMore(!!res.data.next);
       })
-      .catch(() => setErr('Failed to load posts.'))
+      .catch(() => setErr(t('calendar.failedLoadPosts')))
       .finally(() => setLoadingPosts(false));
-  }, []);
+  }, [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') close(); };
@@ -821,10 +821,14 @@ function Calendar() {
           <div className="cal-nav-right">
             <span className="cal-post-count">{t('calendar.postsThisMonth', { count: posts.length })}</span>
             <div className="cal-view-toggle">
-              {['month','week','day'].map(v => (
-                <button key={v} className={`cal-view-btn${calView === v ? ' cal-view-btn--active' : ''}`}
-                  onClick={() => setCalView(v)}>
-                  {v.charAt(0).toUpperCase() + v.slice(1)}
+              {[
+                { id: 'month', label: t('calendar.viewMonth') },
+                { id: 'week', label: t('calendar.viewWeek') },
+                { id: 'day', label: t('calendar.viewDay') },
+              ].map(v => (
+                <button key={v.id} className={`cal-view-btn${calView === v.id ? ' cal-view-btn--active' : ''}`}
+                  onClick={() => setCalView(v.id)}>
+                  {v.label}
                 </button>
               ))}
             </div>
@@ -960,7 +964,7 @@ function Calendar() {
                 onDragOver={e => onDragOver(e, key)} onDragLeave={onDragLeave} onDrop={e => onDrop(e, key)}
               >
                 {dayPosts.length === 0
-                  ? <div className="cal-day-empty">No posts scheduled. Click to add one.</div>
+                  ? <div className="cal-day-empty">{t('calendar.dayEmpty')}</div>
                   : dayPosts.map(post => {
                       const p = PLATFORM_META[post.platform] || { icon: '📄' };
                       const isDraggingThis = dragging?.id === post.id;
@@ -975,7 +979,13 @@ function Calendar() {
                           <span className="cal-chip-icon">{p.icon}</span>
                           <span className="cal-day-post-caption">{post.topic || post.caption.slice(0, 60)}</span>
                           <span className={`status-badge ${STATUS_CLS[post.status] || 'badge-draft'}`} style={{ marginLeft: 'auto', flexShrink: 0 }}>
-                            {post.status.replace(/_/g, ' ')}
+                            {({
+                              draft: t('status.draft'),
+                              pending_approval: t('status.awaitingApproval'),
+                              approved: t('status.approved'),
+                              scheduled: t('status.scheduled'),
+                              posted: t('status.posted'),
+                            })[post.status] || post.status.replace(/_/g, ' ')}
                           </span>
                           {!isPast && <FiMove className="cal-chip-grip" style={{ marginLeft: 8 }} />}
                         </button>
@@ -991,7 +1001,7 @@ function Calendar() {
 
       {clientsInMonth.length > 0 && (
         <div className="cal-client-legend">
-          <span className="cal-client-legend-label">Clients this month:</span>
+          <span className="cal-client-legend-label">{t('calendar.clientsThisMonth')}</span>
           {clientsInMonth.map(c => (
             <div key={c.id} className="cal-client-legend-item">
               <span className="cal-chip-client">{c.initial}</span>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useBlocker } from 'react-router-dom';
-import { aiAPI, postsAPI, clientsAPI } from '../services/api';
+import { aiAPI, postsAPI, clientsAPI, instagramAPI } from '../services/api';
 import { useTranslation } from '../i18n';
 import { useActiveClient } from '../context/ActiveClientContext';
 import { FiRefreshCw, FiCheck, FiCopy, FiCamera, FiX, FiUpload, FiRefreshCcw, FiVideo, FiDownload } from 'react-icons/fi';
@@ -11,10 +11,6 @@ import { PostPreview, CaptionCounter, HashtagsCounter, LIMITS } from './PostPrev
 import '../styles/CreatePost.css';
 
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-const role = localStorage.getItem('role');
-const isOwner = role === 'owner';
-const isSpecialist = role === 'specialist';
 
 function UnsavedModal({ onLeave, onStay, t }) {
   useEffect(() => {
@@ -74,6 +70,9 @@ function RegenButton({ onClick, loading, disabled, t }) {
 function CreatePost() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const role = localStorage.getItem('role');
+  const isOwner = role === 'owner';
+  const isSpecialist = role === 'specialist';
 
   const [topic, setTopic] = useState('');
   const [caption, setCaption] = useState('');
@@ -86,14 +85,20 @@ function CreatePost() {
   const { activeClientId } = useActiveClient();
   const [clientId, setClientId] = useState(() => activeClientId ? String(activeClientId) : '');
   const [clients, setClients] = useState([]);
+  const [igAccounts, setIgAccounts] = useState([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
   useEffect(() => {
     if (isSpecialist) {
       clientsAPI.list().then(res => setClients(res.data)).catch(() => {});
+    } else {
+      instagramAPI.getStatus().then(res => {
+        const accounts = res.data.accounts || [];
+        setIgAccounts(accounts);
+        if (accounts.length === 1) setSelectedAccountId(String(accounts[0].id));
+      }).catch(() => {});
     }
-  }, []);
+  }, [isSpecialist]);
 
-  // When the active client context changes (e.g. specialist switches client while on this page),
-  // keep the selector in sync — but only if the user hasn't manually overridden it yet.
   useEffect(() => {
     setClientId(activeClientId ? String(activeClientId) : '');
   }, [activeClientId]);
@@ -180,7 +185,7 @@ function CreatePost() {
       const res = await postsAPI.uploadVideo(file, setUploadProgress);
       setUploadedVideoUrl(res.data.video_url);
     } catch (err) {
-      const msg = err.response?.data?.error || 'Video upload failed';
+      const msg = err.response?.data?.error || t('create.videoUploadFailed');
       setUploadError(msg);
       setUploadedVideoPreview('');
       setMediaType('image');
@@ -481,7 +486,7 @@ function CreatePost() {
     setPolishing(true);
     setError('');
     try {
-      const res = await aiAPI.polishContent({ topic, caption, hashtags, image_prompt: imagePrompt, platform, tone, client_id: clientId || undefined });
+      const res = await aiAPI.polishContent({ topic, caption, hashtags, image_prompt: imagePrompt, platform, tone, client_id: clientId || undefined, account_id: selectedAccountId ? parseInt(selectedAccountId, 10) : undefined });
       setCaption(res.data.caption);
       setHashtags(res.data.hashtags);
       if (res.data.image_prompt) setImagePrompt(res.data.image_prompt);
@@ -492,8 +497,6 @@ function CreatePost() {
     }
   };
 
-  // Regen uses polishContent so it's aware of all existing content, not just topic.
-  // If caption is empty (nothing to be context-aware of), falls back to generateContent.
   const handleRegen = async (field) => {
     if (!topic.trim() && !caption.trim()) {
       setError(t('create.topicRequiredRegen'));
@@ -504,9 +507,9 @@ function CreatePost() {
     try {
       let res;
       if (caption.trim()) {
-        res = await aiAPI.polishContent({ topic, caption, hashtags, image_prompt: imagePrompt, platform, tone, client_id: clientId || undefined });
+        res = await aiAPI.polishContent({ topic, caption, hashtags, image_prompt: imagePrompt, platform, tone, client_id: clientId || undefined, account_id: selectedAccountId ? parseInt(selectedAccountId, 10) : undefined });
       } else {
-        res = await aiAPI.generateContent({ topic, platform, tone, client_id: clientId || undefined });
+        res = await aiAPI.generateContent({ topic, platform, tone, client_id: clientId || undefined, account_id: selectedAccountId ? parseInt(selectedAccountId, 10) : undefined });
       }
       if (field === 'caption') setCaption(res.data.caption);
       else if (field === 'hashtags') setHashtags(res.data.hashtags);
@@ -534,8 +537,6 @@ function CreatePost() {
     }
     setSaving(true);
     setError('');
-    // Use activeClientId from context as authoritative source when a filter is active;
-    // fall back to the manual dropdown selection.
     const resolvedClientId = activeClientId ?? (clientId ? parseInt(clientId, 10) : null);
     const hasSchedule = isOwner && scheduledTime;
     try {
@@ -610,9 +611,9 @@ function CreatePost() {
         {clients.length > 0 && (
           <div className="create-form-group">
             <label>
-              Assign to Client{' '}
+              {t('common2.assignToClient')}{' '}
               {activeClientId
-                ? <span className="label-context-set">pre-filled from filter</span>
+                ? <span className="label-context-set">{t('common2.prefilledFromFilter')}</span>
                 : <span className="label-required">*</span>
               }
             </label>
@@ -627,7 +628,7 @@ function CreatePost() {
               </div>
             ) : (
               <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
-                <option value="">— Select a client —</option>
+                <option value="">{t('common2.selectClient')}</option>
                 {clients.map(c => (
                   <option key={c.id} value={c.id}>
                     {[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username}
@@ -642,7 +643,27 @@ function CreatePost() {
           const c = clients.find(x => String(x.id) === clientId);
           return c ? (
             <div className="brand-banner brand-banner--ok">
-              <span>✓ Using brand context for <strong>{[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username}</strong></span>
+              <span>{t('common2.usingBrandContext')} <strong>{[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username}</strong></span>
+            </div>
+          ) : null;
+        })()}
+
+        {!isSpecialist && igAccounts.length > 1 && (
+          <div className="create-form-group">
+            <label>{t('common2.instagramAccount')}</label>
+            <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)}>
+              <option value="">{t('common2.noAccountSelected')}</option>
+              {igAccounts.map(a => (
+                <option key={a.id} value={a.id}>@{a.username}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {!isSpecialist && selectedAccountId && (() => {
+          const a = igAccounts.find(x => String(x.id) === selectedAccountId);
+          return a ? (
+            <div className="brand-banner brand-banner--ok">
+              <span>{t('common2.usingBrandProfile')} <strong>@{a.username}</strong></span>
             </div>
           ) : null;
         })()}
@@ -720,7 +741,7 @@ function CreatePost() {
 
         <div className="create-form-group">
           <label>
-            Media{' '}
+            {t('common2.media')}{' '}
             {platform === 'instagram'
               ? <span className="label-required">*</span>
               : <span className="label-optional">{t('create.optional')}</span>}
@@ -787,20 +808,20 @@ function CreatePost() {
               {showImageMenu && (
                 <div className="create-upload-menu">
                   <button onClick={() => { setShowImageMenu(false); fileInputRef.current?.click(); }}>
-                    <FiUpload /> Upload a file
+                    <FiUpload /> {t('common2.uploadFile')}
                   </button>
                   {isMobile ? (
                     <>
                       <button onClick={() => openCamera('photo')}>
-                        <FiCamera /> Take a photo
+                        <FiCamera /> {t('common2.takePhoto')}
                       </button>
                       <button onClick={() => openCamera('video')}>
-                        <FiVideo /> Record a video
+                        <FiVideo /> {t('common2.recordVideo')}
                       </button>
                     </>
                   ) : (
                     <button onClick={() => openCamera('photo')}>
-                      <FiCamera /> Open camera
+                      <FiCamera /> {t('common2.openCamera')}
                     </button>
                   )}
                 </div>
@@ -815,8 +836,8 @@ function CreatePost() {
               <button className="create-camera-close" onClick={closeCamera}><FiX /></button>
               {!capturedSrc && !recordedSrc && (
                 <div className="create-camera-mode-tabs">
-                  <button className={cameraMode === 'photo' ? 'active' : ''} onClick={() => setCameraMode('photo')}><FiCamera /> Photo</button>
-                  <button className={cameraMode === 'video' ? 'active' : ''} onClick={() => setCameraMode('video')}><FiVideo /> Video</button>
+                  <button className={cameraMode === 'photo' ? 'active' : ''} onClick={() => setCameraMode('photo')}><FiCamera /> {t('common2.modePhoto')}</button>
+                  <button className={cameraMode === 'video' ? 'active' : ''} onClick={() => setCameraMode('video')}><FiVideo /> {t('common2.modeVideo')}</button>
                 </div>
               )}
               {cameraError ? (
@@ -824,7 +845,7 @@ function CreatePost() {
               ) : capturedSrc ? (
                 <>
                   <img src={capturedSrc} alt="captured" className="create-camera-video" />
-                  <a href={capturedSrc} download="captured.jpg" className="create-camera-download"><FiDownload /><span>Download</span></a>
+                  <a href={capturedSrc} download="captured.jpg" className="create-camera-download"><FiDownload /><span>{t('common2.download')}</span></a>
                   <div className="create-camera-retake-row">
                     <button className="create-camera-retake-btn" onClick={retakePhoto}>
                       <FiRefreshCcw /> {t('create.retake')}
@@ -843,13 +864,13 @@ function CreatePost() {
                     playsInline
                     className="create-camera-video"
                   />
-                  <a href={recordedSrc} download="recorded.webm" className="create-camera-download"><FiDownload /><span>Download</span></a>
+                  <a href={recordedSrc} download="recorded.webm" className="create-camera-download"><FiDownload /><span>{t('common2.download')}</span></a>
                   <div className="create-camera-retake-row">
                     <button className="create-camera-retake-btn" onClick={retakeVideo}>
                       <FiRefreshCcw /> {t('create.retake')}
                     </button>
                     <button className="create-camera-use-btn" onClick={useVideo}>
-                      Use video
+                      {t('common2.useVideo')}
                     </button>
                   </div>
                 </>
@@ -920,6 +941,8 @@ function CreatePost() {
           caption={caption}
           hashtags={hashtags}
           imageUrl={uploadedImagePreview || undefined}
+          videoUrl={uploadedVideoPreview || undefined}
+          mediaType={mediaType}
           username={localStorage.getItem('username') || ''}
         />
       </div>

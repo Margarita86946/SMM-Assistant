@@ -39,7 +39,7 @@ urlpatterns = [
     path('ai-status/', views.ai_status, name='ai-status'),
 
     # Brand Profile
-    path('brand-profile/', views.brand_profile, name='brand-profile'),
+    path('brand-profile/<int:account_id>/', views.brand_profile, name='brand-profile'),
 
     # Instagram Integration
     path('auth/instagram/', views.instagram_oauth_start, name='instagram-oauth-start'),
@@ -63,6 +63,11 @@ urlpatterns = [
     path('notifications/stream/', views.notifications_stream, name='notifications-stream'),
     path('notifications/<int:pk>/read/', views.mark_read, name='notification-read'),
     path('notifications/read-all/', views.mark_all_read, name='notifications-read-all'),
+
+    # Comments
+    path('analyzer/<int:account_id>/media/<str:media_id>/comments/', views.get_comments, name='get-comments'),
+    path('analyzer/<int:account_id>/media/<str:media_id>/comments/<str:comment_id>/reply/', views.reply_comment, name='reply-comment'),
+    path('analyzer/<int:account_id>/suggest-reply/', views.suggest_reply, name='suggest-reply'),
 
     # Analyzer
     path('analyzer/accounts/', views.analyzer_accounts, name='analyzer-accounts'),

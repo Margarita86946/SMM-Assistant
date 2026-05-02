@@ -14,7 +14,7 @@ from ..models import Post, User
 
 
 def _client_filtered_posts(request):
-    qs = Post.objects.filter(user=request.user)
+    qs = Post.objects.filter(user=request.user, deleted_at__isnull=True)
     client_id = request.query_params.get('client_id', '').strip()
     if client_id and request.user.role != 'client':
         try:

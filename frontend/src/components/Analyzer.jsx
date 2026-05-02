@@ -7,24 +7,12 @@ import {
   FiRefreshCw, FiInstagram, FiUsers, FiUser, FiGrid, FiBarChart2,
   FiZap, FiHeart, FiMessageCircle, FiShare2, FiBookmark,
   FiTrendingUp, FiEye, FiArrowUp, FiArrowDown, FiDownload, FiVideo,
+  FiSend, FiZapOff, FiChevronDown, FiChevronUp,
 } from 'react-icons/fi';
 import { analyzerAPI } from '../services/api';
+import { useTranslation } from '../i18n';
+import { useSettings, LOCALE_MAP } from '../context/SettingsContext';
 import '../styles/Analyzer.css';
-
-const TABS = [
-  { id: 'overview', label: 'Overview', icon: <FiGrid /> },
-  { id: 'posts', label: 'Posts', icon: <FiInstagram /> },
-  { id: 'audience', label: 'Audience', icon: <FiUsers /> },
-  { id: 'ai', label: 'AI Analysis', icon: <FiZap /> },
-];
-
-const SORT_OPTIONS = [
-  { value: 'date', label: 'Latest' },
-  { value: 'likes', label: 'Most Liked' },
-  { value: 'comments', label: 'Most Comments' },
-  { value: 'reach', label: 'Most Reach' },
-  { value: 'engagement', label: 'Most Engagement' },
-];
 
 const CHART_COLORS = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#EF4444'];
 
@@ -64,12 +52,15 @@ function fmt(n) {
   return String(n);
 }
 
-function formatDate(iso) {
+function formatDate(iso, locale) {
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return new Date(iso).toLocaleDateString(locale || 'en-US', { month: 'short', day: 'numeric' });
 }
 
 function OverviewTab({ accountId }) {
+  const { t } = useTranslation();
+  const { language } = useSettings();
+  const locale = LOCALE_MAP[language] || 'en-US';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -96,7 +87,7 @@ function OverviewTab({ accountId }) {
     followers: follower_series,
   };
   const activeData = (seriesMap[metric] || []).map(p => ({
-    date: formatDate(p.date),
+    date: formatDate(p.date, locale),
     value: p.value,
   }));
 
@@ -111,7 +102,7 @@ function OverviewTab({ accountId }) {
         <div className="az-profile-info">
           <h2 className="az-profile-name">{overview.name || overview.username}</h2>
           <span className="az-profile-handle">@{overview.username}</span>
-          {overview.biography && <p className="az-profile-bio">{overview.biography}</p>}
+          {overview.biography && <p className="az-profile-bio" style={{whiteSpace: 'pre-line'}}>{overview.biography}</p>}
           {overview.website && (
             <a className="az-profile-website" href={overview.website} target="_blank" rel="noreferrer">
               {overview.website}
@@ -120,30 +111,34 @@ function OverviewTab({ accountId }) {
           <span className="az-profile-type">{overview.account_type}</span>
         </div>
         <div className="az-profile-counters">
-          <div className="az-counter"><span className="az-counter-val">{fmt(overview.followers_count)}</span><span className="az-counter-label">Followers</span></div>
-          <div className="az-counter"><span className="az-counter-val">{fmt(overview.follows_count)}</span><span className="az-counter-label">Following</span></div>
-          <div className="az-counter"><span className="az-counter-val">{fmt(overview.media_count)}</span><span className="az-counter-label">Posts</span></div>
+          <div className="az-counter"><span className="az-counter-val">{fmt(overview.followers_count)}</span><span className="az-counter-label">{t('analyzer.followers')}</span></div>
+          <div className="az-counter"><span className="az-counter-val">{fmt(overview.follows_count)}</span><span className="az-counter-label">{t('analyzer.following')}</span></div>
+          <div className="az-counter"><span className="az-counter-val">{fmt(overview.media_count)}</span><span className="az-counter-label">{t('analyzer.posts')}</span></div>
         </div>
       </div>
 
       <div className="az-stats-grid">
-        <StatCard icon={<FiEye />} label="Reach (30d)" value={fmt(summary.total_reach_30d)} />
-        <StatCard icon={<FiTrendingUp />} label="Impressions (30d)" value={fmt(summary.total_impressions_30d)} />
-        <StatCard icon={<FiHeart />} label="Avg Engagement Rate" value={`${summary.avg_engagement_rate}%`} />
-        <StatCard icon={<FiInstagram />} label="Total Posts Analyzed" value={fmt(summary.total_posts)} />
+        <StatCard icon={<FiEye />} label={t('analyzer.reach30d')} value={fmt(summary.total_reach_30d)} />
+        <StatCard icon={<FiTrendingUp />} label={t('analyzer.impressions30d')} value={fmt(summary.total_impressions_30d)} />
+        <StatCard icon={<FiHeart />} label={t('analyzer.avgEngagement')} value={`${summary.avg_engagement_rate}%`} />
+        <StatCard icon={<FiInstagram />} label={t('analyzer.totalPostsAnalyzed')} value={fmt(summary.total_posts)} />
       </div>
 
       <div className="az-chart-card">
         <div className="az-chart-header">
-          <h3 className="az-chart-title">30-Day Trend</h3>
+          <h3 className="az-chart-title">{t('analyzer.trend30d')}</h3>
           <div className="az-metric-tabs">
-            {['reach', 'impressions', 'followers'].map(m => (
+            {[
+              { id: 'reach', label: t('analyzer.metricTabReach') },
+              { id: 'impressions', label: t('analyzer.metricTabImpressions') },
+              { id: 'followers', label: t('analyzer.metricTabFollowers') },
+            ].map(m => (
               <button
-                key={m}
-                className={`az-metric-tab${metric === m ? ' active' : ''}`}
-                onClick={() => setMetric(m)}
+                key={m.id}
+                className={`az-metric-tab${metric === m.id ? ' active' : ''}`}
+                onClick={() => setMetric(m.id)}
               >
-                {m.charAt(0).toUpperCase() + m.slice(1)}
+                {m.label}
               </button>
             ))}
           </div>
@@ -159,14 +154,154 @@ function OverviewTab({ accountId }) {
             </LineChart>
           </ResponsiveContainer>
         ) : (
-          <div className="az-no-data">Not enough data for this metric yet.</div>
+          <div className="az-no-data">{t('analyzer.notEnoughData')}</div>
         )}
       </div>
     </div>
   );
 }
 
-function PostsTab({ accountId }) {
+function CommentsPanel({ accountId, mediaId, commentsCount, accountUsername, accountBio }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [replyText, setReplyText] = useState({});
+  const [suggesting, setSuggesting] = useState({});
+  const [sending, setSending] = useState({});
+  const [sent, setSent] = useState({});
+
+  const load = async () => {
+    if (loading) return;
+    setLoading(true);
+    setError('');
+    try {
+      const r = await analyzerAPI.getComments(accountId, mediaId);
+      setComments(r.data.comments || []);
+    } catch (e) {
+      setError(e.message || 'Failed to load comments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggle = () => {
+    if (!open && comments.length === 0) load();
+    setOpen(o => !o);
+  };
+
+  const suggest = async (comment) => {
+    setSuggesting(s => ({ ...s, [comment.id]: true }));
+    try {
+      const r = await analyzerAPI.suggestReply(accountId, {
+        comment_text: comment.text,
+        commenter_username: comment.username,
+        account_username: accountUsername,
+        account_bio: accountBio,
+      });
+      setReplyText(t => ({ ...t, [comment.id]: r.data.suggestion }));
+    } catch (e) {
+      setError(e.message || 'AI suggestion failed');
+    } finally {
+      setSuggesting(s => ({ ...s, [comment.id]: false }));
+    }
+  };
+
+  const send = async (comment) => {
+    const msg = (replyText[comment.id] || '').trim();
+    if (!msg) return;
+    setSending(s => ({ ...s, [comment.id]: true }));
+    try {
+      await analyzerAPI.replyComment(accountId, mediaId, comment.id, msg);
+      setSent(s => ({ ...s, [comment.id]: true }));
+      setReplyText(t => ({ ...t, [comment.id]: '' }));
+    } catch (e) {
+      setError(e.message || 'Failed to send reply');
+    } finally {
+      setSending(s => ({ ...s, [comment.id]: false }));
+    }
+  };
+
+  return (
+    <div className="az-comments-panel">
+      <button className="az-comments-toggle" onClick={toggle}>
+        <FiMessageCircle size={15} />
+        <span>{t('analyzer.commentsCount', { n: commentsCount ?? 0 })}</span>
+        {open ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
+      </button>
+      {open && (
+        <div className="az-comments-body">
+          {loading && <div className="az-comments-loading">{t('analyzer.commentsLoading')}</div>}
+          {error && <div className="az-comments-error">{error}</div>}
+          {!loading && comments.length === 0 && !error && (
+            <div className="az-comments-empty">{t('analyzer.noComments')}</div>
+          )}
+          {comments.map(c => (
+            <div key={c.id} className="az-comment">
+              <div className="az-comment-header">
+                <span className="az-comment-user">
+                  @{c.username}
+                  {c.verified && (
+                    <svg className="az-comment-verified" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M16 2l2.78 4.34L23.5 4.5l.32 5.01L29 11.5l-2.35 4.5L29 20.5l-5.18 1.99-.32 5.01-4.72-2.34L16 30l-2.78-4.34-4.72 2.34-.32-5.01L3 20.5l2.35-4.5L3 11.5l5.18-1.99.32-5.01 4.72 2.34Z" fill="#3897F0"/>
+                      <path d="M12 16l2.5 2.5 5.5-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </span>
+                <span className="az-comment-time">{c.timestamp ? c.timestamp.slice(0, 10) : ''}</span>
+              </div>
+              <p className="az-comment-text">{c.text}</p>
+              {sent[c.id] ? (
+                <div className="az-comment-sent">{t('analyzer.replySent')}</div>
+              ) : (
+                <div className="az-comment-reply">
+                  <textarea
+                    className="az-comment-input"
+                    rows={2}
+                    placeholder={t('analyzer.replyPlaceholder')}
+                    value={replyText[c.id] || ''}
+                    onChange={e => setReplyText(prev => ({ ...prev, [c.id]: e.target.value }))}
+                  />
+                  <div className="az-comment-actions">
+                    <button
+                      className="az-comment-btn az-comment-btn--ai"
+                      onClick={() => suggest(c)}
+                      disabled={suggesting[c.id]}
+                    >
+                      <FiZap size={13} />
+                      {suggesting[c.id] ? t('analyzer.thinking') : t('analyzer.aiSuggest')}
+                    </button>
+                    <button
+                      className="az-comment-btn az-comment-btn--send"
+                      onClick={() => send(c)}
+                      disabled={sending[c.id] || !replyText[c.id]?.trim()}
+                    >
+                      <FiSend size={13} />
+                      {sending[c.id] ? t('analyzer.sending') : t('analyzer.send')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostsTab({ accountId, accountUsername, accountBio }) {
+  const { t } = useTranslation();
+  const { language } = useSettings();
+  const locale = LOCALE_MAP[language] || 'en-US';
+  const SORT_OPTIONS = [
+    { value: 'date', label: t('analyzer.sortLatest') },
+    { value: 'likes', label: t('analyzer.sortMostLiked') },
+    { value: 'comments', label: t('analyzer.sortMostComments') },
+    { value: 'reach', label: t('analyzer.sortMostReach') },
+    { value: 'engagement', label: t('analyzer.sortMostEngagement') },
+  ];
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -190,9 +325,9 @@ function PostsTab({ accountId }) {
   return (
     <div className="az-tab-content">
       <div className="az-posts-toolbar">
-        <span className="az-posts-count">{posts.length} posts</span>
+        <span className="az-posts-count">{posts.length} {t('analyzer.tabPosts').toLowerCase()}</span>
         <div className="az-sort-wrap">
-          <span className="az-sort-label">Sort by</span>
+          <span className="az-sort-label">{t('analyzer.sortBy')}</span>
           <select className="az-sort-select" value={sort} onChange={e => setSort(e.target.value)}>
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
@@ -207,12 +342,12 @@ function PostsTab({ accountId }) {
           <div key={post.id} className="az-post-card" onClick={() => setSelected(post)}>
             <div className="az-post-thumb">
               {thumb
-                ? <><img src={thumb} alt="" />{isVideo && <span className="az-post-video-badge"><FiVideo size={11} /> Reel</span>}</>
+                ? <><img src={thumb} alt="" />{isVideo && <span className="az-post-video-badge"><FiVideo size={11} /> {t('analyzer.reelBadge')}</span>}</>
                 : <div className="az-post-thumb-placeholder"><FiInstagram /></div>}
             </div>
             <div className="az-post-meta">
-              <p className="az-post-caption">{post.caption ? post.caption.slice(0, 80) + (post.caption.length > 80 ? '…' : '') : '(no caption)'}</p>
-              <span className="az-post-date">{formatDate(post.timestamp)}</span>
+              <p className="az-post-caption">{post.caption ? post.caption.slice(0, 80) + (post.caption.length > 80 ? '…' : '') : t('analyzer.noCaption')}</p>
+              <span className="az-post-date">{formatDate(post.timestamp, locale)}</span>
               <div className="az-post-metrics">
                 <span><FiHeart /> {fmt(post.like_count)}</span>
                 <span><FiMessageCircle /> {fmt(post.comments_count)}</span>
@@ -232,24 +367,32 @@ function PostsTab({ accountId }) {
             <div className="az-drawer-thumb">
               {(() => {
                 const isVideo = selected.media_type === 'VIDEO' || selected.media_type === 'REELS';
-                const thumb = selected.thumbnail_url || (isVideo ? null : selected.media_url) || selected.media_url;
+                const thumb = selected.thumbnail_url || (!isVideo ? selected.media_url : null);
                 return thumb
-                  ? <><img src={thumb} alt="" />{isVideo && <span className="az-post-video-badge az-post-video-badge--drawer"><FiVideo size={12} /> Reel</span>}</>
+                  ? <img src={thumb} alt="" />
                   : <div className="az-post-thumb-placeholder large"><FiInstagram size={48} /></div>;
               })()}
             </div>
             <div className="az-drawer-body">
-              <p className="az-drawer-caption">{selected.caption || '(no caption)'}</p>
-              <span className="az-drawer-date">{formatDate(selected.timestamp)}</span>
-              <a className="az-drawer-link" href={selected.permalink} target="_blank" rel="noreferrer">View on Instagram ↗</a>
+              <p className="az-drawer-caption">{selected.caption || t('analyzer.noCaption')}</p>
+              <span className="az-drawer-date">{formatDate(selected.timestamp, locale)}</span>
+              <a className="az-drawer-link" href={selected.permalink} target="_blank" rel="noreferrer">{t('analyzer.viewOnInstagram')}</a>
               <div className="az-drawer-metrics">
-                <div className="az-drawer-metric"><FiHeart /><span>{fmt(selected.like_count)}</span><label>Likes</label></div>
-                <div className="az-drawer-metric"><FiMessageCircle /><span>{fmt(selected.comments_count)}</span><label>Comments</label></div>
-                <div className="az-drawer-metric"><FiShare2 /><span>{fmt(selected.insights?.shares)}</span><label>Shares</label></div>
-                <div className="az-drawer-metric"><FiBookmark /><span>{fmt(selected.insights?.saved)}</span><label>Saved</label></div>
-                <div className="az-drawer-metric"><FiEye /><span>{fmt(selected.insights?.reach)}</span><label>Reach</label></div>
-                <div className="az-drawer-metric"><FiTrendingUp /><span>{fmt(selected.insights?.impressions)}</span><label>Impressions</label></div>
+                <div className="az-drawer-metric"><FiHeart /><span>{fmt(selected.like_count)}</span><label>{t('analyzer.metricLikes')}</label></div>
+                <div className="az-drawer-metric"><FiMessageCircle /><span>{fmt(selected.comments_count)}</span><label>{t('analyzer.metricComments')}</label></div>
+                <div className="az-drawer-metric"><FiShare2 /><span>{fmt(selected.insights?.shares)}</span><label>{t('analyzer.metricShares')}</label></div>
+                <div className="az-drawer-metric"><FiBookmark /><span>{fmt(selected.insights?.saved)}</span><label>{t('analyzer.metricSaved')}</label></div>
+                <div className="az-drawer-metric"><FiEye /><span>{fmt(selected.insights?.reach)}</span><label>{t('analyzer.metricReach')}</label></div>
+                <div className="az-drawer-metric"><FiTrendingUp /><span>{fmt(selected.insights?.impressions)}</span><label>{t('analyzer.metricImpressions')}</label></div>
               </div>
+              <CommentsPanel
+                key={selected.id}
+                accountId={accountId}
+                mediaId={selected.id}
+                commentsCount={selected.comments_count}
+                accountUsername={accountUsername}
+                accountBio={accountBio}
+              />
             </div>
           </div>
         </div>
@@ -259,6 +402,7 @@ function PostsTab({ accountId }) {
 }
 
 function AudienceTab({ accountId }) {
+  const { t } = useTranslation();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -327,53 +471,53 @@ function AudienceTab({ accountId }) {
     <div className="az-tab-content">
       <div className="az-audience-grid">
         <div className="az-chart-card">
-          <h3 className="az-chart-title">Gender Breakdown</h3>
+          <h3 className="az-chart-title">{t('analyzer.genderBreakdown')}</h3>
           {genderData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie data={genderData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
                   {genderData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={(v) => [fmt(v), 'followers']} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }} />
+                <Tooltip formatter={(v) => [fmt(v), t('analyzer.followers')]} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }} />
               </PieChart>
             </ResponsiveContainer>
-          ) : <div className="az-no-data">No gender data available.</div>}
+          ) : <div className="az-no-data">{t('analyzer.noGenderData')}</div>}
         </div>
 
         <div className="az-chart-card">
-          <h3 className="az-chart-title">Age Distribution</h3>
+          <h3 className="az-chart-title">{t('analyzer.ageDistribution')}</h3>
           {ageData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={ageData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} tickLine={false} />
                 <YAxis tickFormatter={fmt} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} tickLine={false} axisLine={false} />
-                <Tooltip formatter={(v) => [fmt(v), 'followers']} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }} />
+                <Tooltip formatter={(v) => [fmt(v), t('analyzer.followers')]} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }} />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                   {ageData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          ) : <div className="az-no-data">No age data available.</div>}
+          ) : <div className="az-no-data">{t('analyzer.noAgeData')}</div>}
         </div>
 
         <div className="az-chart-card">
-          <h3 className="az-chart-title">Top Cities</h3>
+          <h3 className="az-chart-title">{t('analyzer.topCities')}</h3>
           {citiesData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={citiesData} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                 <XAxis type="number" tickFormatter={fmt} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} tickLine={false} axisLine={false} />
                 <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} tickLine={false} width={80} />
-                <Tooltip formatter={(v) => [fmt(v), 'followers']} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }} />
+                <Tooltip formatter={(v) => [fmt(v), t('analyzer.followers')]} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }} />
                 <Bar dataKey="value" fill="#6366F1" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <div className="az-no-data">No city data available.</div>}
+          ) : <div className="az-no-data">{t('analyzer.noCityData')}</div>}
         </div>
 
         <div className="az-chart-card">
-          <h3 className="az-chart-title">Top Countries</h3>
+          <h3 className="az-chart-title">{t('analyzer.topCountries')}</h3>
           {countriesData.length > 0 ? (
             <div className="az-countries-list">
               {countriesData.map((c, i) => {
@@ -391,14 +535,14 @@ function AudienceTab({ accountId }) {
                 );
               })}
             </div>
-          ) : <div className="az-no-data">No country data available.</div>}
+          ) : <div className="az-no-data">{t('analyzer.noCountryData')}</div>}
         </div>
       </div>
 
       {heatmapData.length > 0 && (
         <div className="az-chart-card az-heatmap-card">
-          <h3 className="az-chart-title">When Followers Are Online</h3>
-          <p className="az-chart-sub">Best times to post for maximum reach</p>
+          <h3 className="az-chart-title">{t('analyzer.whenOnline')}</h3>
+          <p className="az-chart-sub">{t('analyzer.whenOnlineSub')}</p>
           <div className="az-heatmap">
             <div className="az-heatmap-hours">
               {Array.from({ length: 24 }, (_, h) => (
@@ -426,9 +570,9 @@ function AudienceTab({ accountId }) {
             ))}
           </div>
           <div className="az-heatmap-legend">
-            <span>Low</span>
+            <span>{t('analyzer.heatmapLow')}</span>
             <div className="az-heatmap-legend-bar" />
-            <span>High</span>
+            <span>{t('analyzer.heatmapHigh')}</span>
           </div>
         </div>
       )}
@@ -437,6 +581,9 @@ function AudienceTab({ accountId }) {
 }
 
 function AITab({ accountId, accountUsername }) {
+  const { t } = useTranslation();
+  const { language } = useSettings();
+  const locale = LOCALE_MAP[language] || 'en-US';
   const [analysis, setAnalysis] = useState('');
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -488,7 +635,7 @@ function AITab({ accountId, accountUsername }) {
       const contentW = pageW - margin * 2;
       const imgH = (canvas.height * contentW) / canvas.width;
 
-      const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const date = new Date().toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
       pdf.setFontSize(9);
       pdf.setTextColor(150);
       pdf.text(`Instagram Analysis — @${accountUsername || 'account'} — ${date}`, margin, 9);
@@ -524,7 +671,6 @@ function AITab({ accountId, accountUsername }) {
       pdf.save(`Instagram Analysis ${handle} ${dateStr}.pdf`);
     } catch (e) {
       document.querySelector('.az-pdf-capture')?.remove();
-      console.error('PDF export failed', e);
     } finally {
       setDownloading(false);
     }
@@ -548,21 +694,18 @@ function AITab({ accountId, accountUsername }) {
       <div className="az-ai-intro">
         <div className="az-ai-icon-wrap"><FiZap size={28} /></div>
         <div>
-          <h3 className="az-ai-title">AI-Powered Analysis</h3>
-          <p className="az-ai-desc">
-            Groq AI reads all account data — posts, engagement, audience demographics, and reach trends —
-            and gives you an actionable strategic breakdown in seconds.
-          </p>
+          <h3 className="az-ai-title">{t('analyzer.aiTitle')}</h3>
+          <p className="az-ai-desc">{t('analyzer.aiDesc')}</p>
         </div>
       </div>
 
       <div className="az-ai-actions">
         <button className="az-ai-run-btn" onClick={run} disabled={loading}>
-          {loading ? <><span className="az-spinner" /> Analyzing…</> : <><FiZap /> Run Analysis</>}
+          {loading ? <><span className="az-spinner" /> {t('analyzer.analyzing')}</> : <><FiZap /> {t('analyzer.runAnalysis')}</>}
         </button>
         {analysis && (
           <button className="az-ai-download-btn" onClick={downloadPDF} disabled={downloading}>
-            {downloading ? <><span className="az-spinner az-spinner--dark" /> Exporting…</> : <><FiDownload /> Download PDF</>}
+            {downloading ? <><span className="az-spinner az-spinner--dark" /> {t('analyzer.exporting')}</> : <><FiDownload /> {t('analyzer.downloadPDF')}</>}
           </button>
         )}
       </div>
@@ -572,9 +715,9 @@ function AITab({ accountId, accountUsername }) {
       {analysis && (
         <div className="az-ai-result" ref={resultRef}>
           <div className="az-ai-result-header">
-            <span className="az-ai-result-label">AI Analysis</span>
+            <span className="az-ai-result-label">{t('analyzer.aiResultLabel')}</span>
             {accountUsername && <span className="az-ai-result-account">@{accountUsername}</span>}
-            <span className="az-ai-result-date">{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            <span className="az-ai-result-date">{new Date().toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
           </div>
           <ul className="az-ai-content">{renderAnalysis(analysis)}</ul>
         </div>
@@ -584,6 +727,15 @@ function AITab({ accountId, accountUsername }) {
 }
 
 function Analyzer() {
+  const { t } = useTranslation();
+
+  const TABS = [
+    { id: 'overview', label: t('analyzer.tabOverview'), icon: <FiGrid /> },
+    { id: 'posts', label: t('analyzer.tabPosts'), icon: <FiInstagram /> },
+    { id: 'audience', label: t('analyzer.tabAudience'), icon: <FiUsers /> },
+    { id: 'ai', label: t('analyzer.tabAI'), icon: <FiZap /> },
+  ];
+
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [tab, setTab] = useState('overview');
@@ -627,8 +779,8 @@ function Analyzer() {
     setRefreshing(true);
     setRefreshMsg('');
     analyzerAPI.refresh(selectedAccount.id)
-      .then(() => setRefreshMsg('Data refreshed'))
-      .catch(e => setRefreshMsg(e.message || 'Refresh failed'))
+      .then(() => setRefreshMsg(t('analyzer.refreshed')))
+      .catch(e => setRefreshMsg(e.message || t('analyzer.refreshFailed')))
       .finally(() => { setRefreshing(false); setRefreshMsg(''); });
   };
 
@@ -638,7 +790,6 @@ function Analyzer() {
     setRefreshMsg('');
   };
 
-  // Group accounts by client. Own accounts (is_client_account=false) go under "My Accounts".
   const groups = accounts.reduce((acc, a) => {
     const key = a.is_client_account ? (a.client_display_name || 'Client') : '__own__';
     if (!acc[key]) acc[key] = [];
@@ -657,24 +808,24 @@ function Analyzer() {
     <div className="az-page">
       <div className="az-header">
         <div className="az-header-left">
-          <h1 className="az-page-title"><FiBarChart2 /> Analyzer</h1>
+          <h1 className="az-page-title"><FiBarChart2 /> {t('sidebar.analyzer')}</h1>
         </div>
         <div className="az-header-right">
-          {demoMode && <span className="az-demo-badge">DEMO</span>}
+          {demoMode && <span className="az-demo-badge">{t('analyzer.demo')}</span>}
           {refreshMsg && <span className="az-refresh-msg">{refreshMsg}</span>}
           <button
             className={`az-demo-toggle${demoMode ? ' active' : ''}`}
             onClick={handleDemoToggle}
             disabled={togglingDemo}
-            title={demoMode ? 'Switch to real data' : 'Switch to demo data'}
+            title={demoMode ? t('analyzer.demoSwitchReal') : t('analyzer.demoSwitchDemo')}
           >
             {togglingDemo ? <span className="az-spinner az-spinner--dark" /> : null}
-            {demoMode ? 'Demo ON' : 'Demo OFF'}
+            {demoMode ? t('analyzer.demoOn') : t('analyzer.demoOff')}
           </button>
           {accounts.length > 0 && (
-            <button className="az-refresh-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh data">
+            <button className="az-refresh-btn" onClick={handleRefresh} disabled={refreshing} title={t('analyzer.refreshTitle')}>
               <FiRefreshCw className={refreshing ? 'az-spin' : ''} />
-              {refreshing ? 'Refreshing…' : 'Refresh'}
+              {refreshing ? t('analyzer.refreshing') : t('analyzer.refresh')}
             </button>
           )}
         </div>
@@ -683,15 +834,15 @@ function Analyzer() {
       {accounts.length === 0 && (
         <div className="az-empty">
           <FiInstagram size={48} />
-          <h2>No Instagram accounts connected</h2>
-          <p>Connect a client's Instagram account, or toggle Demo to explore with sample data.</p>
+          <h2>{t('analyzer.noAccounts')}</h2>
+          <p>{t('analyzer.noAccountsHint')}</p>
         </div>
       )}
 
       {accounts.length > 0 && <div className="az-selector-panel">
         {groupKeys.map(key => {
           const groupAccounts = groups[key];
-          const label = key === '__own__' ? 'My Accounts' : key;
+          const label = key === '__own__' ? t('analyzer.myAccounts') : key;
           return (
             <div key={key} className="az-selector-group">
               <span className="az-selector-group-label">
@@ -716,21 +867,21 @@ function Analyzer() {
       </div>}
 
       {accounts.length > 0 && <div className="az-tabs">
-        {TABS.map(t => (
+        {TABS.map(tabItem => (
           <button
-            key={t.id}
-            className={`az-tab-btn${tab === t.id ? ' active' : ''}`}
-            onClick={() => setTab(t.id)}
+            key={tabItem.id}
+            className={`az-tab-btn${tab === tabItem.id ? ' active' : ''}`}
+            onClick={() => setTab(tabItem.id)}
           >
-            {t.icon}
-            <span>{t.label}</span>
+            {tabItem.icon}
+            <span>{tabItem.label}</span>
           </button>
         ))}
       </div>}
 
       {accounts.length > 0 && <div className="az-body">
         {selectedAccount && tab === 'overview' && <OverviewTab accountId={selectedAccount.id} />}
-        {selectedAccount && tab === 'posts' && <PostsTab accountId={selectedAccount.id} />}
+        {selectedAccount && tab === 'posts' && <PostsTab accountId={selectedAccount.id} accountUsername={selectedAccount.username} accountBio="" />}
         {selectedAccount && tab === 'audience' && <AudienceTab accountId={selectedAccount.id} />}
         {selectedAccount && tab === 'ai' && <AITab accountId={selectedAccount.id} accountUsername={selectedAccount.username} />}
       </div>}

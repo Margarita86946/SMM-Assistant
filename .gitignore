@@ -7,6 +7,10 @@ backend/db.sqlite3
 backend/media/
 backend/staticfiles/
 backend/*.log
+backend/logs/
+backend/celerybeat-schedule.bak
+backend/celerybeat-schedule.dat
+backend/celerybeat-schedule.dir
 
 frontend/node_modules/
 frontend/build/

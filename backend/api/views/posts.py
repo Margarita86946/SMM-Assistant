@@ -122,7 +122,7 @@ def post_detail(request, pk):
         serializer = PostCreateSerializer(post, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated = serializer.save()
-            if old_status in ('scheduled', 'approved'):
+            if old_status in ('scheduled', 'approved') and updated.client_id:
                 new_content = {f: getattr(updated, f, '') or '' for f in _CONTENT_FIELDS}
                 content_changed = any(old_content[f] != new_content[f] for f in _CONTENT_FIELDS)
                 explicit_status = (request.data.get('status') or '').strip()
@@ -130,13 +130,12 @@ def post_detail(request, pk):
                     updated.status = 'pending_approval'
                     updated.approval_note = ''
                     updated.save(update_fields=['status', 'approval_note', 'updated_at'])
-                    if updated.client_id:
-                        Notification.objects.create(
-                            recipient=updated.client,
-                            actor=request.user,
-                            notification_type='post_submitted',
-                            post=updated,
-                        )
+                    Notification.objects.create(
+                        recipient=updated.client,
+                        actor=request.user,
+                        notification_type='post_submitted',
+                        post=updated,
+                    )
                     return Response(PostSerializer(updated).data)
             return Response(PostSerializer(updated).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -265,18 +264,17 @@ def upload_post_video(request):
     if file.size > 500 * 1024 * 1024:
         return Response({'error': 'File too large. Maximum size is 500 MB.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    content = file.read()
     cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME')
     api_key = os.environ.get('CLOUDINARY_API_KEY')
     api_secret = os.environ.get('CLOUDINARY_API_SECRET')
     if cloud_name and api_key and api_secret:
-        import cloudinary, cloudinary.uploader, io
+        import cloudinary, cloudinary.uploader
         cloudinary.config(cloud_name=cloud_name, api_key=api_key, api_secret=api_secret)
-        result = cloudinary.uploader.upload(io.BytesIO(content), folder='smm_assistant', resource_type='video')
+        result = cloudinary.uploader.upload(file, folder='smm_assistant', resource_type='video')
         return Response({'video_url': result['secure_url']}, status=status.HTTP_201_CREATED)
 
     ext = os.path.splitext(file.name)[1].lower() or '.mp4'
     filename = f"post_videos/{uuid.uuid4().hex}{ext}"
-    saved_path = default_storage.save(filename, ContentFile(content))
+    saved_path = default_storage.save(filename, file)
     url = request.build_absolute_uri(settings.MEDIA_URL + saved_path)
     return Response({'video_url': url}, status=status.HTTP_201_CREATED)

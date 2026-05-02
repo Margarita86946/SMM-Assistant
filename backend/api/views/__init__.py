@@ -60,3 +60,4 @@ from .analyzer import (
     analyzer_refresh,
     analyzer_demo_toggle,
 )
+from .comments import get_comments, reply_comment, suggest_reply
