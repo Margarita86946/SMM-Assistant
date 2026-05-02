@@ -7,7 +7,7 @@ import {
   FiRefreshCw, FiInstagram, FiUsers, FiUser, FiGrid, FiBarChart2,
   FiZap, FiHeart, FiMessageCircle, FiShare2, FiBookmark,
   FiTrendingUp, FiEye, FiArrowUp, FiArrowDown, FiDownload, FiVideo,
-  FiSend, FiZapOff, FiChevronDown, FiChevronUp,
+  FiSend, FiChevronDown, FiChevronUp,
 } from 'react-icons/fi';
 import { analyzerAPI } from '../services/api';
 import { useTranslation } from '../i18n';
