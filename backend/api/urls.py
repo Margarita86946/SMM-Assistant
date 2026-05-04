@@ -35,7 +35,6 @@ urlpatterns = [
     path('generate-content/', views.generate_content, name='generate-content'),
     path('polish-content/', views.polish_content_view, name='polish-content'),
     path('generate-image/', views.generate_image, name='generate-image'),
-    path('generate-variants/', views.generate_variants, name='generate-variants'),
     path('ai-status/', views.ai_status, name='ai-status'),
 
     # Brand Profile

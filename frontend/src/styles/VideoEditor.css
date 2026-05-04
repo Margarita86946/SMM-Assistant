@@ -4,7 +4,7 @@
 
 .ve-preview-area {
   position: relative;
-  background: #000;
+  background: var(--primary-light);
   height: 300px;
   display: flex;
   align-items: center;

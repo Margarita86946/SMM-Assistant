@@ -27,7 +27,7 @@ def submit_post(request, pk):
             post = Post.objects.select_for_update(of=('self',)).select_related('client', 'user').get(pk=pk, user=request.user)
         except Post.DoesNotExist:
             return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
-        if post.status != 'draft':
+        if post.status not in ('draft', 'rejected'):
             return Response(
                 {'error': 'Only draft posts can be submitted for approval.'},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -102,7 +102,7 @@ def reject_post(request, pk):
             )
         else:
             return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
-        post.status = 'draft'
+        post.status = 'rejected'
         post.approval_note = note
         post.save(update_fields=['status', 'approval_note', 'updated_at'])
     log_action(

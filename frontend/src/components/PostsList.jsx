@@ -18,6 +18,7 @@ const STATUS_META_KEYS = {
   draft:            { key: 'status.draft',            cls: 'badge-draft'     },
   pending_approval: { key: 'status.awaitingApproval', cls: 'badge-pending'   },
   approved:         { key: 'status.approved',         cls: 'badge-approved'  },
+  rejected:         { key: 'status.rejected',         cls: 'badge-rejected'  },
   scheduled:        { key: 'status.scheduled',        cls: 'badge-scheduled' },
   posted:           { key: 'status.posted',           cls: 'badge-posted'    },
 };
@@ -376,7 +377,7 @@ function PostsList() {
               const metaEntry = STATUS_META_KEYS[post.status];
               const meta = metaEntry ? { text: t(metaEntry.key), cls: metaEntry.cls } : { text: post.status, cls: 'badge-draft' };
               const isApproved = post.status === 'approved';
-              const isRejectedDraft = post.status === 'draft' && post.approval_note;
+              const isRejectedDraft = post.status === 'rejected';
               const isSelectable = isPostSelectable(post);
               const isSelected = selected.has(post.id);
 
@@ -408,7 +409,6 @@ function PostsList() {
                     </div>
                   )}
 
-                  {/* Rejection note callout — shown on draft posts that were previously rejected */}
                   {isRejectedDraft && (
                     <div className="post-rejection-callout">
                       <FiAlertCircle />
@@ -457,8 +457,7 @@ function PostsList() {
                       </button>
                     )}
 
-                    {/* Submit for Approval — specialist only, draft only */}
-                    {isSpecialist && post.status === 'draft' && (
+                    {isSpecialist && (post.status === 'draft' || post.status === 'rejected') && (
                       <button className="btn-submit-approval"
                         onClick={e => handleSubmitForApproval(e, post.id)}
                         disabled={submitting === post.id}>
