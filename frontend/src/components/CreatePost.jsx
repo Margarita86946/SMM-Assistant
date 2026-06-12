@@ -1,23 +1,67 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { aiAPI, postsAPI } from '../services/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useBlocker } from 'react-router-dom';
+import { aiAPI, postsAPI, clientsAPI, instagramAPI } from '../services/api';
 import { useTranslation } from '../i18n';
+import { useActiveClient } from '../context/ActiveClientContext';
+import { FiRefreshCw, FiCheck, FiCopy, FiCamera, FiX, FiUpload, FiRefreshCcw, FiVideo, FiDownload } from 'react-icons/fi';
+import fixWebmDuration from 'fix-webm-duration';
+import ImageEditor from './ImageEditor';
+import VideoEditor from './VideoEditor';
+import { PostPreview, CaptionCounter, HashtagsCounter, LIMITS } from './PostPreview';
 import '../styles/CreatePost.css';
 
-function RegenButton({ onClick, loading, t }) {
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+function UnsavedModal({ onLeave, onStay, t }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onStay(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onStay]);
+  return (
+    <div className="edit-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onStay(); }}>
+      <div className="edit-modal">
+        <div className="edit-modal-header">
+          <span className="edit-modal-icon">⚠️</span>
+          <h3>{t('edit.unsavedTitle')}</h3>
+        </div>
+        <p className="edit-modal-msg">{t('edit.unsavedMsg')}</p>
+        <div className="edit-modal-actions">
+          <button className="edit-modal-leave-btn" onClick={onLeave}>{t('edit.leave')}</button>
+          <button className="edit-modal-stay-btn" onClick={onStay}>{t('edit.stay')}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  const { t } = useTranslation();
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+  return (
+    <button className={`btn-copy${copied ? ' btn-copy--done' : ''}`} onClick={handleCopy} title={t('generate.copy')} disabled={!text}>
+      {copied ? <FiCheck /> : <FiCopy />}
+      {copied ? t('generate.copied') : t('generate.copy')}
+    </button>
+  );
+}
+
+function RegenButton({ onClick, loading, disabled, t }) {
   return (
     <button
       className={`btn-regen${loading ? ' btn-regen--loading' : ''}`}
       onClick={onClick}
-      disabled={loading}
-      title={t('generate.regen')}
+      disabled={loading || disabled}
+      title={disabled ? t('create.topicRequiredRegen') : t('generate.regen')}
     >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-        style={loading ? { animation: 'spin 0.7s linear infinite' } : {}}>
-        <polyline points="23 4 23 10 17 10"/>
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-      </svg>
+      <FiRefreshCw style={loading ? { animation: 'spin 0.7s linear infinite' } : {}} />
       {loading ? t('generate.regenLoading') : t('generate.regen')}
     </button>
   );
@@ -26,6 +70,9 @@ function RegenButton({ onClick, loading, t }) {
 function CreatePost() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const role = localStorage.getItem('role');
+  const isOwner = role === 'owner';
+  const isSpecialist = role === 'specialist';
 
   const [topic, setTopic] = useState('');
   const [caption, setCaption] = useState('');
@@ -34,11 +81,402 @@ function CreatePost() {
   const [platform, setPlatform] = useState('instagram');
 
   const [tone, setTone] = useState('professional');
+  const [scheduledTime, setScheduledTime] = useState('');
+  const { activeClientId } = useActiveClient();
+  const [clientId, setClientId] = useState(() => activeClientId ? String(activeClientId) : '');
+  const [clients, setClients] = useState([]);
+  const [igAccounts, setIgAccounts] = useState([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  useEffect(() => {
+    if (isSpecialist) {
+      clientsAPI.list().then(res => setClients(res.data)).catch(() => {});
+    } else {
+      instagramAPI.getStatus().then(res => {
+        const accounts = res.data.accounts || [];
+        setIgAccounts(accounts);
+        if (accounts.length === 1) setSelectedAccountId(String(accounts[0].id));
+      }).catch(() => {});
+    }
+  }, [isSpecialist]);
+
+  useEffect(() => {
+    setClientId(activeClientId ? String(activeClientId) : '');
+  }, [activeClientId]);
   const [polishing, setPolishing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [regenLoading, setRegenLoading] = useState({ caption: false, hashtags: false, image_prompt: false });
+  const [uploadedImageUrl, setUploadedImageUrl] = useState('');
+  const [uploadedImagePreview, setUploadedImagePreview] = useState('');
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState('');
+  const [uploadedVideoPreview, setUploadedVideoPreview] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [mediaType, setMediaType] = useState('image');
+  const [showImageMenu, setShowImageMenu] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const [capturedSrc, setCapturedSrc] = useState(null);
+  const [facingMode, setFacingMode] = useState('user');
+  const facingModeRef = useRef('user');
+  const [cameraMode, setCameraMode] = useState('photo');
+  const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
+  const [recordedSrc, setRecordedSrc] = useState(null);
+  const [recordedMime, setRecordedMime] = useState('video/webm');
+  const [editorSrc, setEditorSrc] = useState(null);
+  const [videoEditorSrc, setVideoEditorSrc] = useState(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
+  const recordedMimeRef = useRef('video/webm');
+  const recordingStartRef = useRef(null);
+  const canvasRef = useRef(null);
+  const canvasStreamRef = useRef(null);
+  const rafRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const imageMenuRef = useRef(null);
+  const pinchStartDistRef = useRef(null);
+  const pinchStartZoomRef = useRef(1);
+  const mobileCameraInputRef = useRef(null);
+  const mobileCameraVideoInputRef = useRef(null);
+
+
+  useEffect(() => {
+    if (!showImageMenu) return;
+    const handler = (e) => {
+      if (imageMenuRef.current && !imageMenuRef.current.contains(e.target)) {
+        setShowImageMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showImageMenu]);
+
+  const handleImageUpload = async (file) => {
+    if (!file) return;
+    setUploadError('');
+    setUploading(true);
+    setUploadedImagePreview(URL.createObjectURL(file));
+    try {
+      const res = await postsAPI.uploadImage(file);
+      setUploadedImageUrl(res.data.image_url);
+    } catch (err) {
+      const msg = err.response?.data?.error || t('create.uploadFailed');
+      setUploadError(msg);
+      setUploadedImagePreview('');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleVideoUpload = async (file) => {
+    if (!file) return;
+    setUploadError('');
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadedVideoPreview(URL.createObjectURL(file));
+    setMediaType('video');
+    try {
+      const res = await postsAPI.uploadVideo(file, setUploadProgress);
+      setUploadedVideoUrl(res.data.video_url);
+    } catch (err) {
+      const msg = err.response?.data?.error || t('create.videoUploadFailed');
+      setUploadError(msg);
+      setUploadedVideoPreview('');
+      setMediaType('image');
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleImageDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (file.type.startsWith('video/')) {
+      setVideoEditorSrc(URL.createObjectURL(file));
+    } else {
+      handleImageUpload(file);
+    }
+  };
+
+  const stopStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+  };
+
+  const startStream = async (facing) => {
+    stopStream();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: true });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        setCameraError(t('create.cameraAccessDenied'));
+      } else {
+        setCameraError(t('create.cameraUnavailable'));
+      }
+    }
+  };
+
+  const applyZoom = async (zoom) => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const caps = track.getCapabilities?.();
+    if (!caps?.zoom) return;
+    const clamped = Math.min(Math.max(zoom, caps.zoom.min), caps.zoom.max);
+    await track.applyConstraints({ advanced: [{ zoom: clamped }] }).catch(() => {});
+    setZoomLevel(clamped);
+  };
+
+  const handlePinchStart = (e) => {
+    if (e.touches.length !== 2) return;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    pinchStartDistRef.current = Math.hypot(dx, dy);
+    pinchStartZoomRef.current = zoomLevel;
+  };
+
+  const handlePinchMove = (e) => {
+    if (e.touches.length !== 2 || pinchStartDistRef.current === null) return;
+    e.preventDefault();
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    const scale = dist / pinchStartDistRef.current;
+    applyZoom(pinchStartZoomRef.current * scale);
+  };
+
+  const handlePinchEnd = () => {
+    pinchStartDistRef.current = null;
+  };
+
+  const openCamera = async (mode = 'photo') => {
+    setShowImageMenu(false);
+    if (isMobile) {
+      if (mode === 'video') mobileCameraVideoInputRef.current?.click();
+      else mobileCameraInputRef.current?.click();
+      return;
+    }
+    setCameraError('');
+    facingModeRef.current = 'user';
+    setFacingMode('user');
+    setZoomLevel(1);
+    setCameraMode(mode);
+    setShowCamera(true);
+    await startStream('user');
+  };
+
+  const handleMobileCameraCapture = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.type.startsWith('video/')) {
+      openVideoFromFile(file);
+    } else {
+      openEditorFromFile(file);
+    }
+  };
+
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (facingMode === 'user' || !isMobile) {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      stopStream();
+      setCapturedSrc(URL.createObjectURL(blob));
+    }, 'image/jpeg', 0.92);
+  };
+
+  const retakePhoto = async () => {
+    setCapturedSrc(null);
+    await startStream(facingMode);
+  };
+
+  const usePhoto = () => {
+    const src = capturedSrc;
+    setCapturedSrc(null);
+    setShowCamera(false);
+    setEditorSrc(src);
+  };
+
+  const startRecording = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvasRef.current = canvas;
+    const ctx = canvas.getContext('2d');
+
+    const drawFrame = () => {
+      const v = videoRef.current;
+      if (v && v.readyState >= 2 && v.videoWidth > 0) {
+        if (canvas.width !== v.videoWidth) canvas.width = v.videoWidth;
+        if (canvas.height !== v.videoHeight) canvas.height = v.videoHeight;
+        const shouldMirror = facingModeRef.current === 'user' || !isMobile;
+        if (shouldMirror) {
+          ctx.save();
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+          ctx.restore();
+        } else {
+          ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+        }
+      }
+      rafRef.current = requestAnimationFrame(drawFrame);
+    };
+    rafRef.current = requestAnimationFrame(drawFrame);
+
+    const canvasStream = canvas.captureStream(30);
+    const audioTrack = streamRef.current?.getAudioTracks()[0];
+    if (audioTrack) canvasStream.addTrack(audioTrack);
+    canvasStreamRef.current = canvasStream;
+
+    const mimeType = (() => {
+      for (const t of ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']) {
+        if (MediaRecorder.isTypeSupported(t)) return t;
+      }
+      return 'video/webm';
+    })();
+    recordedMimeRef.current = mimeType;
+    recordedChunksRef.current = [];
+    recordingStartRef.current = Date.now();
+
+    const recorder = new MediaRecorder(canvasStream, { mimeType });
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+    };
+    recorder.onstop = () => {
+      cancelAnimationFrame(rafRef.current);
+      const duration = recordingStartRef.current ? Date.now() - recordingStartRef.current : 0;
+      const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+      stopStream();
+      setRecordedMime(mimeType);
+      fixWebmDuration(blob, duration, (fixed) => {
+        setRecordedSrc(URL.createObjectURL(fixed));
+      });
+      isRecordingRef.current = false;
+      setIsRecording(false);
+    };
+    mediaRecorderRef.current = recorder;
+    recorder.start(100);
+    isRecordingRef.current = true;
+    setIsRecording(true);
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+  };
+
+  const retakeVideo = async () => {
+    setRecordedSrc(null);
+    await startStream(facingMode);
+  };
+
+  const useVideo = () => {
+    const src = recordedSrc;
+    const mime = recordedMime;
+    setRecordedSrc(null);
+    setShowCamera(false);
+    fetch(src)
+      .then(r => r.blob())
+      .then(blob => {
+        const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+        const file = new File([blob], `recorded.${ext}`, { type: mime });
+        openVideoFromFile(file);
+      });
+  };
+
+  const openEditorFromFile = (file) => {
+    if (!file) return;
+    setShowImageMenu(false);
+    setEditorSrc(URL.createObjectURL(file));
+  };
+
+  const handleEditorApply = (file) => {
+    setEditorSrc(null);
+    handleImageUpload(file);
+  };
+
+  const handleEditorCancel = () => {
+    setEditorSrc(null);
+  };
+
+  const handleVideoEditorApply = (file) => {
+    setVideoEditorSrc(null);
+    handleVideoUpload(file);
+  };
+
+  const handleVideoEditorCancel = () => {
+    setVideoEditorSrc(null);
+  };
+
+  const openVideoFromFile = (file) => {
+    if (!file) return;
+    setShowImageMenu(false);
+    if (isMobile) {
+      handleVideoUpload(file);
+    } else {
+      setVideoEditorSrc(URL.createObjectURL(file));
+    }
+  };
+
+  const clearMedia = () => {
+    setUploadedImagePreview('');
+    setUploadedImageUrl('');
+    setUploadedVideoPreview('');
+    setUploadedVideoUrl('');
+    setUploadError('');
+    setMediaType('image');
+  };
+
+  const closeCamera = () => {
+    isRecordingRef.current = false;
+    mediaRecorderRef.current?.stop();
+    stopStream();
+    setShowCamera(false);
+    setCameraError('');
+    setCapturedSrc(null);
+    setRecordedSrc(null);
+    setRecordedMime('video/webm');
+    setIsRecording(false);
+    isRecordingRef.current = false;
+    setZoomLevel(1);
+    setCameraMode('photo');
+  };
+
+  const isDirty = !!(caption || hashtags || imagePrompt || topic || uploadedImageUrl || uploadedVideoUrl);
+
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    isDirty && currentLocation.pathname !== nextLocation.pathname
+  );
+
+  useEffect(() => {
+    const handler = (e) => { if (isDirty) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   const handlePolish = async () => {
     if (!caption.trim()) {
@@ -48,7 +486,7 @@ function CreatePost() {
     setPolishing(true);
     setError('');
     try {
-      const res = await aiAPI.polishContent({ topic, caption, hashtags, image_prompt: imagePrompt, platform, tone });
+      const res = await aiAPI.polishContent({ topic, caption, hashtags, image_prompt: imagePrompt, platform, tone, client_id: clientId || undefined, account_id: selectedAccountId ? parseInt(selectedAccountId, 10) : undefined });
       setCaption(res.data.caption);
       setHashtags(res.data.hashtags);
       if (res.data.image_prompt) setImagePrompt(res.data.image_prompt);
@@ -60,17 +498,22 @@ function CreatePost() {
   };
 
   const handleRegen = async (field) => {
-    if (!topic.trim()) {
+    if (!topic.trim() && !caption.trim()) {
       setError(t('create.topicRequiredRegen'));
       return;
     }
     setRegenLoading(prev => ({ ...prev, [field]: true }));
     setError('');
     try {
-      const res = await aiAPI.generateContent({ topic, platform, tone });
+      let res;
+      if (caption.trim()) {
+        res = await aiAPI.polishContent({ topic, caption, hashtags, image_prompt: imagePrompt, platform, tone, client_id: clientId || undefined, account_id: selectedAccountId ? parseInt(selectedAccountId, 10) : undefined });
+      } else {
+        res = await aiAPI.generateContent({ topic, platform, tone, client_id: clientId || undefined, account_id: selectedAccountId ? parseInt(selectedAccountId, 10) : undefined });
+      }
       if (field === 'caption') setCaption(res.data.caption);
       else if (field === 'hashtags') setHashtags(res.data.hashtags);
-      else if (field === 'image_prompt') setImagePrompt(res.data.image_prompt);
+      else if (field === 'image_prompt' && res.data.image_prompt) setImagePrompt(res.data.image_prompt);
     } catch {
       setError(t('generate.failedRegen'));
     } finally {
@@ -83,11 +526,34 @@ function CreatePost() {
       setError(t('create.captionRequired'));
       return;
     }
+    if (platform === 'instagram' && !uploadedImageUrl && !uploadedVideoUrl) {
+      setError(t('create.imageRequired'));
+      return;
+    }
+    const resolvedClient = activeClientId ?? (clientId ? parseInt(clientId, 10) : null);
+    if (clients.length > 0 && !resolvedClient) {
+      setError(t('create.clientRequired'));
+      return;
+    }
     setSaving(true);
     setError('');
+    const resolvedClientId = activeClientId ?? (clientId ? parseInt(clientId, 10) : null);
+    const hasSchedule = isOwner && scheduledTime;
     try {
-      await postsAPI.create({ topic, caption, hashtags, tone, image_prompt: imagePrompt, platform, status: 'draft', scheduled_time: null });
+      await postsAPI.create({
+        topic, caption, hashtags, tone,
+        image_prompt: imagePrompt,
+        image_url: mediaType === 'image' ? (uploadedImageUrl || undefined) : undefined,
+        video_url: mediaType === 'video' ? (uploadedVideoUrl || undefined) : undefined,
+        media_type: mediaType,
+        platform,
+        status: hasSchedule ? 'scheduled' : 'draft',
+        scheduled_time: hasSchedule ? scheduledTime : null,
+        client: resolvedClientId || null,
+      });
       setSuccessMsg(t('create.savedMsg'));
+      setCaption(''); setHashtags(''); setImagePrompt(''); setTopic('');
+      clearMedia();
       setTimeout(() => navigate('/posts'), 1500);
     } catch {
       setError(t('create.failedSave'));
@@ -98,22 +564,20 @@ function CreatePost() {
 
   return (
     <div className="create-container">
+      {blocker.state === 'blocked' && (
+        <UnsavedModal t={t} onLeave={() => blocker.proceed()} onStay={() => blocker.reset()} />
+      )}
       <div className="create-header">
-        <div>
-          <h1>{t('create.title')}</h1>
-          <p className="create-subtitle">{t('create.subtitle')}</p>
-        </div>
+        <h1>{t('create.title')}</h1>
+        <p className="create-subtitle">{t('create.subtitle')}</p>
       </div>
 
       {error && <div className="error-message">{error}</div>}
       {successMsg && <div className="success-message">{successMsg}</div>}
 
+      <div className="create-layout">
+      <div className="create-layout-form">
       <div className="create-card">
-        <div className="card-title">
-          <span className="card-title-icon">📝</span>
-          {t('create.content')}
-        </div>
-
         <div className="create-form-group">
           <label>{t('create.topic')}</label>
           <input
@@ -144,16 +608,89 @@ function CreatePost() {
           </div>
         </div>
 
+        {clients.length > 0 && (
+          <div className="create-form-group">
+            <label>
+              {t('common2.assignToClient')}{' '}
+              {activeClientId
+                ? <span className="label-context-set">{t('common2.prefilledFromFilter')}</span>
+                : <span className="label-required">*</span>
+              }
+            </label>
+            {activeClientId ? (
+              <div className="create-client-locked">
+                {(() => {
+                  const c = clients.find(x => String(x.id) === clientId);
+                  return c
+                    ? `${[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username}`
+                    : clientId;
+                })()}
+              </div>
+            ) : (
+              <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
+                <option value="">{t('common2.selectClient')}</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
+        {clientId && (() => {
+          const c = clients.find(x => String(x.id) === clientId);
+          return c ? (
+            <div className="brand-banner brand-banner--ok">
+              <span>{t('common2.usingBrandContext')} <strong>{[c.first_name, c.last_name].filter(Boolean).join(' ') || c.username}</strong></span>
+            </div>
+          ) : null;
+        })()}
+
+        {!isSpecialist && igAccounts.length > 1 && (
+          <div className="create-form-group">
+            <label>{t('common2.instagramAccount')}</label>
+            <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)}>
+              <option value="">{t('common2.noAccountSelected')}</option>
+              {igAccounts.map(a => (
+                <option key={a.id} value={a.id}>@{a.username}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {!isSpecialist && selectedAccountId && (() => {
+          const a = igAccounts.find(x => String(x.id) === selectedAccountId);
+          return a ? (
+            <div className="brand-banner brand-banner--ok">
+              <span>{t('common2.usingBrandProfile')} <strong>@{a.username}</strong></span>
+            </div>
+          ) : null;
+        })()}
+
         <div className="create-form-group">
           <div className="create-field-label-row">
             <label>{t('create.caption')} <span className="label-required">*</span></label>
-            <RegenButton onClick={() => handleRegen('caption')} loading={regenLoading.caption} t={t} />
+            <div className="create-field-actions">
+              <CaptionCounter caption={caption} hashtags={hashtags} platform={platform} />
+              <RegenButton onClick={() => handleRegen('caption')} loading={regenLoading.caption} disabled={!topic.trim() && !caption.trim()} t={t} />
+              <CopyButton text={caption} />
+            </div>
           </div>
           <textarea
             rows={6}
             placeholder={t('create.captionPlaceholder')}
             value={caption}
-            onChange={(e) => setCaption(e.target.value)}
+            onChange={(e) => {
+              const limit = LIMITS[platform]?.caption;
+              if (platform === 'twitter') {
+                const combined = [e.target.value, hashtags].filter(Boolean).join(' ');
+                if (limit && combined.length > limit) return;
+              } else if (limit && e.target.value.length > limit) {
+                return;
+              }
+              setCaption(e.target.value);
+            }}
             disabled={regenLoading.caption}
           />
         </div>
@@ -161,13 +698,26 @@ function CreatePost() {
         <div className="create-form-group">
           <div className="create-field-label-row">
             <label>{t('create.hashtags')}</label>
-            <RegenButton onClick={() => handleRegen('hashtags')} loading={regenLoading.hashtags} t={t} />
+            <div className="create-field-actions">
+              <HashtagsCounter hashtags={hashtags} platform={platform} />
+              <RegenButton onClick={() => handleRegen('hashtags')} loading={regenLoading.hashtags} disabled={!topic.trim() && !caption.trim()} t={t} />
+              <CopyButton text={hashtags} />
+            </div>
           </div>
           <input
             type="text"
             placeholder={t('create.hashtagsPlaceholder')}
             value={hashtags}
-            onChange={(e) => setHashtags(e.target.value)}
+            onChange={(e) => {
+              if (platform === 'twitter') {
+                const combined = [caption, e.target.value].filter(Boolean).join(' ');
+                if (combined.length > LIMITS.twitter.caption) return;
+              } else if (platform === 'instagram') {
+                const tags = e.target.value.trim().split(/\s+/).filter(t => t.startsWith('#')).length;
+                if (tags > LIMITS.instagram.hashtagCount) return;
+              }
+              setHashtags(e.target.value);
+            }}
             disabled={regenLoading.hashtags}
           />
         </div>
@@ -175,7 +725,10 @@ function CreatePost() {
         <div className="create-form-group">
           <div className="create-field-label-row">
             <label>{t('create.imagePrompt')} <span className="label-optional">{t('create.optional')}</span></label>
-            <RegenButton onClick={() => handleRegen('image_prompt')} loading={regenLoading.image_prompt} t={t} />
+            <div className="create-field-actions">
+              <RegenButton onClick={() => handleRegen('image_prompt')} loading={regenLoading.image_prompt} disabled={!topic.trim() && !caption.trim()} t={t} />
+              <CopyButton text={imagePrompt} />
+            </div>
           </div>
           <textarea
             rows={3}
@@ -186,6 +739,187 @@ function CreatePost() {
           />
         </div>
 
+        <div className="create-form-group">
+          <label>
+            {t('common2.media')}{' '}
+            {platform === 'instagram'
+              ? <span className="label-required">*</span>
+              : <span className="label-optional">{t('create.optional')}</span>}
+          </label>
+          {uploadError && <p className="create-upload-error">{uploadError}</p>}
+          {(uploadedImagePreview || uploadedVideoPreview) ? (
+            <div className="create-upload-preview">
+              <div className="create-upload-img-wrap">
+                {mediaType === 'video'
+                  ? <video src={uploadedVideoPreview} className="create-upload-img" controls playsInline />
+                  : <img src={uploadedImagePreview} alt="preview" className="create-upload-img" />}
+                <button
+                  className="create-upload-remove"
+                  onClick={clearMedia}
+                  title="Remove"
+                >
+                  <FiX />
+                </button>
+                {uploading && (
+                  <div className="create-upload-overlay">
+                    {uploadProgress > 0 ? `${uploadProgress}%` : t('create.uploading')}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div ref={imageMenuRef} className="create-upload-zone-wrap" onDrop={handleImageDrop} onDragOver={(e) => e.preventDefault()}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/x-m4v"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  if (file.type.startsWith('video/')) openVideoFromFile(file);
+                  else openEditorFromFile(file);
+                }}
+              />
+              <input
+                ref={mobileCameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={handleMobileCameraCapture}
+              />
+              <input
+                ref={mobileCameraVideoInputRef}
+                type="file"
+                accept="video/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={handleMobileCameraCapture}
+              />
+              <button
+                className="create-upload-cam-btn"
+                onClick={() => setShowImageMenu(m => !m)}
+                type="button"
+              >
+                <FiCamera />
+              </button>
+
+              {showImageMenu && (
+                <div className="create-upload-menu">
+                  <button onClick={() => { setShowImageMenu(false); fileInputRef.current?.click(); }}>
+                    <FiUpload /> {t('common2.uploadFile')}
+                  </button>
+                  {isMobile ? (
+                    <>
+                      <button onClick={() => openCamera('photo')}>
+                        <FiCamera /> {t('common2.takePhoto')}
+                      </button>
+                      <button onClick={() => openCamera('video')}>
+                        <FiVideo /> {t('common2.recordVideo')}
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={() => openCamera('photo')}>
+                      <FiCamera /> {t('common2.openCamera')}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {showCamera && (
+          <div className="create-camera-overlay">
+            <div className="create-camera-modal">
+              <button className="create-camera-close" onClick={closeCamera}><FiX /></button>
+              {!capturedSrc && !recordedSrc && (
+                <div className="create-camera-mode-tabs">
+                  <button className={cameraMode === 'photo' ? 'active' : ''} onClick={() => setCameraMode('photo')}><FiCamera /> {t('common2.modePhoto')}</button>
+                  <button className={cameraMode === 'video' ? 'active' : ''} onClick={() => setCameraMode('video')}><FiVideo /> {t('common2.modeVideo')}</button>
+                </div>
+              )}
+              {cameraError ? (
+                <p className="create-camera-error">{cameraError}</p>
+              ) : capturedSrc ? (
+                <>
+                  <img src={capturedSrc} alt="captured" className="create-camera-video" />
+                  <a href={capturedSrc} download="captured.jpg" className="create-camera-download"><FiDownload /><span>{t('common2.download')}</span></a>
+                  <div className="create-camera-retake-row">
+                    <button className="create-camera-retake-btn" onClick={retakePhoto}>
+                      <FiRefreshCcw /> {t('create.retake')}
+                    </button>
+                    <button className="create-camera-use-btn" onClick={usePhoto}>
+                      {t('create.usePhoto')}
+                    </button>
+                  </div>
+                </>
+              ) : recordedSrc ? (
+                <>
+                  <video
+                    key={recordedSrc}
+                    src={recordedSrc}
+                    controls
+                    playsInline
+                    className="create-camera-video"
+                  />
+                  <a href={recordedSrc} download="recorded.webm" className="create-camera-download"><FiDownload /><span>{t('common2.download')}</span></a>
+                  <div className="create-camera-retake-row">
+                    <button className="create-camera-retake-btn" onClick={retakeVideo}>
+                      <FiRefreshCcw /> {t('create.retake')}
+                    </button>
+                    <button className="create-camera-use-btn" onClick={useVideo}>
+                      {t('common2.useVideo')}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="create-camera-video create-camera-preview"
+                    onTouchStart={handlePinchStart}
+                    onTouchMove={handlePinchMove}
+                    onTouchEnd={handlePinchEnd}
+                  />
+                  {cameraMode === 'photo' ? (
+                    <button className="create-camera-capture" onClick={capturePhoto}>
+                      <span className="create-camera-shutter" />
+                    </button>
+                  ) : (
+                    <button
+                      className={`create-camera-capture${isRecording ? ' create-camera-capture--recording' : ''}`}
+                      onClick={isRecording ? stopRecording : startRecording}
+                    >
+                      <span className={isRecording ? 'create-camera-stop' : 'create-camera-shutter'} />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {isOwner && (
+          <div className="create-form-group">
+            <label>{t('create.scheduleTime')} <span className="label-optional">{t('create.optional')}</span></label>
+            <input
+              type="datetime-local"
+              value={scheduledTime}
+              onChange={(e) => setScheduledTime(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+              max="2099-12-31T23:59"
+            />
+            {scheduledTime && (
+              <p className="create-schedule-hint">{t('create.scheduleHint')}</p>
+            )}
+          </div>
+        )}
+
         <button className="btn-ai-assist" onClick={handlePolish} disabled={polishing}>
           {polishing ? (
             <><span className="btn-spinner" /> {t('common.polishing')}</>
@@ -195,9 +929,39 @@ function CreatePost() {
         </button>
 
         <button className="btn-save-draft" onClick={handleSave} disabled={saving}>
-          {saving ? t('common.saving') : t('generate.saveAsDraft')}
+          {saving ? t('common.saving') : (isOwner && scheduledTime ? t('create.schedulePost') : t('generate.saveAsDraft'))}
         </button>
       </div>
+      </div>
+
+      <div className="create-layout-preview">
+        <div className="preview-label">{t('create.previewTitle')}</div>
+        <PostPreview
+          platform={platform}
+          caption={caption}
+          hashtags={hashtags}
+          imageUrl={uploadedImagePreview || undefined}
+          videoUrl={uploadedVideoPreview || undefined}
+          mediaType={mediaType}
+          username={localStorage.getItem('username') || ''}
+        />
+      </div>
+      </div>
+
+      {editorSrc && (
+        <ImageEditor
+          src={editorSrc}
+          onApply={handleEditorApply}
+          onCancel={handleEditorCancel}
+        />
+      )}
+      {videoEditorSrc && (
+        <VideoEditor
+          src={videoEditorSrc}
+          onApply={handleVideoEditorApply}
+          onCancel={handleVideoEditorCancel}
+        />
+      )}
     </div>
   );
 }

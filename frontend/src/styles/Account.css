@@ -201,6 +201,75 @@
   flex-shrink: 0;
 }
 
+/* Edit button in card title */
+.account-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 5px 12px;
+  background: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid rgba(99,102,241,0.25);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.account-edit-btn:hover {
+  background: var(--primary-muted);
+  border-color: var(--primary);
+}
+
+.account-edit-btn svg {
+  width: 13px;
+  height: 13px;
+  color: var(--primary);
+}
+
+/* Read-only field display */
+.account-field-readonly {
+  padding: 10px 13px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--text-primary);
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+}
+
+.account-field-empty {
+  color: var(--text-tertiary);
+}
+
+/* Save/cancel row in edit mode */
+.account-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.account-btn-cancel {
+  padding: 10px 20px;
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.account-btn-cancel:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
 .account-form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -264,11 +333,11 @@
 }
 
 .account-btn-danger {
-  background: #EF4444;
+  background: var(--error);
 }
 
 .account-btn-danger:hover:not(:disabled) {
-  background: #DC2626;
+  background: var(--error-dark);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
@@ -279,6 +348,183 @@
   font-style: italic;
 }
 
+.ig-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg, #F8FAFC);
+}
+
+.ig-card--connected {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.ig-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+
+.ig-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.ig-icon--active {
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #F58529 0%, #DD2A7B 50%, #8134AF 100%);
+}
+
+.ig-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ig-info-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ig-info-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.ig-info-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-primary, #111827);
+}
+
+.ig-info-muted {
+  color: var(--text-secondary, #6B7280);
+  font-weight: 500;
+}
+
+.ig-info-meta {
+  font-size: 13px;
+  color: var(--text-secondary, #6B7280);
+}
+
+.ig-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--success-text);
+  background: var(--success-bg);
+  border-radius: 999px;
+}
+
+.ig-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.ig-actions { flex-shrink: 0; }
+
+.ig-btn {
+  width: auto;
+  padding: 10px 18px;
+  font-size: 14px;
+}
+
+.ig-btn--connect {
+  background: linear-gradient(135deg, #F58529 0%, #DD2A7B 50%, #8134AF 100%);
+  border: none;
+}
+
+.ig-btn--connect:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+/* ── Auto-approve toggle ── */
+.auto-approve-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.auto-approve-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auto-approve-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.auto-approve-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.auto-approve-toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--border);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.auto-approve-toggle.on {
+  background: var(--primary);
+}
+
+.auto-approve-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auto-approve-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  display: block;
+}
+
+.auto-approve-toggle.on .auto-approve-thumb {
+  transform: translateX(20px);
+}
+
 @media (max-width: 640px) {
   .account-container { padding: 24px 16px; }
   .account-hero-card { flex-direction: column; align-items: flex-start; }
@@ -287,4 +533,7 @@
   .account-hero-stats { margin-left: 0; }
   .account-stat { text-align: left; }
   .account-form-row { grid-template-columns: 1fr; }
+  .ig-card { flex-direction: column; align-items: flex-start; }
+  .ig-actions { width: 100%; }
+  .ig-btn { width: 100%; }
 }
